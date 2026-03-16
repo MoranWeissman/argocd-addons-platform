@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"compress/gzip"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -168,4 +169,101 @@ func (f *Fetcher) FetchValues(ctx context.Context, repoURL, chartName, version s
 	}
 
 	return "", fmt.Errorf("values.yaml not found in chart archive")
+}
+
+// FetchReleaseNotes tries to get release notes for a chart version.
+// It attempts GitHub Releases API first, then falls back to chart metadata.
+func (f *Fetcher) FetchReleaseNotes(ctx context.Context, repoURL, chartName, version string) (string, error) {
+	githubRepo := guessGitHubRepo(repoURL, chartName)
+	if githubRepo == "" {
+		return "Release notes not available (no GitHub repository found for this chart).", nil
+	}
+
+	// Fetch from GitHub Releases API
+	// Try tag patterns: {chartName}-{version}, v{version}, {version}
+	tagPatterns := []string{
+		chartName + "-" + version,
+		"v" + version,
+		version,
+	}
+
+	for _, tag := range tagPatterns {
+		notes, err := f.fetchGitHubRelease(ctx, githubRepo, tag)
+		if err == nil && notes != "" {
+			// Truncate to 3000 chars to keep LLM context manageable
+			if len(notes) > 3000 {
+				notes = notes[:3000] + "\n... (truncated)"
+			}
+			return notes, nil
+		}
+	}
+
+	return "Release notes not found for version " + version + " (tried GitHub releases for " + githubRepo + ").", nil
+}
+
+func (f *Fetcher) fetchGitHubRelease(ctx context.Context, repo, tag string) (string, error) {
+	url := fmt.Sprintf("https://api.github.com/repos/%s/releases/tags/%s", repo, tag)
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Accept", "application/vnd.github.v3+json")
+
+	resp, err := f.client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return "", fmt.Errorf("GitHub returned %d", resp.StatusCode)
+	}
+
+	var release struct {
+		TagName string `json:"tag_name"`
+		Name    string `json:"name"`
+		Body    string `json:"body"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
+		return "", fmt.Errorf("parsing GitHub release: %w", err)
+	}
+
+	if release.Body == "" {
+		return "", fmt.Errorf("empty release body")
+	}
+	return fmt.Sprintf("Release: %s (%s)\n\n%s", release.Name, release.TagName, release.Body), nil
+}
+
+// guessGitHubRepo maps common Helm repo URLs to GitHub repos.
+func guessGitHubRepo(repoURL, chartName string) string {
+	// Known mappings
+	mappings := map[string]string{
+		"https://helm.datadoghq.com":                          "DataDog/helm-charts",
+		"https://argoproj.github.io/argo-helm":                "argoproj/argo-helm",
+		"https://charts.jetstack.io":                          "cert-manager/cert-manager",
+		"https://kedacore.github.io/charts":                   "kedacore/charts",
+		"https://charts.external-secrets.io":                  "external-secrets/external-secrets",
+		"https://kyverno.github.io/kyverno":                   "kyverno/kyverno",
+		"https://istio-release.storage.googleapis.com/charts": "istio/istio",
+		"https://kubernetes-sigs.github.io/external-dns":      "kubernetes-sigs/external-dns",
+		"https://pileus-cloud.github.io/charts":               "pileus-cloud/charts",
+	}
+
+	for prefix, repo := range mappings {
+		if strings.HasPrefix(repoURL, prefix) {
+			return repo
+		}
+	}
+
+	// Try to extract from GitHub Pages pattern: https://org.github.io/repo
+	if strings.Contains(repoURL, ".github.io/") {
+		parts := strings.SplitN(strings.TrimPrefix(repoURL, "https://"), "/", 3)
+		if len(parts) >= 2 {
+			org := strings.TrimSuffix(parts[0], ".github.io")
+			repo := strings.TrimRight(parts[1], "/")
+			return org + "/" + repo
+		}
+	}
+
+	return ""
 }

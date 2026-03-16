@@ -32,13 +32,17 @@ type Config struct {
 }
 
 // GetAgentModel returns the model to use for agent conversations.
-// For cloud providers, falls back to CloudModel. For Ollama, falls back to OllamaModel.
+// Cloud providers always use CloudModel. Ollama uses AgentModel or falls back to OllamaModel.
 func (c Config) GetAgentModel() string {
+	if c.Provider == ProviderClaude || c.Provider == ProviderOpenAI || c.Provider == ProviderGemini {
+		if c.CloudModel != "" {
+			return c.CloudModel
+		}
+		return "gemini-2.5-flash" // sensible default
+	}
+	// Ollama: prefer AgentModel, fall back to OllamaModel
 	if c.AgentModel != "" {
 		return c.AgentModel
-	}
-	if c.Provider == ProviderClaude || c.Provider == ProviderOpenAI || c.Provider == ProviderGemini {
-		return c.CloudModel
 	}
 	return c.OllamaModel
 }
@@ -287,7 +291,7 @@ func (c *Client) geminiSummarize(ctx context.Context, prompt string) (string, er
 
 // BuildUpgradePrompt creates a concise prompt for analyzing an upgrade.
 // Keeps prompt small for faster LLM response.
-func BuildUpgradePrompt(addonName, currentVersion, targetVersion string, added, removed, changed int, changedDetails string, conflicts string) string {
+func BuildUpgradePrompt(addonName, currentVersion, targetVersion string, added, removed, changed int, changedDetails string, conflicts string, releaseNotes string) string {
 	// Limit changed details to top 15 entries to keep prompt short
 	lines := strings.Split(changedDetails, "\n")
 	if len(lines) > 15 {
@@ -305,6 +309,15 @@ Key changes:
 
 	if conflicts != "" {
 		prompt += "\n\nConflicts with our config:\n" + conflicts
+	}
+
+	if releaseNotes != "" {
+		// Truncate release notes for the prompt to keep it manageable
+		rn := releaseNotes
+		if len(rn) > 1500 {
+			rn = rn[:1500] + "\n... (truncated)"
+		}
+		prompt += "\n\nRelease notes for target version:\n" + rn
 	}
 
 	prompt += `

@@ -293,4 +293,5 @@ export interface UpgradeCheckResponse {
   removed: ValueDiffEntry[]
   changed: ValueDiffEntry[]
   conflicts: ConflictCheckEntry[]
+  release_notes?: string
 }

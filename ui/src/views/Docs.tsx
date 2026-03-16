@@ -57,6 +57,17 @@ function OverviewContent() {
       </ul>
 
       <h2 className="mb-3 mt-8 text-2xl font-semibold text-gray-900 dark:text-white">
+        AI-Powered Operations
+      </h2>
+      <p className="mb-4 text-gray-700 dark:text-gray-300">
+        The platform includes an AI assistant that can answer natural-language
+        questions about your clusters, addons, and configurations. It has
+        access to 17 specialized tools for querying cluster data, analyzing
+        upgrade impacts, and providing actionable recommendations -- all
+        without leaving the UI.
+      </p>
+
+      <h2 className="mb-3 mt-8 text-2xl font-semibold text-gray-900 dark:text-white">
         Who It's For
       </h2>
       <p className="mb-4 text-gray-700 dark:text-gray-300">
@@ -125,6 +136,47 @@ function FeaturesContent() {
         Available on each cluster detail page under the "Config Overrides" tab.
         Shows a side-by-side comparison of global default values versus
         cluster-specific overrides for each addon.
+      </p>
+
+      <h2 className="mb-3 mt-8 text-2xl font-semibold text-gray-900 dark:text-white">
+        Upgrade Impact Checker
+      </h2>
+      <p className="mb-4 text-gray-700 dark:text-gray-300">
+        Analyze the impact of addon upgrades before applying them. The checker
+        compares values.yaml between chart versions, detects conflicts with
+        your configured overrides, fetches release notes from GitHub, and
+        provides AI-powered analysis summarizing breaking changes and
+        recommended actions.
+      </p>
+
+      <h2 className="mb-3 mt-8 text-2xl font-semibold text-gray-900 dark:text-white">
+        AI Assistant
+      </h2>
+      <p className="mb-4 text-gray-700 dark:text-gray-300">
+        A conversational agent accessible from any page via the chat panel.
+        It has 17 specialized tools for querying cluster status, addon health,
+        version information, configuration data, and more. Ask questions in
+        natural language and get structured, actionable answers.
+      </p>
+
+      <h2 className="mb-3 mt-8 text-2xl font-semibold text-gray-900 dark:text-white">
+        External Dashboards
+      </h2>
+      <p className="mb-4 text-gray-700 dark:text-gray-300">
+        Embed external monitoring dashboards (Datadog, Grafana, or custom URLs)
+        directly into the platform. Configure dashboard links per addon or
+        cluster to get one-click access to relevant observability data without
+        switching tools.
+      </p>
+
+      <h2 className="mb-3 mt-8 text-2xl font-semibold text-gray-900 dark:text-white">
+        Observability
+      </h2>
+      <p className="mb-4 text-gray-700 dark:text-gray-300">
+        Track ArgoCD sync operations over time with the sync timeline view.
+        Addon health cards provide at-a-glance status for each deployment.
+        The control plane information panel shows ArgoCD server version,
+        cluster connectivity, and API health metrics.
       </p>
     </div>
   )

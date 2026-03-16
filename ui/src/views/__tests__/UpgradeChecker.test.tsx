@@ -58,6 +58,7 @@ vi.mock('@/services/api', () => ({
       conflicts: [],
     }),
     getAIStatus: vi.fn().mockResolvedValue({ enabled: false }),
+    getAIConfig: vi.fn().mockResolvedValue({ current_provider: 'none', available_providers: [] }),
     getAISummary: vi.fn().mockResolvedValue({ summary: 'Test AI summary' }),
   },
 }));

@@ -23,6 +23,7 @@ type UpgradeCheckResponse struct {
 	Removed        []ValueDiffEntry     `json:"removed"`
 	Changed        []ValueDiffEntry     `json:"changed"`
 	Conflicts      []ConflictCheckEntry `json:"conflicts"`
+	ReleaseNotes   string               `json:"release_notes,omitempty"`
 }
 
 // ValueDiffEntry represents a single value difference between chart versions.

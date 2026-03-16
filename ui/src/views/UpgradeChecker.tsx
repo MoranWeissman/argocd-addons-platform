@@ -10,6 +10,7 @@ import {
   Search,
   Sparkles,
   Info,
+  FileText,
 } from 'lucide-react';
 import { api } from '@/services/api';
 import type {
@@ -134,6 +135,99 @@ function ChangedFields({ items }: { items: ValueDiffEntry[] }) {
   );
 }
 
+function ReleaseNotesSection({ notes }: { notes: string }) {
+  const [expanded, setExpanded] = useState(notes.length <= 500);
+
+  // Basic markdown-like formatting
+  const formatLine = (line: string, i: number) => {
+    const trimmed = line.trim();
+    if (trimmed === '') return <br key={i} />;
+
+    // Headers
+    if (trimmed.startsWith('### '))
+      return <h5 key={i} className="mt-3 text-sm font-semibold text-gray-900 dark:text-white">{trimmed.slice(4)}</h5>;
+    if (trimmed.startsWith('## '))
+      return <h4 key={i} className="mt-4 text-base font-semibold text-gray-900 dark:text-white">{trimmed.slice(3)}</h4>;
+    if (trimmed.startsWith('# '))
+      return <h3 key={i} className="mt-4 text-lg font-bold text-gray-900 dark:text-white">{trimmed.slice(2)}</h3>;
+
+    // Bullet points
+    if (trimmed.startsWith('- ') || trimmed.startsWith('* '))
+      return <li key={i} className="ml-4 text-sm text-gray-700 dark:text-gray-300">{formatInlineMarkdown(trimmed.slice(2))}</li>;
+
+    return <p key={i} className="text-sm text-gray-700 dark:text-gray-300">{formatInlineMarkdown(trimmed)}</p>;
+  };
+
+  const formatInlineMarkdown = (text: string) => {
+    // Convert **bold** and links [text](url)
+    const parts: (string | React.ReactElement)[] = [];
+    let remaining = text;
+    let keyIdx = 0;
+
+    while (remaining.length > 0) {
+      // Bold
+      const boldMatch = remaining.match(/\*\*(.+?)\*\*/);
+      // Link
+      const linkMatch = remaining.match(/\[([^\]]+)\]\(([^)]+)\)/);
+
+      const boldIdx = boldMatch?.index ?? Infinity;
+      const linkIdx = linkMatch?.index ?? Infinity;
+
+      if (boldIdx === Infinity && linkIdx === Infinity) {
+        parts.push(remaining);
+        break;
+      }
+
+      if (boldIdx < linkIdx && boldMatch) {
+        parts.push(remaining.slice(0, boldIdx));
+        parts.push(<strong key={keyIdx++}>{boldMatch[1]}</strong>);
+        remaining = remaining.slice(boldIdx + boldMatch[0].length);
+      } else if (linkMatch) {
+        parts.push(remaining.slice(0, linkIdx));
+        parts.push(
+          <a key={keyIdx++} href={linkMatch[2]} target="_blank" rel="noopener noreferrer" className="text-cyan-600 underline hover:text-cyan-700 dark:text-cyan-400">
+            {linkMatch[1]}
+          </a>
+        );
+        remaining = remaining.slice(linkIdx + linkMatch[0].length);
+      }
+    }
+
+    return <>{parts}</>;
+  };
+
+  const lines = notes.split('\n');
+  const displayLines = expanded ? lines : lines.slice(0, 8);
+
+  return (
+    <div className="rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
+      <div
+        className="flex cursor-pointer items-center justify-between border-b border-gray-100 px-6 py-3 dark:border-gray-800"
+        onClick={() => setExpanded((e) => !e)}
+      >
+        <div className="flex items-center gap-2">
+          <FileText className="h-4 w-4 text-blue-500" />
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Release Notes</h3>
+        </div>
+        <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${expanded ? 'rotate-180' : ''}`} />
+      </div>
+      <div className="px-6 py-4">
+        <div className="space-y-0.5">
+          {displayLines.map((line, i) => formatLine(line, i))}
+        </div>
+        {!expanded && lines.length > 8 && (
+          <button
+            onClick={(e) => { e.stopPropagation(); setExpanded(true); }}
+            className="mt-2 text-xs font-medium text-cyan-600 hover:text-cyan-700 dark:text-cyan-400"
+          >
+            Show all ({lines.length} lines)
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function ConflictsSection({ conflicts }: { conflicts: ConflictCheckEntry[] }) {
   if (conflicts.length === 0) return null;
   return (
@@ -226,14 +320,18 @@ export function UpgradeChecker() {
 
   // AI state
   const [aiEnabled, setAiEnabled] = useState(false);
+  const [aiProvider, setAiProvider] = useState('');
   const [aiSummary, setAiSummary] = useState<string | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
 
   // Check AI status on mount
   useEffect(() => {
-    api.getAIStatus()
-      .then((data) => setAiEnabled(data.enabled))
+    api.getAIConfig()
+      .then((data) => {
+        setAiEnabled(data.current_provider !== '' && data.current_provider !== 'none');
+        setAiProvider(data.current_provider);
+      })
       .catch(() => setAiEnabled(false));
   }, []);
 
@@ -535,7 +633,7 @@ export function UpgradeChecker() {
                 {aiLoading && (
                   <div className="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
                     <RefreshCw className="h-4 w-4 animate-spin" />
-                    Analyzing with Llama 3.2... (this may take 10-20 seconds)
+                    Analyzing with AI ({aiProvider || 'loading'})...
                   </div>
                 )}
                 {aiError && (
@@ -556,7 +654,7 @@ export function UpgradeChecker() {
                         return <p key={i}>{line}</p>;
                       })}
                     </div>
-                    <p className="mt-3 text-[10px] text-gray-400 dark:text-gray-600">Powered by Ollama (local LLM)</p>
+                    <p className="mt-3 text-[10px] text-gray-400 dark:text-gray-600">Powered by {aiProvider === 'ollama' ? 'Ollama (local)' : aiProvider === 'gemini' ? 'Google Gemini' : aiProvider === 'claude' ? 'Claude (Anthropic)' : aiProvider === 'openai' ? 'OpenAI' : 'AI'}</p>
                   </div>
                 )}
                 {!aiSummary && !aiLoading && !aiError && (
@@ -619,6 +717,11 @@ export function UpgradeChecker() {
                 {activeTab === 'changed' && <ChangedFields items={result.changed} />}
               </div>
             </div>
+          )}
+
+          {/* Release Notes */}
+          {result.release_notes && result.release_notes.trim() !== '' && (
+            <ReleaseNotesSection notes={result.release_notes} />
           )}
 
           {/* Conflicts */}

@@ -85,6 +85,7 @@ func NewRouter(srv *Server, staticFS fs.FS) http.Handler {
 	// AI Configuration
 	mux.HandleFunc("GET /api/v1/ai/config", srv.handleGetAIConfig)
 	mux.HandleFunc("POST /api/v1/ai/provider", srv.handleSetAIProvider)
+	mux.HandleFunc("POST /api/v1/ai/test", srv.handleTestAI)
 
 	// Observability
 	mux.HandleFunc("GET /api/v1/observability/overview", srv.handleGetObservabilityOverview)

@@ -102,6 +102,7 @@ export const api = {
   getAISummary: (addonName: string, targetVersion: string) => postJSON<{ summary: string }>('/upgrade/ai-summary', { addon_name: addonName, target_version: targetVersion }),
   getAIConfig: () => fetchJSON<AIConfigResponse>('/ai/config'),
   setAIProvider: (provider: string) => postJSON<{ status: string; provider: string }>('/ai/provider', { provider }),
+  testAI: () => postJSON<{ status: string; response: string }>('/ai/test', {}),
 
   // Agent Chat
   agentChat: (sessionId: string, message: string) => postJSON<{ session_id: string; response: string }>('/agent/chat', { session_id: sessionId, message }),

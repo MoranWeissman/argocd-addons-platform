@@ -176,6 +176,14 @@ func GetToolDefinitions() []ToolDefinition {
 				Parameters:  json.RawMessage(`{"type":"object","properties":{"query":{"type":"string","description":"Search term to match against addon names"}},"required":["query"]}`),
 			},
 		},
+		{
+			Type: "function",
+			Function: ToolFunction{
+				Name:        "get_release_notes",
+				Description: "Fetch release notes for a specific version of a Helm chart addon from GitHub",
+				Parameters:  json.RawMessage(`{"type":"object","properties":{"addon_name":{"type":"string","description":"Name of the addon"},"version":{"type":"string","description":"Version to get release notes for"}},"required":["addon_name","version"]}`),
+			},
+		},
 	}
 }
 
@@ -228,6 +236,8 @@ func (e *ToolExecutor) ExecuteTool(ctx context.Context, name string, args json.R
 		return e.getAddonConfigOnCluster(ctx, params["addon_name"], params["cluster_name"])
 	case "search_addons":
 		return e.searchAddons(ctx, params["query"])
+	case "get_release_notes":
+		return e.getReleaseNotes(ctx, params["addon_name"], params["version"])
 	default:
 		return "", fmt.Errorf("unknown tool: %s", name)
 	}
@@ -803,4 +813,40 @@ func (e *ToolExecutor) searchAddons(ctx context.Context, query string) (string, 
 		return fmt.Sprintf("No addons matching '%s' found.", query), nil
 	}
 	return fmt.Sprintf("Found %d addons matching '%s':\n%s", count, query, sb.String()), nil
+}
+
+func (e *ToolExecutor) getReleaseNotes(ctx context.Context, addonName, version string) (string, error) {
+	if addonName == "" {
+		return "Please specify an addon name.", nil
+	}
+	if version == "" {
+		return "Please specify a version.", nil
+	}
+
+	catalogData, err := e.gp.GetFileContent(ctx, "configuration/addons-catalog.yaml", "main")
+	if err != nil {
+		return "", err
+	}
+	addons, err := e.parser.ParseAddonsCatalog(catalogData)
+	if err != nil {
+		return "", err
+	}
+
+	var repoURL, chart string
+	for _, a := range addons {
+		if a.AppName == addonName {
+			repoURL = a.RepoURL
+			chart = a.Chart
+			break
+		}
+	}
+	if repoURL == "" {
+		return "Addon not found in catalog.", nil
+	}
+
+	notes, err := e.fetcher.FetchReleaseNotes(ctx, repoURL, chart, version)
+	if err != nil {
+		return fmt.Sprintf("Could not fetch release notes: %v", err), nil
+	}
+	return notes, nil
 }

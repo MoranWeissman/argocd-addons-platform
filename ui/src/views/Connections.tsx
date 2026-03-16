@@ -726,8 +726,8 @@ function AIConfigSection() {
     setTesting(true)
     setTestResult(null)
     try {
-      const res = await api.getAISummary('test', '0.0.0')
-      setTestResult(res.summary ? 'AI is responding correctly' : 'AI returned empty response')
+      const res = await api.testAI()
+      setTestResult(res.status === 'ok' ? 'AI is responding correctly' : 'AI returned unexpected response')
     } catch (err) {
       setTestResult(err instanceof Error ? err.message : 'Connection failed')
     } finally {
@@ -824,8 +824,8 @@ function AIConfigSection() {
                     isActive
                       ? 'border-purple-500 bg-purple-50 ring-2 ring-purple-200 dark:border-purple-400 dark:bg-purple-950/20 dark:ring-purple-900/50'
                       : provider.configured
-                        ? 'border-gray-200 bg-white hover:border-gray-300 dark:border-gray-600 dark:bg-gray-750 dark:hover:border-gray-500'
-                        : 'border-gray-200 bg-gray-50 opacity-75 dark:border-gray-700 dark:bg-gray-800/50'
+                        ? 'border-gray-200 bg-white hover:border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:hover:border-gray-500'
+                        : 'border-gray-300 bg-gray-50 opacity-60 dark:border-gray-700 dark:bg-gray-900'
                   }`}
                 >
                   <div className="flex items-center justify-between">

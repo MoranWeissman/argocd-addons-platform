@@ -56,7 +56,7 @@ func (s *UpgradeService) GetAISummary(ctx context.Context, result *models.Upgrad
 	prompt := ai.BuildUpgradePrompt(
 		result.AddonName, result.CurrentVersion, result.TargetVersion,
 		len(result.Added), len(result.Removed), len(result.Changed),
-		changedDetails.String(), conflictsStr.String(),
+		changedDetails.String(), conflictsStr.String(), result.ReleaseNotes,
 	)
 
 	return s.ai.Summarize(ctx, prompt)
@@ -255,6 +255,9 @@ func (s *UpgradeService) CheckUpgrade(ctx context.Context, addonName, targetVers
 
 	totalChanges := len(addedEntries) + len(removedEntries) + len(changedEntries)
 
+	// Fetch release notes for the target version
+	releaseNotes, _ := s.fetcher.FetchReleaseNotes(ctx, addon.RepoURL, addon.Chart, targetVersion)
+
 	return &models.UpgradeCheckResponse{
 		AddonName:      addonName,
 		Chart:          addon.Chart,
@@ -265,5 +268,6 @@ func (s *UpgradeService) CheckUpgrade(ctx context.Context, addonName, targetVers
 		Removed:        removedEntries,
 		Changed:        changedEntries,
 		Conflicts:      allConflicts,
+		ReleaseNotes:   releaseNotes,
 	}, nil
 }

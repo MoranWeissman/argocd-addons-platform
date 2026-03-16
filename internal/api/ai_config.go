@@ -98,3 +98,18 @@ func (s *Server) handleSetAIProvider(w http.ResponseWriter, r *http.Request) {
 	s.aiClient.SetProvider(ai.Provider(req.Provider))
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok", "provider": req.Provider})
 }
+
+func (s *Server) handleTestAI(w http.ResponseWriter, r *http.Request) {
+	if !s.aiClient.IsEnabled() {
+		writeError(w, http.StatusServiceUnavailable, "AI not configured")
+		return
+	}
+
+	result, err := s.aiClient.Summarize(r.Context(), "Say 'AI connection successful' in one short sentence.")
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok", "response": result})
+}
