@@ -117,7 +117,12 @@ func (p *Parser) GetEnabledAddons(cluster models.Cluster, catalog []models.Addon
 			continue
 		}
 
-		enabled := strings.EqualFold(labelValue, "enabled")
+		// Only include addons where the label value is "enabled".
+		// The ArgoCD cluster generator only listens to key: enabled;
+		// disabled, commented out, or missing labels are all equivalent.
+		if !strings.EqualFold(labelValue, "enabled") {
+			continue
+		}
 
 		// Check for version override: <addon-name>-version label
 		versionKey := addonName + "-version"
@@ -133,7 +138,7 @@ func (p *Parser) GetEnabledAddons(cluster models.Cluster, catalog []models.Addon
 			Chart:              catalogEntry.Chart,
 			RepoURL:            catalogEntry.RepoURL,
 			CurrentVersion:     currentVersion,
-			Enabled:            enabled,
+			Enabled:            true,
 			Namespace:          catalogEntry.Namespace,
 			EnvironmentVersion: catalogEntry.Version,
 			CustomVersion:      customVersion,
