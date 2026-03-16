@@ -71,6 +71,37 @@ vi.mock('@/services/api', () => ({
           ],
         },
       ],
+      addon_groups: [
+        {
+          addon_name: 'istio',
+          total_apps: 10,
+          health_counts: { Healthy: 8, Degraded: 2 },
+          child_apps: [
+            {
+              app_name: 'istio-prod-cluster1',
+              cluster_name: 'prod-cluster1',
+              health: 'Healthy',
+              sync_status: 'Synced',
+              reconciled_at: new Date(Date.now() - 600000).toISOString(),
+              resource_summary: {
+                total_pods: 5,
+                running_pods: 5,
+                total_containers: 3,
+                has_missing_limits: false,
+              },
+            },
+          ],
+        },
+      ],
+      resource_alerts: [
+        {
+          app_name: '',
+          cluster_name: '',
+          addon_name: 'prometheus',
+          alert_type: 'missing_limits',
+          details: 'No resource requests/limits configured in global values',
+        },
+      ],
     }),
   },
 }));
@@ -117,14 +148,25 @@ describe('Observability', () => {
     expect(screen.getAllByText('prometheus').length).toBeGreaterThan(0);
   });
 
-  it('renders addon health section', async () => {
+  it('renders addon health groups section', async () => {
     renderObservability();
 
     await waitFor(() => {
       expect(screen.getByText('Addon Health')).toBeInTheDocument();
     });
 
-    expect(screen.getByText('8/10 healthy')).toBeInTheDocument();
+    // The addon group card for 'istio' should be shown with app count
+    expect(screen.getByText('10 apps')).toBeInTheDocument();
+  });
+
+  it('renders resource alerts section', async () => {
+    renderObservability();
+
+    await waitFor(() => {
+      expect(screen.getByText('Resource Configuration Alerts')).toBeInTheDocument();
+    });
+
+    expect(screen.getByText('No resource requests/limits configured in global values')).toBeInTheDocument();
   });
 
   it('renders error state when API fails', async () => {

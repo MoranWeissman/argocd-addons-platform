@@ -107,7 +107,7 @@ func (c *Client) ollamaSummarize(ctx context.Context, prompt string) (string, er
 		"stream": false,
 		"options": map[string]interface{}{
 			"temperature": 0.3,
-			"num_predict": 400,
+			"num_predict": 1500,
 		},
 	})
 
@@ -141,7 +141,7 @@ func (c *Client) ollamaSummarize(ctx context.Context, prompt string) (string, er
 func (c *Client) claudeSummarize(ctx context.Context, prompt string) (string, error) {
 	body, err := json.Marshal(map[string]interface{}{
 		"model":      c.config.CloudModel,
-		"max_tokens": 1024,
+		"max_tokens": 4096,
 		"messages": []map[string]string{
 			{"role": "user", "content": prompt},
 		},
@@ -188,7 +188,7 @@ func (c *Client) claudeSummarize(ctx context.Context, prompt string) (string, er
 func (c *Client) openaiSummarize(ctx context.Context, prompt string) (string, error) {
 	body, err := json.Marshal(map[string]interface{}{
 		"model":      c.config.CloudModel,
-		"max_tokens": 1024,
+		"max_tokens": 4096,
 		"messages": []map[string]interface{}{
 			{"role": "user", "content": prompt},
 		},
@@ -246,7 +246,7 @@ func (c *Client) geminiSummarize(ctx context.Context, prompt string) (string, er
 		},
 		"generationConfig": map[string]interface{}{
 			"temperature":    0.3,
-			"maxOutputTokens": 1024,
+			"maxOutputTokens": 4096,
 		},
 	})
 	if err != nil {
@@ -322,10 +322,25 @@ Key changes:
 
 	prompt += `
 
-Respond in this exact format (keep each section to 1-2 lines):
-**Summary:** [what changed]
-**Risk:** [low/medium/high] - [one line why]
-**Action items:** [bullet list, max 3 items]`
+Provide a detailed analysis with these sections. Use markdown formatting with headers, bullet points, and bold text:
+
+## Summary
+Explain what changed in this upgrade in 3-5 sentences. Mention specific components affected (agents, operators, CRDs, etc.) and the nature of the changes (version bumps, feature flags, behavioral changes).
+
+## What's New
+List the most important new features or changes as bullet points. Be specific about what each change means in practice.
+
+## Risk Assessment
+State the risk level (Low / Medium / High) and explain why in 2-3 sentences. Consider: are there breaking changes? Do default behaviors change? Are any features removed?
+
+## Action Items
+List specific steps to take before upgrading as a numbered list. Include:
+- Which configuration values to review
+- Any deprecated features to migrate away from
+- Testing recommendations
+
+## Impact on Your Configuration
+Based on the conflicts detected (if any), explain which of your custom values may be affected and what to do about them.`
 
 	return prompt
 }

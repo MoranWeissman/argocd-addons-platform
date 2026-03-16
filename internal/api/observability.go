@@ -11,7 +11,13 @@ func (s *Server) handleGetObservabilityOverview(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	resp, err := s.observabilitySvc.GetOverview(r.Context(), ac)
+	gp, err := s.connSvc.GetActiveGitProvider()
+	if err != nil {
+		// Git provider is optional for observability — resource alerts will be skipped
+		gp = nil
+	}
+
+	resp, err := s.observabilitySvc.GetOverview(r.Context(), ac, gp)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return

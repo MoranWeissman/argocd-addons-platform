@@ -17,11 +17,13 @@ import {
   RefreshCw,
   ChevronDown,
   ChevronUp,
+  ShieldAlert,
 } from 'lucide-react';
 import { api } from '@/services/api';
 import type {
   ObservabilityOverviewResponse,
-  AddonHealthDetail,
+  AddonGroupHealth,
+  ResourceAlert,
   SyncActivityEntry,
 } from '@/services/models';
 import { LoadingState } from '@/components/LoadingState';
@@ -45,21 +47,33 @@ function timeAgo(dateStr: string): string {
   return `${days}d ago`;
 }
 
-function healthColor(health: string): string {
+function healthBadgeCls(health: string): string {
   const h = health.toLowerCase();
-  if (h === 'healthy') return 'text-green-500';
-  if (h === 'degraded') return 'text-red-500';
-  if (h === 'progressing') return 'text-blue-500';
-  return 'text-gray-400';
+  if (h === 'healthy')
+    return 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300';
+  if (h === 'degraded')
+    return 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300';
+  if (h === 'progressing')
+    return 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300';
+  return 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400';
 }
 
-function healthBg(health: string): string {
-  const h = health.toLowerCase();
-  if (h === 'healthy') return 'bg-green-500';
-  if (h === 'degraded') return 'bg-red-500';
-  if (h === 'progressing') return 'bg-blue-500';
-  return 'bg-gray-400';
+function syncBadgeCls(sync: string): string {
+  const s = (sync ?? '').toLowerCase();
+  if (s === 'synced')
+    return 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300';
+  if (s === 'outofsync' || s === 'out_of_sync')
+    return 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300';
+  return 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400';
 }
+
+const HEALTH_COLORS: Record<string, string> = {
+  Healthy: '#22c55e',
+  Degraded: '#ef4444',
+  Progressing: '#3b82f6',
+  Missing: '#f59e0b',
+  Unknown: '#9ca3af',
+};
 
 function statusIcon(status: string) {
   const s = status.toLowerCase();
@@ -69,8 +83,6 @@ function statusIcon(status: string) {
     return <AlertTriangle className="h-4 w-4 text-red-500" />;
   return <RefreshCw className="h-4 w-4 text-blue-400" />;
 }
-
-type SortMode = 'issues' | 'alpha' | 'deployed';
 
 // ---------------------------------------------------------------------------
 // Section 1: Control Plane Health
@@ -89,14 +101,6 @@ function ControlPlaneSection({
       })),
     [data.health_summary],
   );
-
-  const COLORS: Record<string, string> = {
-    Healthy: '#22c55e',
-    Degraded: '#ef4444',
-    Progressing: '#3b82f6',
-    Missing: '#f59e0b',
-    Unknown: '#9ca3af',
-  };
 
   const total = healthData.reduce((sum, d) => sum + d.value, 0);
 
@@ -138,7 +142,7 @@ function ControlPlaneSection({
               key={d.name}
               style={{
                 width: total > 0 ? `${(d.value / total) * 100}%` : '0%',
-                backgroundColor: COLORS[d.name] ?? '#9ca3af',
+                backgroundColor: HEALTH_COLORS[d.name] ?? '#9ca3af',
               }}
               title={`${d.name}: ${d.value}`}
             />
@@ -152,7 +156,7 @@ function ControlPlaneSection({
             >
               <span
                 className="inline-block h-2.5 w-2.5 rounded-full"
-                style={{ backgroundColor: COLORS[d.name] ?? '#9ca3af' }}
+                style={{ backgroundColor: HEALTH_COLORS[d.name] ?? '#9ca3af' }}
               />
               {d.name}: {d.value}
             </span>
@@ -188,7 +192,251 @@ function StatBlock({
 }
 
 // ---------------------------------------------------------------------------
-// Section 2: Sync Activity Timeline
+// Section 2: Resource Alerts
+// ---------------------------------------------------------------------------
+
+function ResourceAlertsSection({ alerts }: { alerts: ResourceAlert[] }) {
+  if (!alerts || alerts.length === 0) return null;
+
+  return (
+    <section className="rounded-xl border border-amber-300 bg-amber-50 p-6 shadow-sm dark:border-amber-700 dark:bg-amber-950/30">
+      <div className="mb-4 flex items-center gap-2">
+        <ShieldAlert className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+        <h2 className="text-lg font-semibold text-amber-800 dark:text-amber-200">
+          Resource Configuration Alerts
+        </h2>
+        <span className="rounded-full bg-amber-200 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-800 dark:text-amber-200">
+          {alerts.length}
+        </span>
+      </div>
+      <p className="mb-4 text-sm text-amber-700 dark:text-amber-300">
+        The following addons are missing resource requests or limits in their
+        global values. This can lead to unpredictable resource usage and
+        scheduling issues.
+      </p>
+      <div className="space-y-2">
+        {alerts.map((alert) => (
+          <div
+            key={`${alert.addon_name}-${alert.alert_type}`}
+            className="flex items-center justify-between rounded-lg bg-white px-4 py-3 dark:bg-gray-900"
+          >
+            <div className="flex items-center gap-3">
+              <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500" />
+              <div>
+                <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                  {alert.addon_name}
+                </span>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  {alert.details}
+                </p>
+              </div>
+            </div>
+            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+              {alert.alert_type.replace(/_/g, ' ')}
+            </span>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Section 3: Addon Health Groups
+// ---------------------------------------------------------------------------
+
+function AddonGroupsSection({ groups }: { groups: AddonGroupHealth[] }) {
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [sortMode, setSortMode] = useState<'issues' | 'alpha'>('issues');
+
+  const sorted = useMemo(() => {
+    const copy = [...(groups ?? [])];
+    if (sortMode === 'alpha') {
+      copy.sort((a, b) => a.addon_name.localeCompare(b.addon_name));
+    }
+    // Default 'issues' sort is already applied by backend
+    return copy;
+  }, [groups, sortMode]);
+
+  const toggle = (name: string) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+  };
+
+  if (!sorted || sorted.length === 0) {
+    return null;
+  }
+
+  return (
+    <section>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <h2 className="flex items-center gap-2 text-lg font-semibold text-gray-900 dark:text-gray-100">
+          <Server className="h-5 w-5 text-cyan-500" />
+          Addon Health
+        </h2>
+        <div className="flex gap-1">
+          {(['issues', 'alpha'] as const).map((m) => (
+            <button
+              key={m}
+              onClick={() => setSortMode(m)}
+              className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                sortMode === m
+                  ? 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/40 dark:text-cyan-300'
+                  : 'text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800'
+              }`}
+            >
+              {m === 'issues' ? 'Most Issues' : 'A-Z'}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        {sorted.map((group) => {
+          const isExpanded = expanded.has(group.addon_name);
+          const healthEntries = Object.entries(group.health_counts);
+          const total = group.total_apps;
+
+          return (
+            <div
+              key={group.addon_name}
+              className="rounded-xl border border-gray-200 bg-white shadow-sm transition-shadow hover:shadow-md dark:border-gray-700 dark:bg-gray-900"
+            >
+              {/* Collapsible header */}
+              <button
+                onClick={() => toggle(group.addon_name)}
+                className="flex w-full items-center gap-4 p-4 text-left"
+                aria-expanded={isExpanded}
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                      {group.addon_name}
+                    </span>
+                    <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500 dark:bg-gray-800 dark:text-gray-400">
+                      {total} app{total !== 1 ? 's' : ''}
+                    </span>
+                  </div>
+                  {/* Health summary bar */}
+                  <div className="mt-2 flex h-2 overflow-hidden rounded-full">
+                    {healthEntries.map(([status, count]) => (
+                      <div
+                        key={status}
+                        style={{
+                          width:
+                            total > 0 ? `${(count / total) * 100}%` : '0%',
+                          backgroundColor:
+                            HEALTH_COLORS[status] ?? '#9ca3af',
+                        }}
+                        title={`${status}: ${count}`}
+                      />
+                    ))}
+                  </div>
+                  <div className="mt-1.5 flex flex-wrap gap-3">
+                    {healthEntries.map(([status, count]) => (
+                      <span
+                        key={status}
+                        className="flex items-center gap-1 text-[11px] text-gray-500 dark:text-gray-400"
+                      >
+                        <span
+                          className="inline-block h-2 w-2 rounded-full"
+                          style={{
+                            backgroundColor:
+                              HEALTH_COLORS[status] ?? '#9ca3af',
+                          }}
+                        />
+                        {status}: {count}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                {isExpanded ? (
+                  <ChevronUp className="h-4 w-4 shrink-0 text-gray-400" />
+                ) : (
+                  <ChevronDown className="h-4 w-4 shrink-0 text-gray-400" />
+                )}
+              </button>
+
+              {/* Expanded child apps table */}
+              {isExpanded && group.child_apps && group.child_apps.length > 0 && (
+                <div className="border-t border-gray-100 px-4 pb-4 dark:border-gray-700">
+                  <table className="mt-3 w-full text-xs">
+                    <thead>
+                      <tr className="text-left text-gray-500 dark:text-gray-400">
+                        <th className="pb-2 font-medium">Cluster</th>
+                        <th className="pb-2 font-medium">Health</th>
+                        <th className="pb-2 font-medium">Sync</th>
+                        <th className="pb-2 font-medium">Resources</th>
+                        <th className="pb-2 font-medium">Last Reconciled</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
+                      {group.child_apps.map((child) => (
+                        <tr
+                          key={child.app_name}
+                          className="hover:bg-gray-50 dark:hover:bg-gray-800"
+                        >
+                          <td className="py-2 pr-3 font-medium text-gray-800 dark:text-gray-200">
+                            {child.cluster_name}
+                          </td>
+                          <td className="py-2 pr-3">
+                            <span
+                              className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${healthBadgeCls(child.health)}`}
+                            >
+                              {child.health || 'Unknown'}
+                            </span>
+                          </td>
+                          <td className="py-2 pr-3">
+                            <span
+                              className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${syncBadgeCls(child.sync_status)}`}
+                            >
+                              {child.sync_status || 'Unknown'}
+                            </span>
+                          </td>
+                          <td className="py-2 pr-3 text-gray-500 dark:text-gray-400">
+                            {child.resource_summary.total_pods > 0 && (
+                              <span>
+                                {child.resource_summary.running_pods}/
+                                {child.resource_summary.total_pods} pods
+                              </span>
+                            )}
+                            {child.resource_summary.total_pods === 0 &&
+                              child.resource_summary.total_containers > 0 && (
+                                <span>
+                                  {child.resource_summary.total_containers}{' '}
+                                  workloads
+                                </span>
+                              )}
+                            {child.resource_summary.total_pods === 0 &&
+                              child.resource_summary.total_containers === 0 && (
+                                <span className="text-gray-400">--</span>
+                              )}
+                          </td>
+                          <td className="py-2 text-gray-400">
+                            {child.reconciled_at
+                              ? timeAgo(child.reconciled_at)
+                              : '--'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Section 4: Sync Activity Timeline
 // ---------------------------------------------------------------------------
 
 function SyncActivitySection({
@@ -321,170 +569,6 @@ function SyncActivitySection({
 }
 
 // ---------------------------------------------------------------------------
-// Section 3: Addon Health Overview
-// ---------------------------------------------------------------------------
-
-function AddonHealthSection({
-  addons,
-}: {
-  addons: AddonHealthDetail[];
-}) {
-  const [sortMode, setSortMode] = useState<SortMode>('issues');
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
-
-  const sorted = useMemo(() => {
-    const copy = [...addons];
-    if (sortMode === 'issues') {
-      copy.sort((a, b) => b.degraded_clusters - a.degraded_clusters);
-    } else if (sortMode === 'alpha') {
-      copy.sort((a, b) => a.addon_name.localeCompare(b.addon_name));
-    } else {
-      copy.sort((a, b) => {
-        const ta = a.last_deploy_time ? new Date(a.last_deploy_time).getTime() : 0;
-        const tb = b.last_deploy_time ? new Date(b.last_deploy_time).getTime() : 0;
-        return tb - ta;
-      });
-    }
-    return copy;
-  }, [addons, sortMode]);
-
-  const toggle = (name: string) => {
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      if (next.has(name)) next.delete(name);
-      else next.add(name);
-      return next;
-    });
-  };
-
-  return (
-    <section>
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <h2 className="flex items-center gap-2 text-lg font-semibold text-gray-900 dark:text-gray-100">
-          <Server className="h-5 w-5 text-cyan-500" />
-          Addon Health
-        </h2>
-        <div className="flex gap-1">
-          {(['issues', 'alpha', 'deployed'] as SortMode[]).map((m) => (
-            <button
-              key={m}
-              onClick={() => setSortMode(m)}
-              className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
-                sortMode === m
-                  ? 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/40 dark:text-cyan-300'
-                  : 'text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800'
-              }`}
-            >
-              {m === 'issues' ? 'Most Issues' : m === 'alpha' ? 'A-Z' : 'Last Deployed'}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {sorted.map((addon) => {
-          const isExpanded = expanded.has(addon.addon_name);
-          const pct =
-            addon.total_clusters > 0
-              ? (addon.healthy_clusters / addon.total_clusters) * 100
-              : 0;
-
-          return (
-            <div
-              key={addon.addon_name}
-              className="rounded-xl border border-gray-200 bg-white shadow-sm transition-shadow hover:shadow-md dark:border-gray-700 dark:bg-gray-900"
-            >
-              <button
-                onClick={() => toggle(addon.addon_name)}
-                className="flex w-full items-center justify-between p-4 text-left"
-                aria-expanded={isExpanded}
-              >
-                <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                  {addon.addon_name}
-                </span>
-                {isExpanded ? (
-                  <ChevronUp className="h-4 w-4 text-gray-400" />
-                ) : (
-                  <ChevronDown className="h-4 w-4 text-gray-400" />
-                )}
-              </button>
-
-              <div className="px-4 pb-4">
-                {/* Health bar */}
-                <div className="mb-3">
-                  <div className="mb-1 flex items-center justify-between text-xs">
-                    <span className="text-gray-500 dark:text-gray-400">
-                      {addon.healthy_clusters}/{addon.total_clusters} healthy
-                    </span>
-                    <span className="font-medium text-gray-700 dark:text-gray-300">
-                      {Math.round(pct)}%
-                    </span>
-                  </div>
-                  <div className="h-2 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
-                    <div
-                      className={`h-full rounded-full transition-all ${
-                        pct === 100 ? 'bg-green-500' : pct > 50 ? 'bg-yellow-500' : 'bg-red-500'
-                      }`}
-                      style={{ width: `${pct}%` }}
-                    />
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
-                  {addon.last_deploy_time && (
-                    <span className="flex items-center gap-1">
-                      <Clock className="h-3 w-3" />
-                      {timeAgo(addon.last_deploy_time)}
-                    </span>
-                  )}
-                  {addon.avg_sync_duration && (
-                    <span className="flex items-center gap-1">
-                      <RefreshCw className="h-3 w-3" />
-                      {addon.avg_sync_duration}
-                    </span>
-                  )}
-                </div>
-
-                {/* Expanded cluster details */}
-                {isExpanded && addon.clusters.length > 0 && (
-                  <div className="mt-3 space-y-2 border-t border-gray-100 pt-3 dark:border-gray-700">
-                    {addon.clusters.map((cl) => (
-                      <div
-                        key={cl.cluster_name}
-                        className="flex flex-wrap items-center gap-2 rounded-md bg-gray-50 px-3 py-2 text-xs dark:bg-gray-800"
-                      >
-                        <span className="font-medium text-gray-800 dark:text-gray-200">
-                          {cl.cluster_name}
-                        </span>
-                        <span
-                          className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase ${healthColor(
-                            cl.health,
-                          )} ${healthBg(cl.health)} bg-opacity-10`}
-                        >
-                          {cl.health}
-                        </span>
-                        {cl.health_since && (
-                          <span className="text-gray-400">
-                            since {timeAgo(cl.health_since)}
-                          </span>
-                        )}
-                        <span className="ml-auto text-gray-400">
-                          {cl.healthy_resources}/{cl.resource_count} resources
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </section>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // Main View
 // ---------------------------------------------------------------------------
 
@@ -522,8 +606,9 @@ export function Observability() {
         Observability
       </h1>
       <ControlPlaneSection data={data.control_plane} />
+      <ResourceAlertsSection alerts={data.resource_alerts} />
+      <AddonGroupsSection groups={data.addon_groups} />
       <SyncActivitySection syncs={data.recent_syncs} />
-      <AddonHealthSection addons={data.addon_health} />
     </div>
   );
 }

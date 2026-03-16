@@ -71,7 +71,15 @@ TOOL SELECTION GUIDE — use the right tool for each question:
 - "What's the config for addon X on cluster Y?" → use get_addon_config_on_cluster
 - "Platform info / ArgoCD version" → use get_platform_info
 
-When asked about "addons across clusters", ALWAYS list the actual addon names, not just cluster names. Call multiple tools if needed.`
+When asked about "addons across clusters", ALWAYS list the actual addon names, not just cluster names. Call multiple tools if needed.
+
+CRITICAL — CLUSTER NAME MATCHING:
+When a user refers to a cluster by a partial name or nickname, you MUST match it against the KNOWN CLUSTERS list above. Examples:
+- "addons cluster" → match to a cluster containing "addons" in its name
+- "automation cluster" → match to a cluster containing "automation"
+- "the dev cluster" → if ambiguous, list the matching clusters and ask which one
+- NEVER say "cluster not found" if a partial match exists in the KNOWN CLUSTERS list. Use the matching cluster name.
+- If multiple clusters match, list them and ask the user to clarify.`
 
 // Agent manages a multi-turn conversation with tool calling.
 type Agent struct {
@@ -81,13 +89,36 @@ type Agent struct {
 }
 
 // NewAgent creates a new conversational agent backed by the given AI client and tool executor.
+// It pre-loads cluster and addon context so the LLM always knows what exists.
 func NewAgent(client *Client, executor *ToolExecutor) *Agent {
-	return &Agent{
+	a := &Agent{
 		client:   client,
 		executor: executor,
-		messages: []ChatMessage{
-			{Role: "system", Content: systemPrompt},
-		},
+	}
+	a.initContext()
+	return a
+}
+
+// initContext pre-loads cluster names and addon catalog into the system prompt.
+func (a *Agent) initContext() {
+	ctx := context.Background()
+
+	contextInfo := ""
+
+	// Pre-load cluster list
+	clusterList, err := a.executor.listClusters(ctx)
+	if err == nil && clusterList != "" {
+		contextInfo += "\n\nKNOWN CLUSTERS:\n" + clusterList
+	}
+
+	// Pre-load addon catalog
+	addonList, err := a.executor.listAddons(ctx)
+	if err == nil && addonList != "" {
+		contextInfo += "\nKNOWN ADDONS:\n" + addonList
+	}
+
+	a.messages = []ChatMessage{
+		{Role: "system", Content: systemPrompt + contextInfo},
 	}
 }
 
@@ -699,7 +730,5 @@ func convertMessagesToGemini(messages []ChatMessage) []map[string]interface{} {
 
 // Reset clears conversation history (keeps system prompt).
 func (a *Agent) Reset() {
-	a.messages = []ChatMessage{
-		{Role: "system", Content: systemPrompt},
-	}
+	a.initContext()
 }

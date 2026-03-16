@@ -255,7 +255,7 @@ export function AIAssistant() {
           AI not configured
         </h2>
         <p className="max-w-md text-gray-500 dark:text-gray-400">
-          The AI assistant requires an Ollama connection. Go to{' '}
+          The AI assistant requires an AI provider (Gemini, Claude, OpenAI, or Ollama). Go to{' '}
           <a
             href="/settings"
             className="font-medium text-cyan-600 underline hover:text-cyan-700 dark:text-cyan-400 dark:hover:text-cyan-300"

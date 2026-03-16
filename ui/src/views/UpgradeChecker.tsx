@@ -65,12 +65,40 @@ function riskIcon(risk: 'safe' | 'minor' | 'conflicts') {
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function AddedFields({ items }: { items: ValueDiffEntry[] }) {
+const PAGE_SIZE = 15;
+
+function PaginatedList({ items, renderItem, emptyMessage }: { items: ValueDiffEntry[]; renderItem: (entry: ValueDiffEntry) => React.ReactNode; emptyMessage: string }) {
+  const [showCount, setShowCount] = useState(PAGE_SIZE);
+
   if (items.length === 0)
-    return <p className="py-4 text-center text-sm text-gray-500 dark:text-gray-400">No added fields.</p>;
+    return <p className="py-4 text-center text-sm text-gray-500 dark:text-gray-400">{emptyMessage}</p>;
+
+  const visible = items.slice(0, showCount);
+  const remaining = items.length - showCount;
+
   return (
-    <div className="divide-y divide-gray-100 dark:divide-gray-800">
-      {items.map((entry) => (
+    <div>
+      <div className="divide-y divide-gray-100 dark:divide-gray-800">
+        {visible.map(renderItem)}
+      </div>
+      {remaining > 0 && (
+        <button
+          onClick={() => setShowCount(c => c + PAGE_SIZE)}
+          className="w-full border-t border-gray-100 px-4 py-3 text-center text-sm font-medium text-cyan-600 hover:bg-gray-50 dark:border-gray-800 dark:text-cyan-400 dark:hover:bg-gray-800"
+        >
+          Show {Math.min(remaining, PAGE_SIZE)} more ({remaining} remaining)
+        </button>
+      )}
+    </div>
+  );
+}
+
+function AddedFields({ items }: { items: ValueDiffEntry[] }) {
+  return (
+    <PaginatedList
+      items={items}
+      emptyMessage="No added fields."
+      renderItem={(entry) => (
         <div key={entry.path} className="flex items-start gap-3 px-4 py-3">
           <Plus className="mt-0.5 h-4 w-4 shrink-0 text-green-500" />
           <div className="min-w-0 flex-1">
@@ -82,17 +110,17 @@ function AddedFields({ items }: { items: ValueDiffEntry[] }) {
             )}
           </div>
         </div>
-      ))}
-    </div>
+      )}
+    />
   );
 }
 
 function RemovedFields({ items }: { items: ValueDiffEntry[] }) {
-  if (items.length === 0)
-    return <p className="py-4 text-center text-sm text-gray-500 dark:text-gray-400">No removed fields.</p>;
   return (
-    <div className="divide-y divide-gray-100 dark:divide-gray-800">
-      {items.map((entry) => (
+    <PaginatedList
+      items={items}
+      emptyMessage="No removed fields."
+      renderItem={(entry) => (
         <div key={entry.path} className="flex items-start gap-3 px-4 py-3">
           <Minus className="mt-0.5 h-4 w-4 shrink-0 text-red-500" />
           <div className="min-w-0 flex-1">
@@ -104,17 +132,17 @@ function RemovedFields({ items }: { items: ValueDiffEntry[] }) {
             )}
           </div>
         </div>
-      ))}
-    </div>
+      )}
+    />
   );
 }
 
 function ChangedFields({ items }: { items: ValueDiffEntry[] }) {
-  if (items.length === 0)
-    return <p className="py-4 text-center text-sm text-gray-500 dark:text-gray-400">No changed defaults.</p>;
   return (
-    <div className="divide-y divide-gray-100 dark:divide-gray-800">
-      {items.map((entry) => (
+    <PaginatedList
+      items={items}
+      emptyMessage="No changed defaults."
+      renderItem={(entry) => (
         <div key={entry.path} className="flex items-start gap-3 px-4 py-3">
           <RefreshCw className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
           <div className="min-w-0 flex-1">
@@ -130,8 +158,8 @@ function ChangedFields({ items }: { items: ValueDiffEntry[] }) {
             </p>
           </div>
         </div>
-      ))}
-    </div>
+      )}
+    />
   );
 }
 
@@ -611,7 +639,22 @@ export function UpgradeChecker() {
             );
           })()}
 
-          {/* AI Analysis — right after summary */}
+          {/* No-changes state */}
+          {result.total_changes === 0 && result.conflicts.length === 0 && (
+            <div className="rounded-xl border-2 border-green-300 bg-green-50 p-6 text-center dark:border-green-700 dark:bg-green-950/30">
+              <CheckCircle className="mx-auto h-10 w-10 text-green-500" />
+              <h3 className="mt-2 text-lg font-semibold text-green-800 dark:text-green-300">
+                No breaking changes detected. Safe to upgrade.
+              </h3>
+            </div>
+          )}
+
+          {/* Release Notes — above AI and changes */}
+          {result.release_notes && result.release_notes.trim() !== '' && (
+            <ReleaseNotesSection notes={result.release_notes} />
+          )}
+
+          {/* AI Analysis */}
           {aiEnabled ? (
             <div className="rounded-xl border border-purple-200 bg-white shadow-sm dark:border-purple-800 dark:bg-gray-900">
               <div className="flex items-center justify-between border-b border-purple-100 px-6 py-3 dark:border-purple-900">
@@ -629,7 +672,7 @@ export function UpgradeChecker() {
                   </button>
                 )}
               </div>
-              <div className="px-6 py-4">
+              <div className="px-6 py-5">
                 {aiLoading && (
                   <div className="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
                     <RefreshCw className="h-4 w-4 animate-spin" />
@@ -642,23 +685,35 @@ export function UpgradeChecker() {
                   </div>
                 )}
                 {aiSummary && (
-                  <div className="space-y-1">
-                    <div className="whitespace-pre-wrap text-sm leading-relaxed text-gray-700 dark:text-gray-300">
+                  <div>
+                    <div className="prose-sm max-w-none text-sm leading-relaxed text-gray-700 dark:text-gray-300">
                       {aiSummary.split('\n').map((line, i) => {
                         const trimmed = line.trim();
-                        if (trimmed.startsWith('**') && trimmed.endsWith('**'))
-                          return <p key={i} className="mt-3 font-semibold text-gray-900 dark:text-white">{trimmed.slice(2, -2)}</p>;
-                        if (/^\d+\./.test(trimmed))
-                          return <p key={i} className="mt-2 font-medium text-gray-800 dark:text-gray-200">{line}</p>;
-                        if (trimmed === '') return <br key={i} />;
-                        return <p key={i}>{line}</p>;
+                        if (trimmed === '') return <div key={i} className="h-3" />;
+                        if (trimmed.startsWith('## '))
+                          return <h3 key={i} className="mt-5 mb-2 text-base font-bold text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-700 pb-1.5">{trimmed.slice(3)}</h3>;
+                        if (trimmed.startsWith('### '))
+                          return <h4 key={i} className="mt-4 mb-1.5 text-sm font-bold text-gray-800 dark:text-gray-200">{trimmed.slice(4)}</h4>;
+                        if (trimmed.startsWith('**') && trimmed.includes('**')) {
+                          const content = trimmed.replace(/\*\*/g, '');
+                          if (trimmed.endsWith('**'))
+                            return <h4 key={i} className="mt-4 mb-1.5 text-sm font-bold text-gray-900 dark:text-white">{content}</h4>;
+                          return <p key={i} className="mt-2"><strong className="text-gray-900 dark:text-white">{content.split(':')[0]}:</strong>{content.includes(':') ? content.slice(content.indexOf(':') + 1) : ''}</p>;
+                        }
+                        if (/^\d+\.\s/.test(trimmed))
+                          return <div key={i} className="ml-4 mt-1.5 flex gap-2.5"><span className="shrink-0 font-bold text-cyan-600 dark:text-cyan-400">{trimmed.match(/^\d+/)?.[0]}.</span><span className="flex-1">{trimmed.replace(/^\d+\.\s*/, '')}</span></div>;
+                        if (trimmed.startsWith('- ') || trimmed.startsWith('* '))
+                          return <div key={i} className="ml-4 mt-1.5 flex gap-2.5"><span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-cyan-500" /><span className="flex-1">{trimmed.slice(2)}</span></div>;
+                        return <p key={i} className="mt-1.5">{line}</p>;
                       })}
                     </div>
-                    <p className="mt-3 text-[10px] text-gray-400 dark:text-gray-600">Powered by {aiProvider === 'ollama' ? 'Ollama (local)' : aiProvider === 'gemini' ? 'Google Gemini' : aiProvider === 'claude' ? 'Claude (Anthropic)' : aiProvider === 'openai' ? 'OpenAI' : 'AI'}</p>
+                    <p className="mt-5 border-t border-gray-100 pt-3 text-[10px] text-gray-400 dark:border-gray-800 dark:text-gray-600">
+                      Powered by {aiProvider === 'ollama' ? 'Ollama (local)' : aiProvider === 'gemini' ? 'Google Gemini' : aiProvider === 'claude' ? 'Claude (Anthropic)' : aiProvider === 'openai' ? 'OpenAI' : 'AI'}
+                    </p>
                   </div>
                 )}
                 {!aiSummary && !aiLoading && !aiError && (
-                  <p className="text-xs text-gray-400 dark:text-gray-500">Click "Analyze with AI" for a summary of changes, risk assessment, and action items.</p>
+                  <p className="text-xs text-gray-400 dark:text-gray-500">Click "Analyze with AI" for a detailed summary of changes, risk assessment, and action items.</p>
                 )}
               </div>
             </div>
@@ -666,16 +721,6 @@ export function UpgradeChecker() {
             <div className="flex items-center gap-2 rounded-lg bg-gray-50 px-4 py-2.5 text-xs text-gray-500 dark:bg-gray-800/50 dark:text-gray-400">
               <Info className="h-3.5 w-3.5 shrink-0" />
               AI analysis available — configure in Settings.
-            </div>
-          )}
-
-          {/* No-changes state */}
-          {result.total_changes === 0 && result.conflicts.length === 0 && (
-            <div className="rounded-xl border-2 border-green-300 bg-green-50 p-6 text-center dark:border-green-700 dark:bg-green-950/30">
-              <CheckCircle className="mx-auto h-10 w-10 text-green-500" />
-              <h3 className="mt-2 text-lg font-semibold text-green-800 dark:text-green-300">
-                No breaking changes detected. Safe to upgrade.
-              </h3>
             </div>
           )}
 
@@ -717,11 +762,6 @@ export function UpgradeChecker() {
                 {activeTab === 'changed' && <ChangedFields items={result.changed} />}
               </div>
             </div>
-          )}
-
-          {/* Release Notes */}
-          {result.release_notes && result.release_notes.trim() !== '' && (
-            <ReleaseNotesSection notes={result.release_notes} />
           )}
 
           {/* Conflicts */}

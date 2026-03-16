@@ -31,13 +31,13 @@ type SyncActivityResponse struct {
 
 // AddonHealthDetail provides per-addon health aggregation across clusters.
 type AddonHealthDetail struct {
-	AddonName        string             `json:"addon_name"`
-	TotalClusters    int                `json:"total_clusters"`
-	HealthyClusters  int                `json:"healthy_clusters"`
-	DegradedClusters int                `json:"degraded_clusters"`
-	LastDeployTime   string             `json:"last_deploy_time,omitempty"`
-	AvgSyncDuration  string             `json:"avg_sync_duration,omitempty"`
-	AvgSyncSecs      float64            `json:"avg_sync_secs"`
+	AddonName        string               `json:"addon_name"`
+	TotalClusters    int                  `json:"total_clusters"`
+	HealthyClusters  int                  `json:"healthy_clusters"`
+	DegradedClusters int                  `json:"degraded_clusters"`
+	LastDeployTime   string               `json:"last_deploy_time,omitempty"`
+	AvgSyncDuration  string               `json:"avg_sync_duration,omitempty"`
+	AvgSyncSecs      float64              `json:"avg_sync_secs"`
 	Clusters         []AddonClusterHealth `json:"clusters"`
 }
 
@@ -54,9 +54,47 @@ type AddonClusterHealth struct {
 	Resources        []AppResource `json:"resources,omitempty"`
 }
 
+// AddonGroupHealth represents an addon (ApplicationSet) with all its child apps across clusters.
+type AddonGroupHealth struct {
+	AddonName    string           `json:"addon_name"`
+	TotalApps    int              `json:"total_apps"`
+	HealthCounts map[string]int   `json:"health_counts"`
+	ChildApps    []ChildAppHealth `json:"child_apps"`
+}
+
+// ChildAppHealth represents one ArgoCD application (child of an ApplicationSet).
+type ChildAppHealth struct {
+	AppName         string          `json:"app_name"`
+	ClusterName     string          `json:"cluster_name"`
+	Health          string          `json:"health"`
+	SyncStatus      string          `json:"sync_status"`
+	ReconciledAt    string          `json:"reconciled_at,omitempty"`
+	ResourceSummary ResourceSummary `json:"resource_summary"`
+	MissingLimits   []string        `json:"missing_limits,omitempty"`
+}
+
+// ResourceSummary holds aggregated resource counts for an app.
+type ResourceSummary struct {
+	TotalPods        int  `json:"total_pods"`
+	RunningPods      int  `json:"running_pods"`
+	TotalContainers  int  `json:"total_containers"`
+	HasMissingLimits bool `json:"has_missing_limits"`
+}
+
+// ResourceAlert represents a resource configuration issue.
+type ResourceAlert struct {
+	AppName     string `json:"app_name"`
+	ClusterName string `json:"cluster_name"`
+	AddonName   string `json:"addon_name"`
+	AlertType   string `json:"alert_type"`
+	Details     string `json:"details"`
+}
+
 // ObservabilityOverviewResponse is the top-level response for the observability dashboard.
 type ObservabilityOverviewResponse struct {
-	ControlPlane ControlPlaneInfo    `json:"control_plane"`
-	RecentSyncs  []SyncActivityEntry `json:"recent_syncs"`
-	AddonHealth  []AddonHealthDetail `json:"addon_health"`
+	ControlPlane   ControlPlaneInfo    `json:"control_plane"`
+	RecentSyncs    []SyncActivityEntry `json:"recent_syncs"`
+	AddonHealth    []AddonHealthDetail `json:"addon_health"`
+	AddonGroups    []AddonGroupHealth  `json:"addon_groups"`
+	ResourceAlerts []ResourceAlert     `json:"resource_alerts"`
 }

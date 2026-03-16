@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/moran/argocd-addons-platform/internal/argocd"
+	"github.com/moran/argocd-addons-platform/internal/gitprovider"
 	"github.com/moran/argocd-addons-platform/internal/models"
 )
 
@@ -21,7 +22,7 @@ func NewObservabilityService() *ObservabilityService {
 }
 
 // GetOverview returns the full observability dashboard data.
-func (s *ObservabilityService) GetOverview(ctx context.Context, ac *argocd.Client) (*models.ObservabilityOverviewResponse, error) {
+func (s *ObservabilityService) GetOverview(ctx context.Context, ac *argocd.Client, gp gitprovider.GitProvider) (*models.ObservabilityOverviewResponse, error) {
 	// 1. Get ArgoCD version info
 	versionInfo, err := ac.GetVersion(ctx)
 	if err != nil {
@@ -186,6 +187,12 @@ func (s *ObservabilityService) GetOverview(ctx context.Context, ac *argocd.Clien
 		return addonHealth[i].AddonName < addonHealth[j].AddonName
 	})
 
+	// 7. Build addon groups (grouped by addon name with health counts and child apps)
+	addonGroups := s.buildAddonGroups(fullApps, clusterNames)
+
+	// 8. Check resource alerts via Git values
+	resourceAlerts := s.checkResourceAlerts(ctx, gp, addonGroups)
+
 	controlPlane := models.ControlPlaneInfo{
 		ArgocdVersion:     versionInfo["Version"],
 		HelmVersion:       versionInfo["HelmVersion"],
@@ -197,10 +204,151 @@ func (s *ObservabilityService) GetOverview(ctx context.Context, ac *argocd.Clien
 	}
 
 	return &models.ObservabilityOverviewResponse{
-		ControlPlane: controlPlane,
-		RecentSyncs:  recentSyncs,
-		AddonHealth:  addonHealth,
+		ControlPlane:   controlPlane,
+		RecentSyncs:    recentSyncs,
+		AddonHealth:    addonHealth,
+		AddonGroups:    addonGroups,
+		ResourceAlerts: resourceAlerts,
 	}, nil
+}
+
+// buildAddonGroups groups apps by addon name, builds health counts and child app details.
+func (s *ObservabilityService) buildAddonGroups(apps []models.ArgocdApplication, clusterNames map[string]bool) []models.AddonGroupHealth {
+	groupMap := make(map[string]*models.AddonGroupHealth)
+
+	for _, app := range apps {
+		addonName, clusterName := extractAddonCluster(app.Name, clusterNames)
+
+		group, ok := groupMap[addonName]
+		if !ok {
+			group = &models.AddonGroupHealth{
+				AddonName:    addonName,
+				HealthCounts: make(map[string]int),
+			}
+			groupMap[addonName] = group
+		}
+
+		group.TotalApps++
+
+		health := app.HealthStatus
+		if health == "" {
+			health = "Unknown"
+		}
+		group.HealthCounts[health]++
+
+		// Build resource summary from the app's resource tree
+		rs := models.ResourceSummary{}
+		for _, r := range app.Resources {
+			switch r.Kind {
+			case "Pod":
+				rs.TotalPods++
+				if r.Health == "Healthy" {
+					rs.RunningPods++
+				}
+			case "Deployment", "DaemonSet", "StatefulSet":
+				rs.TotalContainers++
+			}
+		}
+
+		child := models.ChildAppHealth{
+			AppName:         app.Name,
+			ClusterName:     clusterName,
+			Health:          health,
+			SyncStatus:      app.SyncStatus,
+			ReconciledAt:    app.ReconciledAt,
+			ResourceSummary: rs,
+		}
+
+		group.ChildApps = append(group.ChildApps, child)
+	}
+
+	// Convert to sorted slice (most unhealthy first)
+	groups := make([]models.AddonGroupHealth, 0, len(groupMap))
+	for _, g := range groupMap {
+		// Sort child apps by health: degraded first, then progressing, then unknown, then healthy
+		sort.Slice(g.ChildApps, func(i, j int) bool {
+			return healthPriority(g.ChildApps[i].Health) < healthPriority(g.ChildApps[j].Health)
+		})
+		groups = append(groups, *g)
+	}
+
+	sort.Slice(groups, func(i, j int) bool {
+		// Sort by most unhealthy first (count of non-healthy apps descending)
+		unhealthyI := groups[i].TotalApps - groups[i].HealthCounts["Healthy"]
+		unhealthyJ := groups[j].TotalApps - groups[j].HealthCounts["Healthy"]
+		if unhealthyI != unhealthyJ {
+			return unhealthyI > unhealthyJ
+		}
+		return groups[i].AddonName < groups[j].AddonName
+	})
+
+	return groups
+}
+
+// healthPriority returns a sort priority for health status (lower = worse = sorts first).
+func healthPriority(health string) int {
+	switch strings.ToLower(health) {
+	case "degraded":
+		return 0
+	case "progressing":
+		return 1
+	case "missing":
+		return 2
+	case "unknown", "":
+		return 3
+	case "healthy":
+		return 4
+	default:
+		return 3
+	}
+}
+
+// checkResourceAlerts checks Git values files for addons missing resource requests/limits.
+func (s *ObservabilityService) checkResourceAlerts(ctx context.Context, gp gitprovider.GitProvider, groups []models.AddonGroupHealth) []models.ResourceAlert {
+	if gp == nil {
+		return nil
+	}
+
+	var alerts []models.ResourceAlert
+	seen := make(map[string]bool)
+
+	for _, group := range groups {
+		addonName := group.AddonName
+		if seen[addonName] {
+			continue
+		}
+		seen[addonName] = true
+
+		missing, detail := checkMissingResources(ctx, gp, addonName)
+		if missing {
+			alerts = append(alerts, models.ResourceAlert{
+				AddonName: addonName,
+				AlertType: "missing_limits",
+				Details:   detail,
+			})
+		}
+	}
+
+	// Sort alerts alphabetically by addon name
+	sort.Slice(alerts, func(i, j int) bool {
+		return alerts[i].AddonName < alerts[j].AddonName
+	})
+
+	return alerts
+}
+
+// checkMissingResources checks if an addon's global values file contains resource configuration.
+func checkMissingResources(ctx context.Context, gp gitprovider.GitProvider, addonName string) (bool, string) {
+	path := fmt.Sprintf("configuration/addons-global-values/%s.yaml", addonName)
+	data, err := gp.GetFileContent(ctx, path, "main")
+	if err != nil {
+		return true, "No global values file found"
+	}
+	content := string(data)
+	if !strings.Contains(content, "resources:") {
+		return true, "No resource requests/limits configured in global values"
+	}
+	return false, ""
 }
 
 // extractAddonCluster extracts addon name and cluster name from an ArgoCD app name.

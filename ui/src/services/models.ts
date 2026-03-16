@@ -238,10 +238,44 @@ export interface AddonHealthDetail {
   clusters: AddonClusterHealth[]
 }
 
+export interface ResourceSummary {
+  total_pods: number
+  running_pods: number
+  total_containers: number
+  has_missing_limits: boolean
+}
+
+export interface ChildAppHealth {
+  app_name: string
+  cluster_name: string
+  health: string
+  sync_status: string
+  reconciled_at?: string
+  resource_summary: ResourceSummary
+  missing_limits?: string[]
+}
+
+export interface AddonGroupHealth {
+  addon_name: string
+  total_apps: number
+  health_counts: Record<string, number>
+  child_apps: ChildAppHealth[]
+}
+
+export interface ResourceAlert {
+  app_name: string
+  cluster_name: string
+  addon_name: string
+  alert_type: string
+  details: string
+}
+
 export interface ObservabilityOverviewResponse {
   control_plane: ControlPlaneInfo
   recent_syncs: SyncActivityEntry[]
   addon_health: AddonHealthDetail[]
+  addon_groups: AddonGroupHealth[]
+  resource_alerts: ResourceAlert[]
 }
 
 export interface AIProviderInfo {
