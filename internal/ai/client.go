@@ -21,8 +21,18 @@ const (
 // Config holds AI provider settings.
 type Config struct {
 	Provider    Provider `yaml:"provider"`
-	OllamaURL  string   `yaml:"ollama_url"`
-	OllamaModel string  `yaml:"ollama_model"`
+	OllamaURL   string   `yaml:"ollama_url"`
+	OllamaModel string   `yaml:"ollama_model"`
+	AgentModel  string   `yaml:"agent_model"` // Separate model for agent (tool calling needs larger model)
+}
+
+// GetAgentModel returns the model to use for agent conversations.
+// Falls back to OllamaModel if not set.
+func (c Config) GetAgentModel() string {
+	if c.AgentModel != "" {
+		return c.AgentModel
+	}
+	return c.OllamaModel
 }
 
 // Client wraps communication with an AI provider.

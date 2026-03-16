@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/moran/argocd-addons-platform/internal/ai"
 	"github.com/moran/argocd-addons-platform/internal/service"
 )
 
@@ -18,6 +19,7 @@ type Server struct {
 	dashboardSvc     *service.DashboardService
 	observabilitySvc *service.ObservabilityService
 	upgradeSvc       *service.UpgradeService
+	aiClient         *ai.Client
 }
 
 // NewServer creates a new API server.
@@ -28,6 +30,7 @@ func NewServer(
 	dashboardSvc *service.DashboardService,
 	observabilitySvc *service.ObservabilityService,
 	upgradeSvc *service.UpgradeService,
+	aiClient *ai.Client,
 ) *Server {
 	return &Server{
 		connSvc:          connSvc,
@@ -36,6 +39,7 @@ func NewServer(
 		dashboardSvc:     dashboardSvc,
 		observabilitySvc: observabilitySvc,
 		upgradeSvc:       upgradeSvc,
+		aiClient:         aiClient,
 	}
 }
 
@@ -80,6 +84,10 @@ func NewRouter(srv *Server, staticFS fs.FS) http.Handler {
 
 	// Observability
 	mux.HandleFunc("GET /api/v1/observability/overview", srv.handleGetObservabilityOverview)
+
+	// AI Agent
+	mux.HandleFunc("POST /api/v1/agent/chat", srv.handleAgentChat)
+	mux.HandleFunc("POST /api/v1/agent/reset", srv.handleAgentReset)
 
 	// Static files (SPA)
 	if staticFS != nil {

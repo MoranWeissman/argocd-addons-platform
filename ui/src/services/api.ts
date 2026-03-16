@@ -99,4 +99,8 @@ export const api = {
   // AI
   getAIStatus: () => fetchJSON<{ enabled: boolean }>('/upgrade/ai-status'),
   getAISummary: (addonName: string, targetVersion: string) => postJSON<{ summary: string }>('/upgrade/ai-summary', { addon_name: addonName, target_version: targetVersion }),
+
+  // Agent Chat
+  agentChat: (sessionId: string, message: string) => postJSON<{ session_id: string; response: string }>('/agent/chat', { session_id: sessionId, message }),
+  agentReset: (sessionId: string) => postJSON<{ status: string }>('/agent/reset', { session_id: sessionId }),
 }

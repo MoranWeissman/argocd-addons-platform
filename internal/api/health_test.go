@@ -21,7 +21,8 @@ func newTestServer() *Server {
 	observabilitySvc := service.NewObservabilityService()
 	upgradeSvc := service.NewUpgradeService(ai.NewClient(ai.Config{}))
 
-	return NewServer(connSvc, clusterSvc, addonSvc, dashboardSvc, observabilitySvc, upgradeSvc)
+	aiClient := ai.NewClient(ai.Config{})
+	return NewServer(connSvc, clusterSvc, addonSvc, dashboardSvc, observabilitySvc, upgradeSvc, aiClient)
 }
 
 func TestHealthEndpoint(t *testing.T) {

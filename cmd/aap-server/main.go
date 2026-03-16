@@ -63,6 +63,7 @@ func main() {
 		Provider:    ai.Provider(os.Getenv("AI_PROVIDER")),
 		OllamaURL:  getEnvDefault("AI_OLLAMA_URL", "http://localhost:11434"),
 		OllamaModel: getEnvDefault("AI_OLLAMA_MODEL", "llama3.2"),
+		AgentModel:  os.Getenv("AI_AGENT_MODEL"), // defaults to OllamaModel if empty
 	}
 	aiClient := ai.NewClient(aiCfg)
 	if aiClient.IsEnabled() {
@@ -78,7 +79,7 @@ func main() {
 	upgradeSvc := service.NewUpgradeService(aiClient)
 
 	// Build server
-	srv := api.NewServer(connSvc, clusterSvc, addonSvc, dashboardSvc, observabilitySvc, upgradeSvc)
+	srv := api.NewServer(connSvc, clusterSvc, addonSvc, dashboardSvc, observabilitySvc, upgradeSvc, aiClient)
 
 	// Static files
 	var staticFS fs.FS
