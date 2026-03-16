@@ -3,6 +3,7 @@ package argocd
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/moran/argocd-addons-platform/internal/models"
 )
@@ -50,6 +51,11 @@ func (s *Service) GetClusterApplications(ctx context.Context, clusterName string
 		}
 		// Match by destination name (used when apps reference clusters by name)
 		if app.DestinationName == clusterName {
+			matched = append(matched, app)
+			continue
+		}
+		// Match by app name containing cluster name (covers in-cluster and other patterns)
+		if strings.HasSuffix(app.Name, "-"+clusterName) {
 			matched = append(matched, app)
 		}
 	}

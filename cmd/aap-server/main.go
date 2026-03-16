@@ -61,13 +61,19 @@ func main() {
 	// AI configuration
 	aiCfg := ai.Config{
 		Provider:    ai.Provider(os.Getenv("AI_PROVIDER")),
-		OllamaURL:  getEnvDefault("AI_OLLAMA_URL", "http://localhost:11434"),
+		OllamaURL:   getEnvDefault("AI_OLLAMA_URL", "http://localhost:11434"),
 		OllamaModel: getEnvDefault("AI_OLLAMA_MODEL", "llama3.2"),
-		AgentModel:  os.Getenv("AI_AGENT_MODEL"), // defaults to OllamaModel if empty
+		AgentModel:  os.Getenv("AI_AGENT_MODEL"),
+		APIKey:      os.Getenv("AI_API_KEY"),
+		CloudModel:  os.Getenv("AI_CLOUD_MODEL"),
 	}
 	aiClient := ai.NewClient(aiCfg)
 	if aiClient.IsEnabled() {
-		log.Printf("AI provider enabled: %s (model: %s)", aiCfg.Provider, aiCfg.OllamaModel)
+		model := aiCfg.OllamaModel
+		if aiCfg.Provider == ai.ProviderClaude || aiCfg.Provider == ai.ProviderOpenAI {
+			model = aiCfg.CloudModel
+		}
+		log.Printf("AI provider enabled: %s (model: %s)", aiCfg.Provider, model)
 	}
 
 	// Wire up services

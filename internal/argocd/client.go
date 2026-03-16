@@ -239,6 +239,12 @@ type argocdApplicationItem struct {
 				} `json:"parameters"`
 			} `json:"helm"`
 		} `json:"source"`
+		Sources []struct {
+			RepoURL        string `json:"repoURL"`
+			Path           string `json:"path"`
+			TargetRevision string `json:"targetRevision"`
+			Chart          string `json:"chart"`
+		} `json:"sources"`
 		Destination struct {
 			Server    string `json:"server"`
 			Name      string `json:"name"`
@@ -289,14 +295,37 @@ type argocdApplicationItem struct {
 }
 
 func (a argocdApplicationItem) toModel() models.ArgocdApplication {
+	// For multi-source apps, extract chart info from the first source that has a chart
+	repoURL := a.Spec.Source.RepoURL
+	path := a.Spec.Source.Path
+	targetRevision := a.Spec.Source.TargetRevision
+	chart := a.Spec.Source.Chart
+
+	if repoURL == "" && len(a.Spec.Sources) > 0 {
+		for _, src := range a.Spec.Sources {
+			if src.Chart != "" {
+				repoURL = src.RepoURL
+				chart = src.Chart
+				targetRevision = src.TargetRevision
+				break
+			}
+		}
+		// If no chart source found, use the first source
+		if repoURL == "" {
+			repoURL = a.Spec.Sources[0].RepoURL
+			path = a.Spec.Sources[0].Path
+			targetRevision = a.Spec.Sources[0].TargetRevision
+		}
+	}
+
 	app := models.ArgocdApplication{
 		Name:                 a.Metadata.Name,
 		Namespace:            a.Metadata.Namespace,
 		Project:              a.Spec.Project,
-		SourceRepoURL:        a.Spec.Source.RepoURL,
-		SourcePath:           a.Spec.Source.Path,
-		SourceTargetRevision: a.Spec.Source.TargetRevision,
-		SourceChart:          a.Spec.Source.Chart,
+		SourceRepoURL:        repoURL,
+		SourcePath:           path,
+		SourceTargetRevision: targetRevision,
+		SourceChart:          chart,
 		DestinationServer:    a.Spec.Destination.Server,
 		DestinationName:      a.Spec.Destination.Name,
 		DestinationNamespace: a.Spec.Destination.Namespace,

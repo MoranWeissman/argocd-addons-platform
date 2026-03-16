@@ -25,18 +25,28 @@ type repoIndex struct {
 }
 
 // Fetcher downloads Helm chart values.yaml for comparison.
+// Includes in-memory caching to avoid redundant downloads.
 type Fetcher struct {
-	client *http.Client
+	client     *http.Client
+	indexCache map[string]*repoIndex // key: repoURL
+	valuesCache map[string]string    // key: repoURL/chart/version
 }
 
-// NewFetcher creates a new Helm chart fetcher.
+// NewFetcher creates a new Helm chart fetcher with caching.
 func NewFetcher() *Fetcher {
-	return &Fetcher{client: &http.Client{}}
+	return &Fetcher{
+		client:      &http.Client{},
+		indexCache:  make(map[string]*repoIndex),
+		valuesCache: make(map[string]string),
+	}
 }
 
-// ListVersions returns available versions for a chart from the repo index.
-func (f *Fetcher) ListVersions(ctx context.Context, repoURL, chartName string) ([]ChartVersion, error) {
-	// Fetch index.yaml from the Helm repo
+// getIndex fetches and caches the repo index.
+func (f *Fetcher) getIndex(ctx context.Context, repoURL string) (*repoIndex, error) {
+	if idx, ok := f.indexCache[repoURL]; ok {
+		return idx, nil
+	}
+
 	indexURL := strings.TrimRight(repoURL, "/") + "/index.yaml"
 	req, err := http.NewRequestWithContext(ctx, "GET", indexURL, nil)
 	if err != nil {
@@ -53,7 +63,6 @@ func (f *Fetcher) ListVersions(ctx context.Context, repoURL, chartName string) (
 		return nil, fmt.Errorf("fetching index returned status %d", resp.StatusCode)
 	}
 
-	// Limit to 10MB
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 10*1024*1024))
 	if err != nil {
 		return nil, fmt.Errorf("reading index: %w", err)
@@ -62,6 +71,17 @@ func (f *Fetcher) ListVersions(ctx context.Context, repoURL, chartName string) (
 	var idx repoIndex
 	if err := yaml.Unmarshal(body, &idx); err != nil {
 		return nil, fmt.Errorf("parsing index: %w", err)
+	}
+
+	f.indexCache[repoURL] = &idx
+	return &idx, nil
+}
+
+// ListVersions returns available versions for a chart from the repo index.
+func (f *Fetcher) ListVersions(ctx context.Context, repoURL, chartName string) ([]ChartVersion, error) {
+	idx, err := f.getIndex(ctx, repoURL)
+	if err != nil {
+		return nil, err
 	}
 
 	versions, ok := idx.Entries[chartName]
@@ -74,6 +94,12 @@ func (f *Fetcher) ListVersions(ctx context.Context, repoURL, chartName string) (
 
 // FetchValues downloads a chart archive and extracts values.yaml.
 func (f *Fetcher) FetchValues(ctx context.Context, repoURL, chartName, version string) (string, error) {
+	// Check cache first
+	cacheKey := repoURL + "/" + chartName + "/" + version
+	if cached, ok := f.valuesCache[cacheKey]; ok {
+		return cached, nil
+	}
+
 	// First get the chart URL from index
 	versions, err := f.ListVersions(ctx, repoURL, chartName)
 	if err != nil {
@@ -135,7 +161,9 @@ func (f *Fetcher) FetchValues(ctx context.Context, repoURL, chartName, version s
 			if err != nil {
 				return "", fmt.Errorf("reading values.yaml: %w", err)
 			}
-			return string(data), nil
+			result := string(data)
+			f.valuesCache[cacheKey] = result
+			return result, nil
 		}
 	}
 

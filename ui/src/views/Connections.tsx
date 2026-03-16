@@ -756,8 +756,8 @@ function AIConfigSection() {
             </h4>
             <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
               {aiStatus?.enabled
-                ? 'Ollama is connected and providing AI-powered upgrade analysis'
-                : 'AI-powered analysis for the Upgrade Impact Checker'
+                ? 'AI provider is connected and providing AI-powered upgrade analysis'
+                : 'AI-powered analysis for the Upgrade Impact Checker (Ollama, Claude, or OpenAI)'
               }
             </p>
           </div>
@@ -786,30 +786,55 @@ function AIConfigSection() {
       {!aiStatus?.enabled && !loading && (
         <div className="mt-4 rounded-lg bg-gray-50 p-4 dark:bg-gray-900">
           <p className="text-sm font-medium text-gray-700 dark:text-gray-300">How to enable</p>
-          <ol className="mt-2 space-y-1.5 text-xs text-gray-600 dark:text-gray-400">
-            <li className="flex gap-2">
-              <span className="font-medium text-gray-500">1.</span>
-              Install Ollama: <code className="rounded bg-gray-200 px-1 dark:bg-gray-700">brew install ollama</code>
-            </li>
-            <li className="flex gap-2">
-              <span className="font-medium text-gray-500">2.</span>
-              Start Ollama: <code className="rounded bg-gray-200 px-1 dark:bg-gray-700">ollama serve</code>
-            </li>
-            <li className="flex gap-2">
-              <span className="font-medium text-gray-500">3.</span>
-              Pull a model: <code className="rounded bg-gray-200 px-1 dark:bg-gray-700">ollama pull llama3.2</code>
-            </li>
-            <li className="flex gap-2">
-              <span className="font-medium text-gray-500">4.</span>
-              Add to <code className="rounded bg-gray-200 px-1 dark:bg-gray-700">.env.secrets</code>:
-            </li>
-          </ol>
-          <pre className="mt-2 rounded-lg bg-gray-900 p-3 font-mono text-xs text-gray-300">
+          <p className="mt-2 text-xs text-gray-600 dark:text-gray-400">
+            Choose one of the following providers and add the configuration to{' '}
+            <code className="rounded bg-gray-200 px-1 dark:bg-gray-700">.env.secrets</code>:
+          </p>
+
+          <div className="mt-3 space-y-3">
+            <div>
+              <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">Option 1: Ollama (local, free)</p>
+              <ol className="mt-1 space-y-1 text-xs text-gray-600 dark:text-gray-400">
+                <li className="flex gap-2">
+                  <span className="font-medium text-gray-500">1.</span>
+                  Install: <code className="rounded bg-gray-200 px-1 dark:bg-gray-700">brew install ollama</code>
+                </li>
+                <li className="flex gap-2">
+                  <span className="font-medium text-gray-500">2.</span>
+                  Start: <code className="rounded bg-gray-200 px-1 dark:bg-gray-700">ollama serve</code>
+                </li>
+                <li className="flex gap-2">
+                  <span className="font-medium text-gray-500">3.</span>
+                  Pull model: <code className="rounded bg-gray-200 px-1 dark:bg-gray-700">ollama pull llama3.2</code>
+                </li>
+              </ol>
+              <pre className="mt-1 rounded-lg bg-gray-900 p-2 font-mono text-xs text-gray-300">
 {`AI_PROVIDER=ollama
 AI_OLLAMA_URL=http://localhost:11434
 AI_OLLAMA_MODEL=llama3.2`}
-          </pre>
-          <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+              </pre>
+            </div>
+
+            <div>
+              <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">Option 2: Claude (Anthropic)</p>
+              <pre className="mt-1 rounded-lg bg-gray-900 p-2 font-mono text-xs text-gray-300">
+{`AI_PROVIDER=claude
+AI_API_KEY=sk-ant-...
+AI_CLOUD_MODEL=claude-sonnet-4-20250514`}
+              </pre>
+            </div>
+
+            <div>
+              <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">Option 3: OpenAI</p>
+              <pre className="mt-1 rounded-lg bg-gray-900 p-2 font-mono text-xs text-gray-300">
+{`AI_PROVIDER=openai
+AI_API_KEY=sk-...
+AI_CLOUD_MODEL=gpt-4o`}
+              </pre>
+            </div>
+          </div>
+
+          <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
             Then restart the platform with <code className="rounded bg-gray-200 px-1 dark:bg-gray-700">make dev</code>
           </p>
         </div>
