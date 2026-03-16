@@ -18,7 +18,7 @@ import { api } from '@/services/api'
 import { LoadingState } from '@/components/LoadingState'
 import { ErrorState } from '@/components/ErrorState'
 import { Badge } from '@/components/ui/badge'
-import type { ConnectionResponse } from '@/services/models'
+import type { AIConfigResponse, AIProviderInfo, ConnectionResponse } from '@/services/models'
 
 interface PlatformInfo {
   status: string
@@ -704,17 +704,23 @@ export function Connections() {
 }
 
 function AIConfigSection() {
-  const [aiStatus, setAiStatus] = useState<{ enabled: boolean } | null>(null)
+  const [aiConfig, setAiConfig] = useState<AIConfigResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [testResult, setTestResult] = useState<string | null>(null)
   const [testing, setTesting] = useState(false)
+  const [switching, setSwitching] = useState<string | null>(null)
 
-  useEffect(() => {
-    api.getAIStatus()
-      .then(setAiStatus)
-      .catch(() => setAiStatus({ enabled: false }))
+  const fetchConfig = useCallback(() => {
+    setLoading(true)
+    api.getAIConfig()
+      .then(setAiConfig)
+      .catch(() => setAiConfig(null))
       .finally(() => setLoading(false))
   }, [])
+
+  useEffect(() => {
+    fetchConfig()
+  }, [fetchConfig])
 
   const handleTest = async () => {
     setTesting(true)
@@ -729,21 +735,38 @@ function AIConfigSection() {
     }
   }
 
+  const handleSwitchProvider = async (providerId: string) => {
+    setSwitching(providerId)
+    setTestResult(null)
+    try {
+      await api.setAIProvider(providerId)
+      fetchConfig()
+    } catch (err) {
+      setTestResult(err instanceof Error ? err.message : 'Failed to switch provider')
+    } finally {
+      setSwitching(null)
+    }
+  }
+
+  const isEnabled = aiConfig?.current_provider && aiConfig.current_provider !== 'none' && aiConfig.current_provider !== ''
+  const activeProvider = aiConfig?.available_providers.find((p: AIProviderInfo) => p.id === aiConfig.current_provider)
+
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+      {/* Header */}
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-3">
           <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${
-            aiStatus?.enabled
+            isEnabled
               ? 'bg-purple-100 dark:bg-purple-900/30'
               : 'bg-gray-100 dark:bg-gray-700'
           }`}>
-            <Sparkles className={`h-5 w-5 ${aiStatus?.enabled ? 'text-purple-600 dark:text-purple-400' : 'text-gray-400'}`} />
+            <Sparkles className={`h-5 w-5 ${isEnabled ? 'text-purple-600 dark:text-purple-400' : 'text-gray-400'}`} />
           </div>
           <div>
             <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
               AI Analysis
-              {loading ? '' : aiStatus?.enabled ? (
+              {loading ? '' : isEnabled ? (
                 <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
                   <span className="inline-block h-1.5 w-1.5 rounded-full bg-green-500" />
                   Active
@@ -755,14 +778,14 @@ function AIConfigSection() {
               )}
             </h4>
             <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-              {aiStatus?.enabled
-                ? 'AI provider is connected and providing AI-powered upgrade analysis'
-                : 'AI-powered analysis for the Upgrade Impact Checker (Ollama, Claude, or OpenAI)'
+              {isEnabled && activeProvider
+                ? `Using ${activeProvider.name}${activeProvider.model ? ` — ${activeProvider.model}` : ''}`
+                : 'AI-powered analysis for the Upgrade Impact Checker (Ollama, Claude, OpenAI, or Gemini)'
               }
             </p>
           </div>
         </div>
-        {aiStatus?.enabled && (
+        {isEnabled && (
           <button
             onClick={handleTest}
             disabled={testing}
@@ -783,55 +806,146 @@ function AIConfigSection() {
         </div>
       )}
 
-      {!aiStatus?.enabled && !loading && (
-        <div className="mt-4 rounded-lg bg-gray-50 p-4 dark:bg-gray-900">
-          <p className="text-sm font-medium text-gray-700 dark:text-gray-300">How to enable</p>
+      {/* Provider Selector Cards */}
+      {!loading && aiConfig && (
+        <div className="mt-5">
+          <p className="mb-3 text-sm font-medium text-gray-700 dark:text-gray-300">
+            Available Providers
+          </p>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {aiConfig.available_providers.map((provider: AIProviderInfo) => {
+              const isActive = provider.id === aiConfig.current_provider
+              const canSwitch = provider.configured && !isActive
+
+              return (
+                <div
+                  key={provider.id}
+                  className={`relative rounded-lg border p-4 transition-all ${
+                    isActive
+                      ? 'border-purple-500 bg-purple-50 ring-2 ring-purple-200 dark:border-purple-400 dark:bg-purple-950/20 dark:ring-purple-900/50'
+                      : provider.configured
+                        ? 'border-gray-200 bg-white hover:border-gray-300 dark:border-gray-600 dark:bg-gray-750 dark:hover:border-gray-500'
+                        : 'border-gray-200 bg-gray-50 opacity-75 dark:border-gray-700 dark:bg-gray-800/50'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className={`text-sm font-semibold ${
+                      isActive
+                        ? 'text-purple-700 dark:text-purple-300'
+                        : 'text-gray-900 dark:text-gray-100'
+                    }`}>
+                      {provider.name}
+                    </span>
+                    {provider.configured ? (
+                      <span className="inline-block h-2 w-2 rounded-full bg-green-500" title="Configured" />
+                    ) : (
+                      <span className="inline-block h-2 w-2 rounded-full bg-gray-300 dark:bg-gray-600" title="Not configured" />
+                    )}
+                  </div>
+
+                  <p className="mt-1 font-mono text-xs text-gray-500 dark:text-gray-400">
+                    {provider.configured && provider.model
+                      ? provider.model
+                      : 'Not configured'}
+                  </p>
+
+                  <div className="mt-3">
+                    {isActive ? (
+                      <span className="inline-flex items-center gap-1 text-xs font-medium text-purple-600 dark:text-purple-400">
+                        <span className="inline-block h-1.5 w-1.5 rounded-full bg-purple-500" />
+                        Active
+                      </span>
+                    ) : canSwitch ? (
+                      <button
+                        onClick={() => handleSwitchProvider(provider.id)}
+                        disabled={switching === provider.id}
+                        className="inline-flex items-center gap-1 rounded-md bg-purple-600 px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-purple-700 disabled:opacity-50 dark:bg-purple-700 dark:hover:bg-purple-600"
+                      >
+                        {switching === provider.id ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : null}
+                        Switch
+                      </button>
+                    ) : (
+                      <span className="text-xs text-gray-400 dark:text-gray-500">
+                        Setup required
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Setup guide for unconfigured providers */}
+      {!loading && aiConfig && aiConfig.available_providers.some((p: AIProviderInfo) => !p.configured) && (
+        <div className="mt-5 rounded-lg bg-gray-50 p-4 dark:bg-gray-900">
+          <p className="text-sm font-medium text-gray-700 dark:text-gray-300">How to enable additional providers</p>
           <p className="mt-2 text-xs text-gray-600 dark:text-gray-400">
-            Choose one of the following providers and add the configuration to{' '}
-            <code className="rounded bg-gray-200 px-1 dark:bg-gray-700">.env.secrets</code>:
+            Add the configuration to{' '}
+            <code className="rounded bg-gray-200 px-1 dark:bg-gray-700">.env.secrets</code> and restart:
           </p>
 
           <div className="mt-3 space-y-3">
-            <div>
-              <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">Option 1: Ollama (local, free)</p>
-              <ol className="mt-1 space-y-1 text-xs text-gray-600 dark:text-gray-400">
-                <li className="flex gap-2">
-                  <span className="font-medium text-gray-500">1.</span>
-                  Install: <code className="rounded bg-gray-200 px-1 dark:bg-gray-700">brew install ollama</code>
-                </li>
-                <li className="flex gap-2">
-                  <span className="font-medium text-gray-500">2.</span>
-                  Start: <code className="rounded bg-gray-200 px-1 dark:bg-gray-700">ollama serve</code>
-                </li>
-                <li className="flex gap-2">
-                  <span className="font-medium text-gray-500">3.</span>
-                  Pull model: <code className="rounded bg-gray-200 px-1 dark:bg-gray-700">ollama pull llama3.2</code>
-                </li>
-              </ol>
-              <pre className="mt-1 rounded-lg bg-gray-900 p-2 font-mono text-xs text-gray-300">
+            {!aiConfig.available_providers.find((p: AIProviderInfo) => p.id === 'ollama')?.configured && (
+              <div>
+                <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">Ollama (local, free)</p>
+                <ol className="mt-1 space-y-1 text-xs text-gray-600 dark:text-gray-400">
+                  <li className="flex gap-2">
+                    <span className="font-medium text-gray-500">1.</span>
+                    Install: <code className="rounded bg-gray-200 px-1 dark:bg-gray-700">brew install ollama</code>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="font-medium text-gray-500">2.</span>
+                    Start: <code className="rounded bg-gray-200 px-1 dark:bg-gray-700">ollama serve</code>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="font-medium text-gray-500">3.</span>
+                    Pull model: <code className="rounded bg-gray-200 px-1 dark:bg-gray-700">ollama pull llama3.2</code>
+                  </li>
+                </ol>
+                <pre className="mt-1 rounded-lg bg-gray-900 p-2 font-mono text-xs text-gray-300">
 {`AI_PROVIDER=ollama
 AI_OLLAMA_URL=http://localhost:11434
 AI_OLLAMA_MODEL=llama3.2`}
-              </pre>
-            </div>
+                </pre>
+              </div>
+            )}
 
-            <div>
-              <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">Option 2: Claude (Anthropic)</p>
-              <pre className="mt-1 rounded-lg bg-gray-900 p-2 font-mono text-xs text-gray-300">
+            {!aiConfig.available_providers.find((p: AIProviderInfo) => p.id === 'claude')?.configured && (
+              <div>
+                <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">Claude (Anthropic)</p>
+                <pre className="mt-1 rounded-lg bg-gray-900 p-2 font-mono text-xs text-gray-300">
 {`AI_PROVIDER=claude
 AI_API_KEY=sk-ant-...
 AI_CLOUD_MODEL=claude-sonnet-4-20250514`}
-              </pre>
-            </div>
+                </pre>
+              </div>
+            )}
 
-            <div>
-              <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">Option 3: OpenAI</p>
-              <pre className="mt-1 rounded-lg bg-gray-900 p-2 font-mono text-xs text-gray-300">
+            {!aiConfig.available_providers.find((p: AIProviderInfo) => p.id === 'openai')?.configured && (
+              <div>
+                <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">OpenAI</p>
+                <pre className="mt-1 rounded-lg bg-gray-900 p-2 font-mono text-xs text-gray-300">
 {`AI_PROVIDER=openai
 AI_API_KEY=sk-...
 AI_CLOUD_MODEL=gpt-4o`}
-              </pre>
-            </div>
+                </pre>
+              </div>
+            )}
+
+            {!aiConfig.available_providers.find((p: AIProviderInfo) => p.id === 'gemini')?.configured && (
+              <div>
+                <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">Google Gemini (free tier available)</p>
+                <pre className="mt-1 rounded-lg bg-gray-900 p-2 font-mono text-xs text-gray-300">
+{`AI_PROVIDER=gemini
+AI_API_KEY=AIzaSy...
+AI_CLOUD_MODEL=gemini-2.5-flash`}
+                </pre>
+              </div>
+            )}
           </div>
 
           <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">

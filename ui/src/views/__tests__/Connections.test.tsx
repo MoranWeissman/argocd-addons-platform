@@ -59,6 +59,8 @@ vi.mock('@/services/api', () => ({
     updateConnection: (...args: unknown[]) => mockUpdateConnection(...args),
     getAIStatus: () => Promise.resolve({ enabled: false }),
     getAISummary: () => Promise.resolve({ summary: '' }),
+    getAIConfig: () => Promise.resolve({ current_provider: 'none', available_providers: [] }),
+    setAIProvider: () => Promise.resolve({ status: 'ok', provider: 'none' }),
   },
 }))
 

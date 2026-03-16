@@ -122,6 +122,13 @@ func (a *Agent) Chat(ctx context.Context, userMessage string) (string, error) {
 					Content:    result,
 					ToolCallID: tc.ID,
 				})
+			case ProviderGemini:
+				// Gemini expects functionResponse in a user message
+				a.messages = append(a.messages, ChatMessage{
+					Role:       "tool",
+					Content:    result,
+					ToolCallID: tc.Function.Name, // Gemini uses function name, not an ID
+				})
 			default:
 				// Ollama and OpenAI use role=tool with tool_call_id
 				a.messages = append(a.messages, ChatMessage{
@@ -145,6 +152,8 @@ func (a *Agent) callLLM(ctx context.Context) (*ChatResponse, error) {
 		return a.callClaudeChat(ctx)
 	case ProviderOpenAI:
 		return a.callOpenAIChat(ctx)
+	case ProviderGemini:
+		return a.callGeminiChat(ctx)
 	default:
 		return nil, fmt.Errorf("unsupported provider: %s", a.client.config.Provider)
 	}
@@ -483,6 +492,197 @@ func convertMessagesToOpenAI(messages []ChatMessage) []map[string]interface{} {
 		openaiMessages = append(openaiMessages, msg)
 	}
 	return openaiMessages
+}
+
+// callGeminiChat sends messages to the Gemini API with tool calling support.
+func (a *Agent) callGeminiChat(ctx context.Context) (*ChatResponse, error) {
+	// Convert tool definitions to Gemini format
+	geminiTools := convertToolsToGemini(GetToolDefinitions())
+
+	// Convert messages to Gemini format (separate system from messages)
+	geminiContents := convertMessagesToGemini(a.messages)
+
+	model := a.client.config.GetAgentModel()
+	if model == "" {
+		model = "gemini-2.5-flash"
+	}
+
+	reqBody := map[string]interface{}{
+		"contents": geminiContents,
+		"tools": []map[string]interface{}{
+			{"function_declarations": geminiTools},
+		},
+		"system_instruction": map[string]interface{}{
+			"parts": []map[string]string{
+				{"text": systemPrompt},
+			},
+		},
+		"generationConfig": map[string]interface{}{
+			"temperature":    0.3,
+			"maxOutputTokens": 1024,
+		},
+	}
+
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("marshaling gemini chat request: %w", err)
+	}
+
+	url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s", model, a.client.config.APIKey)
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := a.client.http.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("gemini chat request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		respBody, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("gemini returned %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	var result struct {
+		Candidates []struct {
+			Content struct {
+				Parts []struct {
+					Text         string `json:"text,omitempty"`
+					FunctionCall *struct {
+						Name string          `json:"name"`
+						Args json.RawMessage `json:"args"`
+					} `json:"functionCall,omitempty"`
+				} `json:"parts"`
+			} `json:"content"`
+			FinishReason string `json:"finishReason"`
+		} `json:"candidates"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("parsing gemini chat response: %w", err)
+	}
+
+	if len(result.Candidates) == 0 {
+		return nil, fmt.Errorf("empty response from Gemini")
+	}
+
+	chatResp := &ChatResponse{}
+	for _, part := range result.Candidates[0].Content.Parts {
+		if part.FunctionCall != nil {
+			chatResp.ToolCalls = append(chatResp.ToolCalls, ToolCall{
+				ID:   part.FunctionCall.Name, // Gemini doesn't use separate IDs
+				Type: "function",
+				Function: ToolCallFunc{
+					Name:      part.FunctionCall.Name,
+					Arguments: part.FunctionCall.Args,
+				},
+			})
+		} else if part.Text != "" {
+			chatResp.Content += part.Text
+		}
+	}
+
+	return chatResp, nil
+}
+
+// convertToolsToGemini converts tool definitions to Gemini's function_declarations format.
+func convertToolsToGemini(tools []ToolDefinition) []map[string]interface{} {
+	var geminiTools []map[string]interface{}
+	for _, t := range tools {
+		geminiTools = append(geminiTools, map[string]interface{}{
+			"name":        t.Function.Name,
+			"description": t.Function.Description,
+			"parameters":  json.RawMessage(t.Function.Parameters),
+		})
+	}
+	return geminiTools
+}
+
+// convertMessagesToGemini converts internal messages to Gemini's format.
+// Gemini uses "model" instead of "assistant" and does not include system messages in contents.
+// Tool results are sent as functionResponse parts in user messages.
+func convertMessagesToGemini(messages []ChatMessage) []map[string]interface{} {
+	var geminiContents []map[string]interface{}
+	for _, m := range messages {
+		// Skip system messages (handled as system_instruction)
+		if m.Role == "system" {
+			continue
+		}
+
+		// Tool result messages: Gemini expects functionResponse in a user message
+		if m.Role == "tool" {
+			geminiContents = append(geminiContents, map[string]interface{}{
+				"role": "user",
+				"parts": []map[string]interface{}{
+					{
+						"functionResponse": map[string]interface{}{
+							"name": m.ToolCallID,
+							"response": map[string]interface{}{
+								"result": m.Content,
+							},
+						},
+					},
+				},
+			})
+			continue
+		}
+
+		// Claude-style tool results (user role with ToolCallID)
+		if m.Role == "user" && m.ToolCallID != "" {
+			geminiContents = append(geminiContents, map[string]interface{}{
+				"role": "user",
+				"parts": []map[string]interface{}{
+					{
+						"functionResponse": map[string]interface{}{
+							"name": m.ToolCallID,
+							"response": map[string]interface{}{
+								"result": m.Content,
+							},
+						},
+					},
+				},
+			})
+			continue
+		}
+
+		// Assistant messages with tool calls: convert to model role with functionCall parts
+		if m.Role == "assistant" && len(m.ToolCalls) > 0 {
+			var parts []map[string]interface{}
+			if m.Content != "" {
+				parts = append(parts, map[string]interface{}{
+					"text": m.Content,
+				})
+			}
+			for _, tc := range m.ToolCalls {
+				parts = append(parts, map[string]interface{}{
+					"functionCall": map[string]interface{}{
+						"name": tc.Function.Name,
+						"args": json.RawMessage(tc.Function.Arguments),
+					},
+				})
+			}
+			geminiContents = append(geminiContents, map[string]interface{}{
+				"role":  "model",
+				"parts": parts,
+			})
+			continue
+		}
+
+		// Regular messages: map assistant -> model
+		role := m.Role
+		if role == "assistant" {
+			role = "model"
+		}
+		geminiContents = append(geminiContents, map[string]interface{}{
+			"role": role,
+			"parts": []map[string]interface{}{
+				{"text": m.Content},
+			},
+		})
+	}
+	return geminiContents
 }
 
 // Reset clears conversation history (keeps system prompt).

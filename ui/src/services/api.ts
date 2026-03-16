@@ -1,6 +1,7 @@
 import type {
   AddonCatalogResponse,
   AddonDetailResponse,
+  AIConfigResponse,
   AvailableVersionsResponse,
   ClusterComparisonResponse,
   ClusterDetailResponse,
@@ -99,6 +100,8 @@ export const api = {
   // AI
   getAIStatus: () => fetchJSON<{ enabled: boolean }>('/upgrade/ai-status'),
   getAISummary: (addonName: string, targetVersion: string) => postJSON<{ summary: string }>('/upgrade/ai-summary', { addon_name: addonName, target_version: targetVersion }),
+  getAIConfig: () => fetchJSON<AIConfigResponse>('/ai/config'),
+  setAIProvider: (provider: string) => postJSON<{ status: string; provider: string }>('/ai/provider', { provider }),
 
   // Agent Chat
   agentChat: (sessionId: string, message: string) => postJSON<{ session_id: string; response: string }>('/agent/chat', { session_id: sessionId, message }),

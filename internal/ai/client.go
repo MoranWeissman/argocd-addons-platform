@@ -17,6 +17,7 @@ const (
 	ProviderOllama Provider = "ollama"
 	ProviderClaude Provider = "claude"
 	ProviderOpenAI Provider = "openai"
+	ProviderGemini Provider = "gemini"
 	ProviderNone   Provider = "none"
 )
 
@@ -36,7 +37,7 @@ func (c Config) GetAgentModel() string {
 	if c.AgentModel != "" {
 		return c.AgentModel
 	}
-	if c.Provider == ProviderClaude || c.Provider == ProviderOpenAI {
+	if c.Provider == ProviderClaude || c.Provider == ProviderOpenAI || c.Provider == ProviderGemini {
 		return c.CloudModel
 	}
 	return c.OllamaModel
@@ -51,6 +52,21 @@ type Client struct {
 // NewClient creates a new AI client with the given configuration.
 func NewClient(cfg Config) *Client {
 	return &Client{config: cfg, http: &http.Client{}}
+}
+
+// GetConfig returns the current AI configuration.
+func (c *Client) GetConfig() Config {
+	return c.config
+}
+
+// SetProvider switches the active AI provider at runtime.
+func (c *Client) SetProvider(provider Provider) {
+	c.config.Provider = provider
+}
+
+// GetProviderName returns the current provider as a string.
+func (c *Client) GetProviderName() string {
+	return string(c.config.Provider)
 }
 
 // IsEnabled returns true when a valid AI provider is configured.
@@ -71,6 +87,8 @@ func (c *Client) Summarize(ctx context.Context, prompt string) (string, error) {
 		return c.claudeSummarize(ctx, prompt)
 	case ProviderOpenAI:
 		return c.openaiSummarize(ctx, prompt)
+	case ProviderGemini:
+		return c.geminiSummarize(ctx, prompt)
 	default:
 		return "", fmt.Errorf("unsupported AI provider: %s", c.config.Provider)
 	}
@@ -208,6 +226,63 @@ func (c *Client) openaiSummarize(ctx context.Context, prompt string) (string, er
 		return result.Choices[0].Message.Content, nil
 	}
 	return "", fmt.Errorf("empty response from OpenAI")
+}
+
+func (c *Client) geminiSummarize(ctx context.Context, prompt string) (string, error) {
+	model := c.config.CloudModel
+	if model == "" {
+		model = "gemini-2.5-flash"
+	}
+
+	url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s", model, c.config.APIKey)
+
+	body, err := json.Marshal(map[string]interface{}{
+		"contents": []map[string]interface{}{
+			{"parts": []map[string]string{{"text": prompt}}},
+		},
+		"generationConfig": map[string]interface{}{
+			"temperature":    0.3,
+			"maxOutputTokens": 1024,
+		},
+	})
+	if err != nil {
+		return "", fmt.Errorf("marshaling gemini request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(body))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("gemini request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		respBody, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("gemini returned %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	var result struct {
+		Candidates []struct {
+			Content struct {
+				Parts []struct {
+					Text string `json:"text"`
+				} `json:"parts"`
+			} `json:"content"`
+		} `json:"candidates"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", fmt.Errorf("parsing gemini response: %w", err)
+	}
+
+	if len(result.Candidates) > 0 && len(result.Candidates[0].Content.Parts) > 0 {
+		return result.Candidates[0].Content.Parts[0].Text, nil
+	}
+	return "", fmt.Errorf("empty response from Gemini")
 }
 
 // BuildUpgradePrompt creates a concise prompt for analyzing an upgrade.

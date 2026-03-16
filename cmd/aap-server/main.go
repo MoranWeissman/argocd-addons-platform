@@ -70,7 +70,7 @@ func main() {
 	aiClient := ai.NewClient(aiCfg)
 	if aiClient.IsEnabled() {
 		model := aiCfg.OllamaModel
-		if aiCfg.Provider == ai.ProviderClaude || aiCfg.Provider == ai.ProviderOpenAI {
+		if aiCfg.Provider == ai.ProviderClaude || aiCfg.Provider == ai.ProviderOpenAI || aiCfg.Provider == ai.ProviderGemini {
 			model = aiCfg.CloudModel
 		}
 		log.Printf("AI provider enabled: %s (model: %s)", aiCfg.Provider, model)

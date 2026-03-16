@@ -244,6 +244,18 @@ export interface ObservabilityOverviewResponse {
   addon_health: AddonHealthDetail[]
 }
 
+export interface AIProviderInfo {
+  id: string
+  name: string
+  configured: boolean
+  model: string
+}
+
+export interface AIConfigResponse {
+  current_provider: string
+  available_providers: AIProviderInfo[]
+}
+
 export interface AvailableVersion {
   version: string
   app_version?: string
