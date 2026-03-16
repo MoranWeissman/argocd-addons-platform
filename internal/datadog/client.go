@@ -211,3 +211,88 @@ func splitTag(tag string) []string {
 	}
 	return []string{tag}
 }
+
+// AddonMetrics holds usage vs requests vs limits for one addon on one cluster.
+type AddonMetrics struct {
+	AddonName       string  `json:"addon_name"`
+	Namespace       string  `json:"namespace"`
+	CPUUsageCores   float64 `json:"cpu_usage_cores"`
+	CPURequestCores float64 `json:"cpu_request_cores"`
+	CPULimitCores   float64 `json:"cpu_limit_cores"`
+	MemUsageMB      float64 `json:"mem_usage_mb"`
+	MemRequestMB    float64 `json:"mem_request_mb"`
+	MemLimitMB      float64 `json:"mem_limit_mb"`
+	PodCount        int     `json:"pod_count"`
+}
+
+// ClusterMetrics holds metrics for all addons on a cluster.
+type ClusterMetrics struct {
+	ClusterName string         `json:"cluster_name"`
+	Addons      []AddonMetrics `json:"addons"`
+}
+
+// GetClusterAddonMetrics fetches metrics for addons on a specific cluster.
+// Uses kube_cluster_name tag to filter by cluster, and kube_namespace to group by addon.
+func (c *Client) GetClusterAddonMetrics(ctx context.Context, clusterName string, namespaces []string, duration time.Duration) (*ClusterMetrics, error) {
+	now := time.Now()
+	from := now.Add(-duration)
+
+	result := &ClusterMetrics{ClusterName: clusterName}
+
+	for _, ns := range namespaces {
+		addon := AddonMetrics{AddonName: ns, Namespace: ns}
+
+		// CPU usage (actual)
+		q := fmt.Sprintf("avg:container.cpu.usage{kube_namespace:%s,kube_cluster_name:%s}", ns, clusterName)
+		series, _ := c.QueryMetrics(ctx, q, from, now)
+		if len(series) > 0 && len(series[0].Points) > 0 {
+			addon.CPUUsageCores = series[0].Points[len(series[0].Points)-1].Value / 1e9
+		}
+
+		// CPU requests
+		q = fmt.Sprintf("sum:kubernetes.cpu.requests{kube_namespace:%s,kube_cluster_name:%s}", ns, clusterName)
+		series, _ = c.QueryMetrics(ctx, q, from, now)
+		if len(series) > 0 && len(series[0].Points) > 0 {
+			addon.CPURequestCores = series[0].Points[len(series[0].Points)-1].Value / 1e9
+		}
+
+		// CPU limits
+		q = fmt.Sprintf("sum:kubernetes.cpu.limits{kube_namespace:%s,kube_cluster_name:%s}", ns, clusterName)
+		series, _ = c.QueryMetrics(ctx, q, from, now)
+		if len(series) > 0 && len(series[0].Points) > 0 {
+			addon.CPULimitCores = series[0].Points[len(series[0].Points)-1].Value / 1e9
+		}
+
+		// Memory usage
+		q = fmt.Sprintf("avg:container.memory.usage{kube_namespace:%s,kube_cluster_name:%s}", ns, clusterName)
+		series, _ = c.QueryMetrics(ctx, q, from, now)
+		if len(series) > 0 && len(series[0].Points) > 0 {
+			addon.MemUsageMB = series[0].Points[len(series[0].Points)-1].Value / (1024 * 1024)
+		}
+
+		// Memory requests
+		q = fmt.Sprintf("sum:kubernetes.memory.requests{kube_namespace:%s,kube_cluster_name:%s}", ns, clusterName)
+		series, _ = c.QueryMetrics(ctx, q, from, now)
+		if len(series) > 0 && len(series[0].Points) > 0 {
+			addon.MemRequestMB = series[0].Points[len(series[0].Points)-1].Value / (1024 * 1024)
+		}
+
+		// Memory limits
+		q = fmt.Sprintf("sum:kubernetes.memory.limits{kube_namespace:%s,kube_cluster_name:%s}", ns, clusterName)
+		series, _ = c.QueryMetrics(ctx, q, from, now)
+		if len(series) > 0 && len(series[0].Points) > 0 {
+			addon.MemLimitMB = series[0].Points[len(series[0].Points)-1].Value / (1024 * 1024)
+		}
+
+		// Running pods (current)
+		q = fmt.Sprintf("sum:kubernetes.pods.running{kube_namespace:%s,kube_cluster_name:%s}", ns, clusterName)
+		series, _ = c.QueryMetrics(ctx, q, from, now)
+		if len(series) > 0 && len(series[0].Points) > 0 {
+			addon.PodCount = int(series[0].Points[len(series[0].Points)-1].Value)
+		}
+
+		result.Addons = append(result.Addons, addon)
+	}
+
+	return result, nil
+}

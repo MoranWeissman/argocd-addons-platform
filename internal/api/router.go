@@ -97,6 +97,7 @@ func NewRouter(srv *Server, staticFS fs.FS) http.Handler {
 	// Datadog Metrics
 	mux.HandleFunc("GET /api/v1/datadog/status", srv.handleDatadogStatus)
 	mux.HandleFunc("GET /api/v1/datadog/metrics/{namespace}", srv.handleDatadogNamespaceMetrics)
+	mux.HandleFunc("GET /api/v1/datadog/cluster-metrics/{clusterName}", srv.handleDatadogClusterMetrics)
 
 	// AI Agent
 	mux.HandleFunc("POST /api/v1/agent/chat", srv.handleAgentChat)

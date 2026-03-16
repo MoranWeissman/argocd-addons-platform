@@ -5,6 +5,7 @@ import type {
   AvailableVersionsResponse,
   ClusterComparisonResponse,
   ClusterDetailResponse,
+  ClusterMetricsData,
   ClustersResponse,
   ConfigDiffResponse,
   ConnectionsListResponse,
@@ -108,6 +109,7 @@ export const api = {
   // Datadog
   getDatadogStatus: () => fetchJSON<{ enabled: boolean; site: string }>('/datadog/status'),
   getDatadogNamespaceMetrics: (namespace: string) => fetchJSON<DatadogNamespaceMetrics>(`/datadog/metrics/${namespace}`),
+  getClusterMetrics: (clusterName: string) => fetchJSON<ClusterMetricsData>(`/datadog/cluster-metrics/${clusterName}`),
 
   // Agent Chat
   agentChat: (sessionId: string, message: string) => postJSON<{ session_id: string; response: string }>('/agent/chat', { session_id: sessionId, message }),
