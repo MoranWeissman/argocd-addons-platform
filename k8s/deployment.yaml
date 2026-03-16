@@ -1,0 +1,96 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: aap-server-config
+  namespace: argocd-addons-platform
+  labels:
+    app.kubernetes.io/name: aap-server
+    app.kubernetes.io/part-of: argocd-addons-platform
+data:
+  AAP_PORT: "8080"
+  AAP_STATIC_DIR: "/app/static"
+  AAP_CONFIG: "/etc/aap/config.yaml"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aap-server
+  namespace: argocd-addons-platform
+  labels:
+    app.kubernetes.io/name: aap-server
+    app.kubernetes.io/part-of: argocd-addons-platform
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: aap-server
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: aap-server
+        app.kubernetes.io/part-of: argocd-addons-platform
+    spec:
+      containers:
+      - name: aap-server
+        image: aap-server:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        envFrom:
+        # Static config (port, paths)
+        - configMapRef:
+            name: aap-server-config
+        # Secrets from .env.secrets (GITHUB_TOKEN, ARGOCD_TOKEN, etc.)
+        # These resolve ${VAR} references in config.yaml at runtime
+        - secretRef:
+            name: aap-env-secrets
+            optional: true
+        volumeMounts:
+        - name: config
+          mountPath: /etc/aap
+          readOnly: true
+        livenessProbe:
+          httpGet:
+            path: /api/v1/health
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /api/v1/health
+            port: http
+          initialDelaySeconds: 3
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 1001
+          runAsGroup: 1001
+          capabilities:
+            drop:
+            - ALL
+      volumes:
+      - name: config
+        configMap:
+          name: aap-config
+          optional: true
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+        fsGroup: 1001
