@@ -8,6 +8,7 @@ import (
 
 	"github.com/moran/argocd-addons-platform/internal/ai"
 	"github.com/moran/argocd-addons-platform/internal/config"
+	"github.com/moran/argocd-addons-platform/internal/datadog"
 	"github.com/moran/argocd-addons-platform/internal/service"
 )
 
@@ -22,7 +23,8 @@ func newTestServer() *Server {
 	upgradeSvc := service.NewUpgradeService(ai.NewClient(ai.Config{}))
 
 	aiClient := ai.NewClient(ai.Config{})
-	return NewServer(connSvc, clusterSvc, addonSvc, dashboardSvc, observabilitySvc, upgradeSvc, aiClient)
+	ddClient := datadog.NewClient(datadog.Config{})
+	return NewServer(connSvc, clusterSvc, addonSvc, dashboardSvc, observabilitySvc, upgradeSvc, aiClient, ddClient)
 }
 
 func TestHealthEndpoint(t *testing.T) {

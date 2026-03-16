@@ -11,6 +11,7 @@ import (
 	"github.com/moran/argocd-addons-platform/internal/ai"
 	"github.com/moran/argocd-addons-platform/internal/api"
 	"github.com/moran/argocd-addons-platform/internal/config"
+	"github.com/moran/argocd-addons-platform/internal/datadog"
 	"github.com/moran/argocd-addons-platform/internal/platform"
 	"github.com/moran/argocd-addons-platform/internal/service"
 )
@@ -76,6 +77,17 @@ func main() {
 		log.Printf("AI provider enabled: %s (model: %s)", aiCfg.Provider, model)
 	}
 
+	// Datadog configuration
+	ddCfg := datadog.Config{
+		APIKey: os.Getenv("DATADOG_API_KEY"),
+		AppKey: os.Getenv("DATADOG_APP_KEY"),
+		Site:   getEnvDefault("DATADOG_SITE", "datadoghq.com"),
+	}
+	ddClient := datadog.NewClient(ddCfg)
+	if ddClient.IsEnabled() {
+		log.Printf("Datadog metrics enabled (site: %s)", ddCfg.Site)
+	}
+
 	// Wire up services
 	connSvc := service.NewConnectionService(store)
 	clusterSvc := service.NewClusterService()
@@ -85,7 +97,7 @@ func main() {
 	upgradeSvc := service.NewUpgradeService(aiClient)
 
 	// Build server
-	srv := api.NewServer(connSvc, clusterSvc, addonSvc, dashboardSvc, observabilitySvc, upgradeSvc, aiClient)
+	srv := api.NewServer(connSvc, clusterSvc, addonSvc, dashboardSvc, observabilitySvc, upgradeSvc, aiClient, ddClient)
 
 	// Static files
 	var staticFS fs.FS

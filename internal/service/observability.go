@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/moran/argocd-addons-platform/internal/argocd"
+	"github.com/moran/argocd-addons-platform/internal/config"
 	"github.com/moran/argocd-addons-platform/internal/gitprovider"
 	"github.com/moran/argocd-addons-platform/internal/models"
 )
@@ -72,9 +73,12 @@ func (s *ObservabilityService) GetOverview(ctx context.Context, ac *argocd.Clien
 		fullApps = append(fullApps, *detail)
 	}
 
-	// 5. Build sync activity timeline from history entries
+	// 5. Build sync activity timeline from history entries (exclude infra apps)
 	var allSyncs []models.SyncActivityEntry
 	for _, app := range fullApps {
+		if isInfrastructureApp(app.Name) {
+			continue
+		}
 		addonName, clusterName := extractAddonCluster(app.Name, clusterNames)
 		for _, h := range app.History {
 			entry := models.SyncActivityEntry{
@@ -217,7 +221,22 @@ func (s *ObservabilityService) buildAddonGroups(apps []models.ArgocdApplication,
 	groupMap := make(map[string]*models.AddonGroupHealth)
 
 	for _, app := range apps {
+		// Skip infrastructure apps (not actual addons)
+		if isInfrastructureApp(app.Name) {
+			continue
+		}
+
 		addonName, clusterName := extractAddonCluster(app.Name, clusterNames)
+
+		// Skip apps where we couldn't extract a valid cluster name
+		// (these are typically bootstrap/infra apps like "external-secrets-operator")
+		if clusterName == "" || !clusterNames[clusterName] {
+			// Check if this looks like an addon by seeing if addonName is a known addon
+			// If clusterName doesn't match any known cluster, skip it
+			if clusterName != "" && clusterName != addonName && !clusterNames[clusterName] {
+				continue
+			}
+		}
 
 		group, ok := groupMap[addonName]
 		if !ok {
@@ -304,25 +323,29 @@ func healthPriority(health string) int {
 }
 
 // checkResourceAlerts checks Git values files for addons missing resource requests/limits.
-func (s *ObservabilityService) checkResourceAlerts(ctx context.Context, gp gitprovider.GitProvider, groups []models.AddonGroupHealth) []models.ResourceAlert {
+// Only checks addons from the catalog (not infrastructure apps like cluster-addons, clusters, karpenter-nodepools).
+func (s *ObservabilityService) checkResourceAlerts(ctx context.Context, gp gitprovider.GitProvider, _ []models.AddonGroupHealth) []models.ResourceAlert {
 	if gp == nil {
 		return nil
 	}
 
+	// Only check addons from the catalog — not infrastructure apps
+	parser := config.NewParser()
+	catalogData, err := gp.GetFileContent(ctx, "configuration/addons-catalog.yaml", "main")
+	if err != nil {
+		return nil
+	}
+	catalog, err := parser.ParseAddonsCatalog(catalogData)
+	if err != nil {
+		return nil
+	}
+
 	var alerts []models.ResourceAlert
-	seen := make(map[string]bool)
-
-	for _, group := range groups {
-		addonName := group.AddonName
-		if seen[addonName] {
-			continue
-		}
-		seen[addonName] = true
-
-		missing, detail := checkMissingResources(ctx, gp, addonName)
+	for _, addon := range catalog {
+		missing, detail := checkMissingResources(ctx, gp, addon.AppName)
 		if missing {
 			alerts = append(alerts, models.ResourceAlert{
-				AddonName: addonName,
+				AddonName: addon.AppName,
 				AlertType: "missing_limits",
 				Details:   detail,
 			})

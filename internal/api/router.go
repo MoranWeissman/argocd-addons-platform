@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/moran/argocd-addons-platform/internal/ai"
+	"github.com/moran/argocd-addons-platform/internal/datadog"
 	"github.com/moran/argocd-addons-platform/internal/service"
 )
 
@@ -20,6 +21,7 @@ type Server struct {
 	observabilitySvc *service.ObservabilityService
 	upgradeSvc       *service.UpgradeService
 	aiClient         *ai.Client
+	ddClient         *datadog.Client
 }
 
 // NewServer creates a new API server.
@@ -31,6 +33,7 @@ func NewServer(
 	observabilitySvc *service.ObservabilityService,
 	upgradeSvc *service.UpgradeService,
 	aiClient *ai.Client,
+	ddClient *datadog.Client,
 ) *Server {
 	return &Server{
 		connSvc:          connSvc,
@@ -40,6 +43,7 @@ func NewServer(
 		observabilitySvc: observabilitySvc,
 		upgradeSvc:       upgradeSvc,
 		aiClient:         aiClient,
+		ddClient:         ddClient,
 	}
 }
 
@@ -89,6 +93,10 @@ func NewRouter(srv *Server, staticFS fs.FS) http.Handler {
 
 	// Observability
 	mux.HandleFunc("GET /api/v1/observability/overview", srv.handleGetObservabilityOverview)
+
+	// Datadog Metrics
+	mux.HandleFunc("GET /api/v1/datadog/status", srv.handleDatadogStatus)
+	mux.HandleFunc("GET /api/v1/datadog/metrics/{namespace}", srv.handleDatadogNamespaceMetrics)
 
 	// AI Agent
 	mux.HandleFunc("POST /api/v1/agent/chat", srv.handleAgentChat)

@@ -434,6 +434,11 @@ var infrastructureAppPrefixes = []string{
 	"karpenter-nodepool",
 	"bootstrap-",
 	"eso-",
+	"cluster-addons",
+	"clusters",
+	"external-secrets-operator",
+	"eso-remote-prerequisites",
+	"github-repo-credentials",
 }
 
 func isInfrastructureApp(appName string) bool {

@@ -278,6 +278,15 @@ export interface ObservabilityOverviewResponse {
   resource_alerts: ResourceAlert[]
 }
 
+export interface DatadogNamespaceMetrics {
+  namespace: string
+  cpu_usage_nanocores: number
+  cpu_usage_cores: number
+  memory_usage_bytes: number
+  memory_usage_mb: number
+  running_pods: number
+}
+
 export interface AIProviderInfo {
   id: string
   name: string

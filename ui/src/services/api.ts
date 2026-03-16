@@ -9,6 +9,7 @@ import type {
   ConfigDiffResponse,
   ConnectionsListResponse,
   DashboardStats,
+  DatadogNamespaceMetrics,
   ObservabilityOverviewResponse,
   PullRequestsResponse,
   UpgradeCheckResponse,
@@ -103,6 +104,10 @@ export const api = {
   getAIConfig: () => fetchJSON<AIConfigResponse>('/ai/config'),
   setAIProvider: (provider: string) => postJSON<{ status: string; provider: string }>('/ai/provider', { provider }),
   testAI: () => postJSON<{ status: string; response: string }>('/ai/test', {}),
+
+  // Datadog
+  getDatadogStatus: () => fetchJSON<{ enabled: boolean; site: string }>('/datadog/status'),
+  getDatadogNamespaceMetrics: (namespace: string) => fetchJSON<DatadogNamespaceMetrics>(`/datadog/metrics/${namespace}`),
 
   // Agent Chat
   agentChat: (sessionId: string, message: string) => postJSON<{ session_id: string; response: string }>('/agent/chat', { session_id: sessionId, message }),

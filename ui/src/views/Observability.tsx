@@ -18,6 +18,8 @@ import {
   ChevronDown,
   ChevronUp,
   ShieldAlert,
+  Cpu,
+  HardDrive,
 } from 'lucide-react';
 import { api } from '@/services/api';
 import type {
@@ -25,6 +27,7 @@ import type {
   AddonGroupHealth,
   ResourceAlert,
   SyncActivityEntry,
+  DatadogNamespaceMetrics,
 } from '@/services/models';
 import { LoadingState } from '@/components/LoadingState';
 import { ErrorState } from '@/components/ErrorState';
@@ -245,6 +248,54 @@ function ResourceAlertsSection({ alerts }: { alerts: ResourceAlert[] }) {
 // Section 3: Addon Health Groups
 // ---------------------------------------------------------------------------
 
+function DatadogMetricsInline({ namespace }: { namespace: string }) {
+  const [metrics, setMetrics] = useState<DatadogNamespaceMetrics | null>(null);
+  const [ddAvailable, setDdAvailable] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    api.getDatadogStatus().then((s) => {
+      if (cancelled) return;
+      setDdAvailable(s.enabled);
+      if (s.enabled) {
+        api.getDatadogNamespaceMetrics(namespace).then((m) => {
+          if (!cancelled) setMetrics(m);
+        }).catch(() => { /* ignore */ });
+      }
+    }).catch(() => {
+      if (!cancelled) setDdAvailable(false);
+    });
+    return () => { cancelled = true; };
+  }, [namespace]);
+
+  if (ddAvailable === false) {
+    return (
+      <div className="mt-2 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-xs text-gray-400 dark:border-gray-700 dark:bg-gray-800">
+        Datadog metrics not available
+      </div>
+    );
+  }
+
+  if (!metrics) return null;
+
+  return (
+    <div className="mt-2 flex flex-wrap gap-4 rounded-lg border border-indigo-100 bg-indigo-50/50 px-3 py-2 dark:border-indigo-900/40 dark:bg-indigo-950/20">
+      <span className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-400">
+        <Cpu className="h-3 w-3 text-indigo-500" />
+        CPU: <span className="font-medium text-gray-900 dark:text-gray-100">{metrics.cpu_usage_cores.toFixed(3)} cores</span>
+      </span>
+      <span className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-400">
+        <HardDrive className="h-3 w-3 text-indigo-500" />
+        Memory: <span className="font-medium text-gray-900 dark:text-gray-100">{metrics.memory_usage_mb.toFixed(1)} MB</span>
+      </span>
+      <span className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-400">
+        <Server className="h-3 w-3 text-indigo-500" />
+        Pods: <span className="font-medium text-gray-900 dark:text-gray-100">{metrics.running_pods}</span>
+      </span>
+    </div>
+  );
+}
+
 function AddonGroupsSection({ groups }: { groups: AddonGroupHealth[] }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [sortMode, setSortMode] = useState<'issues' | 'alpha'>('issues');
@@ -364,6 +415,7 @@ function AddonGroupsSection({ groups }: { groups: AddonGroupHealth[] }) {
               {/* Expanded child apps table */}
               {isExpanded && group.child_apps && group.child_apps.length > 0 && (
                 <div className="border-t border-gray-100 px-4 pb-4 dark:border-gray-700">
+                  <DatadogMetricsInline namespace={group.addon_name} />
                   <table className="mt-3 w-full text-xs">
                     <thead>
                       <tr className="text-left text-gray-500 dark:text-gray-400">
