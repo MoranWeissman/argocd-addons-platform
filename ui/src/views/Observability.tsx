@@ -318,7 +318,8 @@ function AddonGroupsSection({ groups }: { groups: AddonGroupHealth[] }) {
   const [sortMode, setSortMode] = useState<'issues' | 'alpha'>('issues');
   const [groupBy, setGroupBy] = useState<GroupBy>('addon');
   const [ddEnabled, setDdEnabled] = useState<boolean | null>(null);
-  const [clusterMetricsCache, setClusterMetricsCache] = useState<Record<string, ClusterMetricsData>>({});
+  // Cache: clusterName -> data (or null if fetch failed/empty)
+  const [clusterMetricsCache, setClusterMetricsCache] = useState<Record<string, ClusterMetricsData | null>>({});
   const [loadingClusters, setLoadingClusters] = useState<Set<string>>(new Set());
 
   useEffect(() => {
@@ -376,11 +377,14 @@ function AddonGroupsSection({ groups }: { groups: AddonGroupHealth[] }) {
   const fetchClusterMetrics = useCallback((clusterNames: string[]) => {
     if (!ddEnabled) return;
     for (const cn of clusterNames) {
-      if (clusterMetricsCache[cn] || loadingClusters.has(cn)) continue;
+      if (cn in clusterMetricsCache || loadingClusters.has(cn)) continue;
       setLoadingClusters((prev) => new Set(prev).add(cn));
       api.getClusterMetrics(cn).then((data) => {
         setClusterMetricsCache((prev) => ({ ...prev, [cn]: data }));
-      }).catch(() => { /* ignore */ }).finally(() => {
+      }).catch(() => {
+        // Mark as fetched-but-empty so we don't retry and don't show "..."
+        setClusterMetricsCache((prev) => ({ ...prev, [cn]: null }));
+      }).finally(() => {
         setLoadingClusters((prev) => {
           const next = new Set(prev);
           next.delete(cn);
@@ -584,9 +588,9 @@ function AddonGroupsSection({ groups }: { groups: AddonGroupHealth[] }) {
                                 </>
                               ) : ddEnabled && !am ? (
                                 <>
-                                  <td className="py-2 pr-3 text-gray-400">...</td>
-                                  <td className="py-2 pr-3 text-gray-400">...</td>
-                                  <td className="py-2 pr-3 text-gray-400">...</td>
+                                  <td className="py-2 pr-3 text-gray-400">{loadingClusters.has(child.cluster_name) ? '...' : '--'}</td>
+                                  <td className="py-2 pr-3 text-gray-400">{loadingClusters.has(child.cluster_name) ? '...' : '--'}</td>
+                                  <td className="py-2 pr-3 text-gray-400">{loadingClusters.has(child.cluster_name) ? '...' : '--'}</td>
                                 </>
                               ) : (
                                 <td className="py-2 pr-3 text-gray-500 dark:text-gray-400">
@@ -732,9 +736,9 @@ function AddonGroupsSection({ groups }: { groups: AddonGroupHealth[] }) {
                                   </>
                                 ) : ddEnabled && !am ? (
                                   <>
-                                    <td className="py-2 pr-3 text-gray-400">...</td>
-                                    <td className="py-2 pr-3 text-gray-400">...</td>
-                                    <td className="py-2 pr-3 text-gray-400">...</td>
+                                    <td className="py-2 pr-3 text-gray-400">{loadingClusters.has(cg.cluster_name) ? '...' : '--'}</td>
+                                    <td className="py-2 pr-3 text-gray-400">{loadingClusters.has(cg.cluster_name) ? '...' : '--'}</td>
+                                    <td className="py-2 pr-3 text-gray-400">{loadingClusters.has(cg.cluster_name) ? '...' : '--'}</td>
                                   </>
                                 ) : (
                                   <td className="py-2 pr-3 text-gray-500 dark:text-gray-400">
