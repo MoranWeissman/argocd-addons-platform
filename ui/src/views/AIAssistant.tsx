@@ -102,7 +102,6 @@ function renderFormattedContent(content: string) {
   const elements: React.ReactNode[] = []
   let listBuffer: { type: 'ul' | 'ol'; items: React.ReactNode[] } | null = null
   let codeBlockBuffer: string[] | null = null
-  let codeBlockLang = ''
 
   function flushList() {
     if (listBuffer) {
@@ -138,7 +137,6 @@ function renderFormattedContent(content: string) {
         </pre>,
       )
       codeBlockBuffer = null
-      codeBlockLang = ''
     }
   }
 
@@ -179,7 +177,6 @@ function renderFormattedContent(content: string) {
       } else {
         flushList()
         codeBlockBuffer = []
-        codeBlockLang = line.trimStart().slice(3).trim()
       }
       continue
     }
