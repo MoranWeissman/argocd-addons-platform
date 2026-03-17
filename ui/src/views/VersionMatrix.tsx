@@ -69,7 +69,7 @@ function MatrixCell({ cell, cluster, addonName }: { cell: VersionMatrixCell | un
 
   if (!cell || cell.health === 'not_enabled') {
     return (
-      <td className="border-r border-gray-100 px-2 py-2 text-center dark:border-gray-700">
+      <td className="border-r border-gray-100 px-1 py-2 text-center dark:border-gray-700">
         <span className="text-[10px] text-gray-300 dark:text-gray-600">—</span>
       </td>
     )
@@ -79,16 +79,16 @@ function MatrixCell({ cell, cluster, addonName }: { cell: VersionMatrixCell | un
 
   return (
     <td
-      className={`border-r border-gray-100 px-2 py-1.5 dark:border-gray-700 ${isDrift ? 'bg-amber-50/50 dark:bg-amber-900/10' : ''}`}
+      className={`border-r border-gray-100 px-0.5 py-1.5 dark:border-gray-700 ${isDrift ? 'bg-amber-50/50 dark:bg-amber-900/10' : ''}`}
     >
       <button
         type="button"
         onClick={() => navigate(`/clusters/${cluster}`)}
         title={`${addonName} on ${cluster}\nVersion: ${cell.version}\nHealth: ${healthLabel(cell.health)}${isDrift ? '\nVersion drift from catalog' : ''}`}
-        className={`group flex w-full items-center justify-center gap-1.5 rounded px-1.5 py-1 text-xs transition-all hover:ring-2 ${healthRing(cell.health)} ${healthBg(cell.health)}`}
+        className={`group flex w-full flex-col items-center gap-0.5 rounded px-1 py-1 text-xs transition-all hover:ring-2 ${healthRing(cell.health)} ${healthBg(cell.health)}`}
       >
         <span className={`inline-block h-2 w-2 shrink-0 rounded-full ${healthColor(cell.health)}`} />
-        <span className={`font-mono text-[11px] leading-none ${isDrift ? 'font-bold text-amber-600 dark:text-amber-400' : 'text-gray-600 dark:text-gray-400'}`}>
+        <span className={`font-mono text-[9px] leading-none ${isDrift ? 'font-bold text-amber-600 dark:text-amber-400' : 'text-gray-500 dark:text-gray-400'}`}>
           {cell.version}
         </span>
       </button>
@@ -99,23 +99,39 @@ function MatrixCell({ cell, cluster, addonName }: { cell: VersionMatrixCell | un
 function MatrixTable({ addons, clusters }: { addons: VersionMatrixRow[]; clusters: string[] }) {
   return (
     <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
-      <table className="w-full text-left text-sm">
+      <table className="text-left text-sm">
         <thead className="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-900">
           <tr>
-            <th className="sticky left-0 z-10 min-w-[180px] border-r border-gray-200 bg-gray-50 px-4 py-2 text-xs font-semibold uppercase text-gray-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400">
+            <th className="sticky left-0 z-10 min-w-[180px] border-r border-gray-200 bg-gray-50 px-4 text-xs font-semibold uppercase text-gray-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400" style={{ height: clusters.length > 3 ? 120 : 40 }}>
               Addon
             </th>
-            <th className="min-w-[70px] border-r border-gray-100 px-2 py-2 text-center text-[10px] font-semibold uppercase text-gray-400 dark:border-gray-700 dark:text-gray-500">
+            <th className="min-w-[70px] border-r border-gray-100 px-2 text-center text-[10px] font-semibold uppercase text-gray-400 dark:border-gray-700 dark:text-gray-500">
               Catalog
             </th>
             {clusters.map((cluster) => (
               <th
                 key={cluster}
-                className="min-w-[100px] border-r border-gray-100 px-2 py-2 text-center dark:border-gray-700"
+                className="border-r border-gray-100 px-0.5 dark:border-gray-700"
+                style={{ minWidth: 56, width: 56 }}
               >
-                <span className="block max-w-[120px] truncate text-[10px] font-medium text-gray-500 dark:text-gray-400" title={cluster}>
-                  {cluster.replace(/-eks$/, '')}
-                </span>
+                <div
+                  className="flex items-end justify-center"
+                  style={clusters.length > 3 ? { height: 110 } : {}}
+                >
+                  <span
+                    className="block whitespace-nowrap text-[10px] font-medium text-gray-500 dark:text-gray-400"
+                    style={clusters.length > 3 ? {
+                      writingMode: 'vertical-rl',
+                      transform: 'rotate(180deg)',
+                      maxHeight: 100,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                    } : { textAlign: 'center', display: 'block', width: '100%' }}
+                    title={cluster}
+                  >
+                    {cluster.replace(/-eks$/, '')}
+                  </span>
+                </div>
               </th>
             ))}
           </tr>
