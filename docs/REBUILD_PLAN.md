@@ -305,11 +305,11 @@ connections:
     git:
       provider: github  # or "azuredevops"
       # GitHub fields
-      owner: merck-ahtl
+      owner: your-org
       repo: argocd-cluster-addons
       token: ${GITHUB_TOKEN}  # env var reference
       # Azure DevOps fields (if provider: azuredevops)
-      # organization: https://dev.azure.com/AHITL
+      # organization: https://dev.azure.com/your-org
       # project: DevOps
       # repository: argocd-cluster-addons
       # pat: ${AZURE_DEVOPS_PAT}

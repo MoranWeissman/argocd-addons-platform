@@ -1,4 +1,4 @@
-# Production values for merck-ahtl deployment.
+# Production values.
 # Secrets are passed via --set from .env.secrets — never in this file.
 
 replicaCount: 1
@@ -14,8 +14,8 @@ config:
       default: true
       git:
         provider: github
-        owner: merck-ahtl
-        repo: argocd-cluster-addons
+        owner: your-org
+        repo: your-addons-repo
         token: ${GITHUB_TOKEN}
       argocd:
         server_url: ${ARGOCD_NONPROD_SERVER_URL}
