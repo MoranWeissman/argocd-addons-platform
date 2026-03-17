@@ -298,20 +298,59 @@ function ResourceUsageBar({
   );
 }
 
+type GroupBy = 'addon' | 'cluster';
+
+interface ClusterGroup {
+  cluster_name: string;
+  addons: Array<{
+    addon_name: string;
+    health: string;
+    sync_status: string;
+    reconciled_at?: string;
+    resource_summary: { total_pods: number; running_pods: number; total_containers: number };
+    app_name: string;
+  }>;
+  health_counts: Record<string, number>;
+}
+
 function AddonGroupsSection({ groups }: { groups: AddonGroupHealth[] }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [sortMode, setSortMode] = useState<'issues' | 'alpha'>('issues');
+  const [groupBy, setGroupBy] = useState<GroupBy>('addon');
   const [ddEnabled, setDdEnabled] = useState<boolean | null>(null);
-  // Cache cluster metrics: clusterName -> ClusterMetricsData
   const [clusterMetricsCache, setClusterMetricsCache] = useState<Record<string, ClusterMetricsData>>({});
   const [loadingClusters, setLoadingClusters] = useState<Set<string>>(new Set());
 
-  // Check Datadog availability once
   useEffect(() => {
     api.getDatadogStatus().then((s) => setDdEnabled(s.enabled)).catch(() => setDdEnabled(false));
   }, []);
 
-  const sorted = useMemo(() => {
+  // Pivot data: group by cluster instead of addon
+  const clusterGroups = useMemo((): ClusterGroup[] => {
+    const map = new Map<string, ClusterGroup>();
+    for (const group of groups) {
+      for (const child of group.child_apps ?? []) {
+        let cg = map.get(child.cluster_name);
+        if (!cg) {
+          cg = { cluster_name: child.cluster_name, addons: [], health_counts: {} };
+          map.set(child.cluster_name, cg);
+        }
+        cg.addons.push({
+          addon_name: group.addon_name,
+          health: child.health,
+          sync_status: child.sync_status,
+          reconciled_at: child.reconciled_at,
+          resource_summary: child.resource_summary,
+          app_name: child.app_name,
+        });
+        const h = child.health || 'Unknown';
+        cg.health_counts[h] = (cg.health_counts[h] ?? 0) + 1;
+      }
+    }
+    return Array.from(map.values());
+  }, [groups]);
+
+  const sortedAddonGroups = useMemo(() => {
     const copy = [...(groups ?? [])];
     if (sortMode === 'alpha') {
       copy.sort((a, b) => a.addon_name.localeCompare(b.addon_name));
@@ -319,7 +358,21 @@ function AddonGroupsSection({ groups }: { groups: AddonGroupHealth[] }) {
     return copy;
   }, [groups, sortMode]);
 
-  // Fetch cluster metrics lazily when a group is expanded
+  const sortedClusterGroups = useMemo(() => {
+    const copy = [...clusterGroups];
+    if (sortMode === 'alpha') {
+      copy.sort((a, b) => a.cluster_name.localeCompare(b.cluster_name));
+    } else {
+      // Most issues first
+      copy.sort((a, b) => {
+        const aIssues = a.addons.filter(x => x.health.toLowerCase() !== 'healthy').length;
+        const bIssues = b.addons.filter(x => x.health.toLowerCase() !== 'healthy').length;
+        return bIssues - aIssues;
+      });
+    }
+    return copy;
+  }, [clusterGroups, sortMode]);
+
   const fetchClusterMetrics = useCallback((clusterNames: string[]) => {
     if (!ddEnabled) return;
     for (const cn of clusterNames) {
@@ -344,25 +397,33 @@ function AddonGroupsSection({ groups }: { groups: AddonGroupHealth[] }) {
         next.delete(name);
       } else {
         next.add(name);
-        // Find unique clusters in this group and fetch their metrics
-        const group = groups.find((g) => g.addon_name === name);
-        if (group?.child_apps) {
-          const clusters = [...new Set(group.child_apps.map((c) => c.cluster_name))];
-          fetchClusterMetrics(clusters);
+        if (groupBy === 'addon') {
+          const group = groups.find((g) => g.addon_name === name);
+          if (group?.child_apps) {
+            const clusters = [...new Set(group.child_apps.map((c) => c.cluster_name))];
+            fetchClusterMetrics(clusters);
+          }
+        } else {
+          fetchClusterMetrics([name]);
         }
       }
       return next;
     });
   };
 
-  // Helper: look up addon metrics for a specific cluster + namespace
-  const getAddonMetrics = (clusterName: string, namespace: string): AddonMetricsData | undefined => {
-    const cm = clusterMetricsCache[clusterName];
-    if (!cm?.addons) return undefined;
-    return cm.addons.find((a) => a.namespace === namespace || a.addon_name === namespace);
+  // Reset expanded state when switching group mode
+  const handleGroupByChange = (mode: GroupBy) => {
+    setGroupBy(mode);
+    setExpanded(new Set());
   };
 
-  if (!sorted || sorted.length === 0) {
+  const getAddonMetrics = (clusterName: string, addonName: string): AddonMetricsData | undefined => {
+    const cm = clusterMetricsCache[clusterName];
+    if (!cm?.addons) return undefined;
+    return cm.addons.find((a) => a.namespace === addonName || a.addon_name === addonName);
+  };
+
+  if (!groups || groups.length === 0) {
     return null;
   }
 
@@ -373,203 +434,336 @@ function AddonGroupsSection({ groups }: { groups: AddonGroupHealth[] }) {
           <Server className="h-5 w-5 text-cyan-500" />
           Addon Health
         </h2>
-        <div className="flex gap-1">
-          {(['issues', 'alpha'] as const).map((m) => (
-            <button
-              key={m}
-              onClick={() => setSortMode(m)}
-              className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
-                sortMode === m
-                  ? 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/40 dark:text-cyan-300'
-                  : 'text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800'
-              }`}
-            >
-              {m === 'issues' ? 'Most Issues' : 'A-Z'}
-            </button>
-          ))}
+        <div className="flex items-center gap-3">
+          {/* Group by toggle */}
+          <div className="flex rounded-md border border-gray-300 dark:border-gray-600">
+            {(['addon', 'cluster'] as const).map((m) => (
+              <button
+                key={m}
+                onClick={() => handleGroupByChange(m)}
+                className={`px-2.5 py-1 text-xs font-medium transition-colors ${
+                  groupBy === m
+                    ? 'bg-cyan-600 text-white'
+                    : 'text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800'
+                } ${m === 'addon' ? 'rounded-l-md' : 'rounded-r-md'}`}
+              >
+                By {m === 'addon' ? 'Addon' : 'Cluster'}
+              </button>
+            ))}
+          </div>
+          {/* Sort toggle */}
+          <div className="flex gap-1">
+            {(['issues', 'alpha'] as const).map((m) => (
+              <button
+                key={m}
+                onClick={() => setSortMode(m)}
+                className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                  sortMode === m
+                    ? 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/40 dark:text-cyan-300'
+                    : 'text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800'
+                }`}
+              >
+                {m === 'issues' ? 'Most Issues' : 'A-Z'}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
       <div className="space-y-3">
-        {sorted.map((group) => {
-          const isExpanded = expanded.has(group.addon_name);
-          const healthEntries = Object.entries(group.health_counts);
-          const total = group.total_apps;
+        {groupBy === 'addon' ? (
+          /* ---- Group by Addon (original) ---- */
+          sortedAddonGroups.map((group) => {
+            const isExpanded = expanded.has(group.addon_name);
+            const healthEntries = Object.entries(group.health_counts);
+            const total = group.total_apps;
 
-          return (
-            <div
-              key={group.addon_name}
-              className="rounded-xl border border-gray-200 bg-white shadow-sm transition-shadow hover:shadow-md dark:border-gray-700 dark:bg-gray-900"
-            >
-              {/* Collapsible header */}
-              <button
-                onClick={() => toggle(group.addon_name)}
-                className="flex w-full items-center gap-4 p-4 text-left"
-                aria-expanded={isExpanded}
+            return (
+              <div
+                key={group.addon_name}
+                className="rounded-xl border border-gray-200 bg-white shadow-sm transition-shadow hover:shadow-md dark:border-gray-700 dark:bg-gray-900"
               >
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                      {group.addon_name}
-                    </span>
-                    <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500 dark:bg-gray-800 dark:text-gray-400">
-                      {total} app{total !== 1 ? 's' : ''}
-                    </span>
-                  </div>
-                  {/* Health summary bar */}
-                  <div className="mt-2 flex h-2 overflow-hidden rounded-full">
-                    {healthEntries.map(([status, count]) => (
-                      <div
-                        key={status}
-                        style={{
-                          width:
-                            total > 0 ? `${(count / total) * 100}%` : '0%',
-                          backgroundColor:
-                            HEALTH_COLORS[status] ?? '#9ca3af',
-                        }}
-                        title={`${status}: ${count}`}
-                      />
-                    ))}
-                  </div>
-                  <div className="mt-1.5 flex flex-wrap gap-3">
-                    {healthEntries.map(([status, count]) => (
-                      <span
-                        key={status}
-                        className="flex items-center gap-1 text-[11px] text-gray-500 dark:text-gray-400"
-                      >
-                        <span
-                          className="inline-block h-2 w-2 rounded-full"
-                          style={{
-                            backgroundColor:
-                              HEALTH_COLORS[status] ?? '#9ca3af',
-                          }}
-                        />
-                        {status}: {count}
+                <button
+                  onClick={() => toggle(group.addon_name)}
+                  className="flex w-full items-center gap-4 p-4 text-left"
+                  aria-expanded={isExpanded}
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                        {group.addon_name}
                       </span>
-                    ))}
+                      <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500 dark:bg-gray-800 dark:text-gray-400">
+                        {total} app{total !== 1 ? 's' : ''}
+                      </span>
+                    </div>
+                    <div className="mt-2 flex h-2 overflow-hidden rounded-full">
+                      {healthEntries.map(([status, count]) => (
+                        <div
+                          key={status}
+                          style={{
+                            width: total > 0 ? `${(count / total) * 100}%` : '0%',
+                            backgroundColor: HEALTH_COLORS[status] ?? '#9ca3af',
+                          }}
+                          title={`${status}: ${count}`}
+                        />
+                      ))}
+                    </div>
+                    <div className="mt-1.5 flex flex-wrap gap-3">
+                      {healthEntries.map(([status, count]) => (
+                        <span
+                          key={status}
+                          className="flex items-center gap-1 text-[11px] text-gray-500 dark:text-gray-400"
+                        >
+                          <span
+                            className="inline-block h-2 w-2 rounded-full"
+                            style={{ backgroundColor: HEALTH_COLORS[status] ?? '#9ca3af' }}
+                          />
+                          {status}: {count}
+                        </span>
+                      ))}
+                    </div>
                   </div>
-                </div>
-                {isExpanded ? (
-                  <ChevronUp className="h-4 w-4 shrink-0 text-gray-400" />
-                ) : (
-                  <ChevronDown className="h-4 w-4 shrink-0 text-gray-400" />
-                )}
-              </button>
+                  {isExpanded ? (
+                    <ChevronUp className="h-4 w-4 shrink-0 text-gray-400" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4 shrink-0 text-gray-400" />
+                  )}
+                </button>
 
-              {/* Expanded child apps table */}
-              {isExpanded && group.child_apps && group.child_apps.length > 0 && (
-                <div className="border-t border-gray-100 px-4 pb-4 dark:border-gray-700">
-                  <table className="mt-3 w-full text-xs">
-                    <thead>
-                      <tr className="text-left text-gray-500 dark:text-gray-400">
-                        <th className="pb-2 font-medium">Cluster</th>
-                        <th className="pb-2 font-medium">Health</th>
-                        <th className="pb-2 font-medium">Sync</th>
-                        {ddEnabled ? (
-                          <>
-                            <th className="pb-2 font-medium">CPU (use / req / lim)</th>
-                            <th className="pb-2 font-medium">Memory (use / req / lim)</th>
-                            <th className="pb-2 font-medium">Pods</th>
-                          </>
-                        ) : (
-                          <th className="pb-2 font-medium">Resources</th>
-                        )}
-                        <th className="pb-2 font-medium">Last Reconciled</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
-                      {group.child_apps.map((child) => {
-                        const am = ddEnabled ? getAddonMetrics(child.cluster_name, group.addon_name) : undefined;
-                        return (
-                          <tr
-                            key={child.app_name}
-                            className="hover:bg-gray-50 dark:hover:bg-gray-800"
-                          >
-                            <td className="py-2 pr-3 font-medium text-gray-800 dark:text-gray-200">
-                              {child.cluster_name}
-                            </td>
-                            <td className="py-2 pr-3">
-                              <span
-                                className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${healthBadgeCls(child.health)}`}
-                              >
-                                {child.health || 'Unknown'}
-                              </span>
-                            </td>
-                            <td className="py-2 pr-3">
-                              <span
-                                className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${syncBadgeCls(child.sync_status)}`}
-                              >
-                                {child.sync_status || 'Unknown'}
-                              </span>
-                            </td>
-                            {ddEnabled && am ? (
-                              <>
-                                <td className="py-2 pr-3">
-                                  <ResourceUsageBar
-                                    usage={am.cpu_usage_cores}
-                                    request={am.cpu_request_cores}
-                                    limit={am.cpu_limit_cores}
-                                    label="CPU"
-                                    unit="cores"
-                                    decimals={3}
-                                  />
-                                </td>
-                                <td className="py-2 pr-3">
-                                  <ResourceUsageBar
-                                    usage={am.mem_usage_mb}
-                                    request={am.mem_request_mb}
-                                    limit={am.mem_limit_mb}
-                                    label="Mem"
-                                    unit="MB"
-                                    decimals={0}
-                                  />
-                                </td>
-                                <td className="py-2 pr-3 text-gray-600 dark:text-gray-300">
-                                  {am.pod_count}
-                                </td>
-                              </>
-                            ) : ddEnabled && !am ? (
-                              <>
-                                <td className="py-2 pr-3 text-gray-400">...</td>
-                                <td className="py-2 pr-3 text-gray-400">...</td>
-                                <td className="py-2 pr-3 text-gray-400">...</td>
-                              </>
-                            ) : (
-                              <td className="py-2 pr-3 text-gray-500 dark:text-gray-400">
-                                {child.resource_summary.total_pods > 0 && (
-                                  <span>
-                                    {child.resource_summary.running_pods}/
-                                    {child.resource_summary.total_pods} pods
-                                  </span>
-                                )}
-                                {child.resource_summary.total_pods === 0 &&
-                                  child.resource_summary.total_containers > 0 && (
-                                    <span>
-                                      {child.resource_summary.total_containers}{' '}
-                                      workloads
-                                    </span>
+                {isExpanded && group.child_apps && group.child_apps.length > 0 && (
+                  <div className="border-t border-gray-100 px-4 pb-4 dark:border-gray-700">
+                    <table className="mt-3 w-full text-xs">
+                      <thead>
+                        <tr className="text-left text-gray-500 dark:text-gray-400">
+                          <th className="pb-2 font-medium">Cluster</th>
+                          <th className="pb-2 font-medium">Health</th>
+                          <th className="pb-2 font-medium">Sync</th>
+                          {ddEnabled ? (
+                            <>
+                              <th className="pb-2 font-medium">CPU (use / req / lim)</th>
+                              <th className="pb-2 font-medium">Memory (use / req / lim)</th>
+                              <th className="pb-2 font-medium">Pods</th>
+                            </>
+                          ) : (
+                            <th className="pb-2 font-medium">Resources</th>
+                          )}
+                          <th className="pb-2 font-medium">Last Reconciled</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
+                        {group.child_apps.map((child) => {
+                          const am = ddEnabled ? getAddonMetrics(child.cluster_name, group.addon_name) : undefined;
+                          return (
+                            <tr
+                              key={child.app_name}
+                              className="hover:bg-gray-50 dark:hover:bg-gray-800"
+                            >
+                              <td className="py-2 pr-3 font-medium text-gray-800 dark:text-gray-200">
+                                {child.cluster_name}
+                              </td>
+                              <td className="py-2 pr-3">
+                                <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${healthBadgeCls(child.health)}`}>
+                                  {child.health || 'Unknown'}
+                                </span>
+                              </td>
+                              <td className="py-2 pr-3">
+                                <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${syncBadgeCls(child.sync_status)}`}>
+                                  {child.sync_status || 'Unknown'}
+                                </span>
+                              </td>
+                              {ddEnabled && am ? (
+                                <>
+                                  <td className="py-2 pr-3">
+                                    <ResourceUsageBar usage={am.cpu_usage_cores} request={am.cpu_request_cores} limit={am.cpu_limit_cores} label="CPU" unit="cores" decimals={3} />
+                                  </td>
+                                  <td className="py-2 pr-3">
+                                    <ResourceUsageBar usage={am.mem_usage_mb} request={am.mem_request_mb} limit={am.mem_limit_mb} label="Mem" unit="MB" decimals={0} />
+                                  </td>
+                                  <td className="py-2 pr-3 text-gray-600 dark:text-gray-300">{am.pod_count}</td>
+                                </>
+                              ) : ddEnabled && !am ? (
+                                <>
+                                  <td className="py-2 pr-3 text-gray-400">...</td>
+                                  <td className="py-2 pr-3 text-gray-400">...</td>
+                                  <td className="py-2 pr-3 text-gray-400">...</td>
+                                </>
+                              ) : (
+                                <td className="py-2 pr-3 text-gray-500 dark:text-gray-400">
+                                  {child.resource_summary.total_pods > 0 && (
+                                    <span>{child.resource_summary.running_pods}/{child.resource_summary.total_pods} pods</span>
                                   )}
-                                {child.resource_summary.total_pods === 0 &&
-                                  child.resource_summary.total_containers === 0 && (
+                                  {child.resource_summary.total_pods === 0 && child.resource_summary.total_containers > 0 && (
+                                    <span>{child.resource_summary.total_containers} workloads</span>
+                                  )}
+                                  {child.resource_summary.total_pods === 0 && child.resource_summary.total_containers === 0 && (
                                     <span className="text-gray-400">--</span>
                                   )}
+                                </td>
+                              )}
+                              <td className="py-2 text-gray-400">
+                                {child.reconciled_at ? timeAgo(child.reconciled_at) : '--'}
                               </td>
-                            )}
-                            <td className="py-2 text-gray-400">
-                              {child.reconciled_at
-                                ? timeAgo(child.reconciled_at)
-                                : '--'}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            );
+          })
+        ) : (
+          /* ---- Group by Cluster ---- */
+          sortedClusterGroups.length === 0 ? (
+            <div className="rounded-lg border border-gray-200 bg-white p-8 text-center text-sm text-gray-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">
+              No cluster data available.
             </div>
-          );
-        })}
+          ) : (
+            sortedClusterGroups.map((cg) => {
+              const isExpanded = expanded.has(cg.cluster_name);
+              const healthEntries = Object.entries(cg.health_counts);
+              const total = cg.addons.length;
+
+              return (
+                <div
+                  key={cg.cluster_name}
+                  className="rounded-xl border border-gray-200 bg-white shadow-sm transition-shadow hover:shadow-md dark:border-gray-700 dark:bg-gray-900"
+                >
+                  <button
+                    onClick={() => toggle(cg.cluster_name)}
+                    className="flex w-full items-center gap-4 p-4 text-left"
+                    aria-expanded={isExpanded}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                          {cg.cluster_name}
+                        </span>
+                        <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500 dark:bg-gray-800 dark:text-gray-400">
+                          {total} addon{total !== 1 ? 's' : ''}
+                        </span>
+                      </div>
+                      <div className="mt-2 flex h-2 overflow-hidden rounded-full">
+                        {healthEntries.map(([status, count]) => (
+                          <div
+                            key={status}
+                            style={{
+                              width: total > 0 ? `${(count / total) * 100}%` : '0%',
+                              backgroundColor: HEALTH_COLORS[status] ?? '#9ca3af',
+                            }}
+                            title={`${status}: ${count}`}
+                          />
+                        ))}
+                      </div>
+                      <div className="mt-1.5 flex flex-wrap gap-3">
+                        {healthEntries.map(([status, count]) => (
+                          <span
+                            key={status}
+                            className="flex items-center gap-1 text-[11px] text-gray-500 dark:text-gray-400"
+                          >
+                            <span
+                              className="inline-block h-2 w-2 rounded-full"
+                              style={{ backgroundColor: HEALTH_COLORS[status] ?? '#9ca3af' }}
+                            />
+                            {status}: {count}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    {isExpanded ? (
+                      <ChevronUp className="h-4 w-4 shrink-0 text-gray-400" />
+                    ) : (
+                      <ChevronDown className="h-4 w-4 shrink-0 text-gray-400" />
+                    )}
+                  </button>
+
+                  {isExpanded && (
+                    <div className="border-t border-gray-100 px-4 pb-4 dark:border-gray-700">
+                      <table className="mt-3 w-full text-xs">
+                        <thead>
+                          <tr className="text-left text-gray-500 dark:text-gray-400">
+                            <th className="pb-2 font-medium">Addon</th>
+                            <th className="pb-2 font-medium">Health</th>
+                            <th className="pb-2 font-medium">Sync</th>
+                            {ddEnabled ? (
+                              <>
+                                <th className="pb-2 font-medium">CPU (use / req / lim)</th>
+                                <th className="pb-2 font-medium">Memory (use / req / lim)</th>
+                                <th className="pb-2 font-medium">Pods</th>
+                              </>
+                            ) : (
+                              <th className="pb-2 font-medium">Resources</th>
+                            )}
+                            <th className="pb-2 font-medium">Last Reconciled</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
+                          {cg.addons.map((addon) => {
+                            const am = ddEnabled ? getAddonMetrics(cg.cluster_name, addon.addon_name) : undefined;
+                            return (
+                              <tr
+                                key={addon.app_name}
+                                className="hover:bg-gray-50 dark:hover:bg-gray-800"
+                              >
+                                <td className="py-2 pr-3 font-medium text-gray-800 dark:text-gray-200">
+                                  {addon.addon_name}
+                                </td>
+                                <td className="py-2 pr-3">
+                                  <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${healthBadgeCls(addon.health)}`}>
+                                    {addon.health || 'Unknown'}
+                                  </span>
+                                </td>
+                                <td className="py-2 pr-3">
+                                  <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${syncBadgeCls(addon.sync_status)}`}>
+                                    {addon.sync_status || 'Unknown'}
+                                  </span>
+                                </td>
+                                {ddEnabled && am ? (
+                                  <>
+                                    <td className="py-2 pr-3">
+                                      <ResourceUsageBar usage={am.cpu_usage_cores} request={am.cpu_request_cores} limit={am.cpu_limit_cores} label="CPU" unit="cores" decimals={3} />
+                                    </td>
+                                    <td className="py-2 pr-3">
+                                      <ResourceUsageBar usage={am.mem_usage_mb} request={am.mem_request_mb} limit={am.mem_limit_mb} label="Mem" unit="MB" decimals={0} />
+                                    </td>
+                                    <td className="py-2 pr-3 text-gray-600 dark:text-gray-300">{am.pod_count}</td>
+                                  </>
+                                ) : ddEnabled && !am ? (
+                                  <>
+                                    <td className="py-2 pr-3 text-gray-400">...</td>
+                                    <td className="py-2 pr-3 text-gray-400">...</td>
+                                    <td className="py-2 pr-3 text-gray-400">...</td>
+                                  </>
+                                ) : (
+                                  <td className="py-2 pr-3 text-gray-500 dark:text-gray-400">
+                                    {addon.resource_summary.total_pods > 0 && (
+                                      <span>{addon.resource_summary.running_pods}/{addon.resource_summary.total_pods} pods</span>
+                                    )}
+                                    {addon.resource_summary.total_pods === 0 && addon.resource_summary.total_containers > 0 && (
+                                      <span>{addon.resource_summary.total_containers} workloads</span>
+                                    )}
+                                    {addon.resource_summary.total_pods === 0 && addon.resource_summary.total_containers === 0 && (
+                                      <span className="text-gray-400">--</span>
+                                    )}
+                                  </td>
+                                )}
+                                <td className="py-2 text-gray-400">
+                                  {addon.reconciled_at ? timeAgo(addon.reconciled_at) : '--'}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )
+        )}
       </div>
     </section>
   );
