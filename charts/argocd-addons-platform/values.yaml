@@ -4,7 +4,7 @@
 replicaCount: 1
 
 image:
-  repository: aap-server
+  repository: ghcr.io/moran/argocd-addons-platform
   tag: ""  # Defaults to appVersion from Chart.yaml
   pullPolicy: IfNotPresent
 

@@ -1,10 +1,22 @@
 #!/usr/bin/env bash
 # Installer for ArgoCD Addons Platform.
+# Builds the Docker image, pushes to registry, and deploys via Helm.
 # Sources secrets from .env.secrets and passes them via --set (never in values files).
 #
 # Usage:
-#   ./scripts/helm-install.sh              # Sources .env.secrets from project root
-#   ./scripts/helm-install.sh /path/to/.env.secrets  # Custom secrets file
+#   ./scripts/helm-install.sh                         # Sources .env.secrets from project root
+#   ./scripts/helm-install.sh /path/to/.env.secrets   # Custom secrets file
+#
+# Required env vars in .env.secrets:
+#   GITHUB_TOKEN          - GitHub PAT for Git provider access
+#
+# Optional env vars:
+#   IMAGE_REGISTRY        - Container registry (e.g. 123456.dkr.ecr.us-east-1.amazonaws.com, ghcr.io/org)
+#                           If unset, uses local image (minikube/kind/docker-desktop)
+#   IMAGE_REPOSITORY      - Image name (default: aap-server)
+#   ARGOCD_TOKEN, ARGOCD_NONPROD_SERVER_URL, ARGOCD_NONPROD_TOKEN
+#   AI_API_KEY, AI_PROVIDER, AI_CLOUD_MODEL
+#   DATADOG_API_KEY, DATADOG_APP_KEY
 
 set -euo pipefail
 
@@ -13,6 +25,7 @@ PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 CHART_DIR="${PROJECT_ROOT}/charts/argocd-addons-platform"
 NAMESPACE="argocd-addons-platform"
 RELEASE="aap"
+VERSION="$(cat "${PROJECT_ROOT}/VERSION" 2>/dev/null || echo "0.0.0")"
 
 # --- Source secrets ---
 SECRETS_FILE="${1:-${PROJECT_ROOT}/.env.secrets}"
@@ -40,8 +53,67 @@ if [[ -z "${GITHUB_TOKEN:-}" ]]; then
   exit 1
 fi
 
-# --- Build --set args for secrets ---
+# --- Image config ---
+IMAGE_REPO="${IMAGE_REPOSITORY:-aap-server}"
+REGISTRY="${IMAGE_REGISTRY:-}"
+
+if [[ -n "${REGISTRY}" ]]; then
+  FULL_IMAGE="${REGISTRY}/${IMAGE_REPO}"
+else
+  FULL_IMAGE="${IMAGE_REPO}"
+fi
+IMAGE_TAG="${VERSION}"
+
+echo "=== ArgoCD Addons Platform Installer ==="
+echo "  Version:   ${VERSION}"
+echo "  Image:     ${FULL_IMAGE}:${IMAGE_TAG}"
+echo "  Namespace: ${NAMESPACE}"
+echo "  Chart:     ${CHART_DIR}"
+echo "  Secrets:   ${SECRETS_FILE}"
+echo "  AI:        ${AI_PROVIDER:-disabled} ${AI_CLOUD_MODEL:+(${AI_CLOUD_MODEL})}"
+echo "  Datadog:   ${DATADOG_API_KEY:+enabled}${DATADOG_API_KEY:-disabled}"
+echo ""
+
+# --- Step 1: Build Docker image ---
+echo ">>> Building Docker image ${FULL_IMAGE}:${IMAGE_TAG} ..."
+
+# If minikube is running, build inside minikube's docker
+if command -v minikube >/dev/null 2>&1 && minikube status --format='{{.Host}}' 2>/dev/null | grep -q Running; then
+  echo "    (Using minikube docker daemon)"
+  eval "$(minikube docker-env)"
+fi
+
+docker build -t "${FULL_IMAGE}:${IMAGE_TAG}" -t "${FULL_IMAGE}:latest" "${PROJECT_ROOT}"
+echo "    Build complete."
+
+# --- Step 2: Push to registry (if configured) ---
+if [[ -n "${REGISTRY}" ]]; then
+  echo ""
+  echo ">>> Pushing ${FULL_IMAGE}:${IMAGE_TAG} to registry..."
+
+  # Auto-login to registry
+  if [[ "${REGISTRY}" == ghcr.io/* ]]; then
+    echo "    Logging into GHCR..."
+    echo "${GITHUB_TOKEN}" | docker login ghcr.io -u "$(echo "${REGISTRY}" | cut -d/ -f2)" --password-stdin
+  elif [[ "${REGISTRY}" == *.dkr.ecr.*.amazonaws.com ]]; then
+    AWS_REGION="$(echo "${REGISTRY}" | sed 's/.*\.dkr\.ecr\.\(.*\)\.amazonaws\.com/\1/')"
+    echo "    Logging into ECR (${AWS_REGION})..."
+    aws ecr get-login-password --region "${AWS_REGION}" | docker login --username AWS --password-stdin "${REGISTRY}"
+  fi
+
+  docker push "${FULL_IMAGE}:${IMAGE_TAG}"
+  docker push "${FULL_IMAGE}:latest"
+  echo "    Push complete."
+fi
+
+# --- Step 3: Helm upgrade --install ---
+echo ""
+echo ">>> Deploying with Helm..."
+
+# Build --set args for secrets
 SECRET_ARGS=(
+  --set "image.repository=${FULL_IMAGE}"
+  --set "image.tag=${IMAGE_TAG}"
   --set "secrets.GITHUB_TOKEN=${GITHUB_TOKEN}"
 )
 
@@ -63,13 +135,10 @@ if [[ -n "${DATADOG_API_KEY:-}" ]]; then
   )
 fi
 
-echo "=== ArgoCD Addons Platform Installer ==="
-echo "  Namespace: ${NAMESPACE}"
-echo "  Chart:     ${CHART_DIR}"
-echo "  Secrets:   ${SECRETS_FILE}"
-echo "  AI:        ${AI_PROVIDER:-disabled} ${AI_CLOUD_MODEL:+(${AI_CLOUD_MODEL})}"
-echo "  Datadog:   ${DATADOG_API_KEY:+enabled}${DATADOG_API_KEY:-disabled}"
-echo ""
+# If no registry, prevent Kubernetes from trying to pull from Docker Hub
+if [[ -z "${REGISTRY}" ]]; then
+  SECRET_ARGS+=(--set "image.pullPolicy=Never")
+fi
 
 helm upgrade --install "${RELEASE}" "${CHART_DIR}" \
   --namespace "${NAMESPACE}" \
@@ -78,7 +147,10 @@ helm upgrade --install "${RELEASE}" "${CHART_DIR}" \
   "${SECRET_ARGS[@]}"
 
 echo ""
-echo "=== Installed successfully ==="
+echo "=== Deployed successfully ==="
+echo "  Version: ${VERSION}"
+echo "  Image:   ${FULL_IMAGE}:${IMAGE_TAG}"
+echo ""
 echo "  kubectl -n ${NAMESPACE} get pods"
 echo "  kubectl -n ${NAMESPACE} logs -f deploy/${RELEASE}-argocd-addons-platform"
 echo "  kubectl -n ${NAMESPACE} port-forward svc/${RELEASE}-argocd-addons-platform 8080:8080"
