@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { VersionMatrix } from '@/views/VersionMatrix'
 
@@ -57,12 +57,26 @@ describe('VersionMatrix', () => {
     expect(screen.getByText('cert-manager')).toBeInTheDocument()
   })
 
-  it('renders cluster chips within addon rows', async () => {
+  it('renders table view by default with cluster columns', async () => {
     renderMatrix()
     await waitFor(() => {
-      expect(screen.getByText('ingress-nginx')).toBeInTheDocument()
+      expect(screen.getByText('Addon Version Matrix')).toBeInTheDocument()
     })
-    // Cluster names appear as chips (with -eks stripped)
+    // Table header should show cluster names
+    expect(screen.getByText('Addon')).toBeInTheDocument()
+    expect(screen.getByText('Catalog')).toBeInTheDocument()
+    // Version cells should be visible
+    expect(screen.getAllByText('4.8.0').length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('switches to card view when toggle is clicked', async () => {
+    renderMatrix()
+    await waitFor(() => {
+      expect(screen.getByText('Addon Version Matrix')).toBeInTheDocument()
+    })
+    const cardButton = screen.getByTitle('Card view')
+    fireEvent.click(cardButton)
+    // Card view shows cluster chips with cluster names
     expect(screen.getAllByText('cluster-prod-1').length).toBeGreaterThanOrEqual(1)
   })
 
