@@ -57,14 +57,14 @@ describe('VersionMatrix', () => {
     expect(screen.getByText('cert-manager')).toBeInTheDocument()
   })
 
-  it('renders table view by default with cluster columns', async () => {
+  it('renders table view by default with addon columns and cluster rows', async () => {
     renderMatrix()
     await waitFor(() => {
       expect(screen.getByText('Addon Version Matrix')).toBeInTheDocument()
     })
-    // Table header should show cluster names
-    expect(screen.getByText('Addon')).toBeInTheDocument()
-    expect(screen.getByText('Catalog')).toBeInTheDocument()
+    // Transposed: clusters as rows, addons as column headers
+    expect(screen.getByText('Cluster')).toBeInTheDocument()
+    expect(screen.getByText('ingress-nginx')).toBeInTheDocument()
     // Version cells should be visible
     expect(screen.getAllByText('4.8.0').length).toBeGreaterThanOrEqual(1)
   })

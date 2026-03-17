@@ -69,7 +69,7 @@ function MatrixCell({ cell, cluster, addonName }: { cell: VersionMatrixCell | un
 
   if (!cell || cell.health === 'not_enabled') {
     return (
-      <td className="border-r border-gray-100 px-1 py-2 text-center dark:border-gray-700">
+      <td className="border-r border-gray-100 px-2 py-2 text-center dark:border-gray-700">
         <span className="text-[10px] text-gray-300 dark:text-gray-600">—</span>
       </td>
     )
@@ -79,16 +79,16 @@ function MatrixCell({ cell, cluster, addonName }: { cell: VersionMatrixCell | un
 
   return (
     <td
-      className={`border-r border-gray-100 px-0.5 py-1.5 dark:border-gray-700 ${isDrift ? 'bg-amber-50/50 dark:bg-amber-900/10' : ''}`}
+      className={`border-r border-gray-100 px-1.5 py-1.5 dark:border-gray-700 ${isDrift ? 'bg-amber-50/50 dark:bg-amber-900/10' : ''}`}
     >
       <button
         type="button"
         onClick={() => navigate(`/clusters/${cluster}`)}
         title={`${addonName} on ${cluster}\nVersion: ${cell.version}\nHealth: ${healthLabel(cell.health)}${isDrift ? '\nVersion drift from catalog' : ''}`}
-        className={`group flex w-full flex-col items-center gap-0.5 rounded px-1 py-1 text-xs transition-all hover:ring-2 ${healthRing(cell.health)} ${healthBg(cell.health)}`}
+        className={`group flex w-full items-center justify-center gap-1.5 rounded px-1.5 py-1 text-xs transition-all hover:ring-2 ${healthRing(cell.health)} ${healthBg(cell.health)}`}
       >
         <span className={`inline-block h-2 w-2 shrink-0 rounded-full ${healthColor(cell.health)}`} />
-        <span className={`font-mono text-[9px] leading-none ${isDrift ? 'font-bold text-amber-600 dark:text-amber-400' : 'text-gray-500 dark:text-gray-400'}`}>
+        <span className={`font-mono text-[10px] leading-none ${isDrift ? 'font-bold text-amber-600 dark:text-amber-400' : 'text-gray-600 dark:text-gray-400'}`}>
           {cell.version}
         </span>
       </button>
@@ -96,62 +96,55 @@ function MatrixCell({ cell, cluster, addonName }: { cell: VersionMatrixCell | un
   )
 }
 
+/* Transposed matrix: clusters as rows, addons as columns */
 function MatrixTable({ addons, clusters }: { addons: VersionMatrixRow[]; clusters: string[] }) {
+  // Filter to addons that have at least one active cell
+  const activeAddons = addons.filter((row) =>
+    Object.values(row.cells).some((c) => c.health !== 'not_enabled'),
+  )
+
   return (
     <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
-      <table className="text-left text-sm">
+      <table className="w-full text-left text-sm">
         <thead className="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-900">
           <tr>
-            <th className="sticky left-0 z-10 min-w-[180px] border-r border-gray-200 bg-gray-50 px-4 text-xs font-semibold uppercase text-gray-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400" style={{ height: clusters.length > 3 ? 120 : 40 }}>
-              Addon
+            <th className="sticky left-0 z-10 min-w-[200px] border-r border-gray-200 bg-gray-50 px-4 py-3 text-xs font-semibold uppercase text-gray-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400">
+              Cluster
             </th>
-            <th className="min-w-[70px] border-r border-gray-100 px-2 text-center text-[10px] font-semibold uppercase text-gray-400 dark:border-gray-700 dark:text-gray-500">
-              Catalog
-            </th>
-            {clusters.map((cluster) => (
+            {activeAddons.map((row) => (
               <th
-                key={cluster}
-                className="border-r border-gray-100 px-0.5 dark:border-gray-700"
-                style={{ minWidth: 56, width: 56 }}
+                key={row.addon_name}
+                className="border-r border-gray-100 px-2 py-3 text-center dark:border-gray-700"
               >
-                <div
-                  className="flex items-end justify-center"
-                  style={clusters.length > 3 ? { height: 110 } : {}}
-                >
-                  <span
-                    className="block whitespace-nowrap text-[10px] font-medium text-gray-500 dark:text-gray-400"
-                    style={clusters.length > 3 ? {
-                      writingMode: 'vertical-rl',
-                      transform: 'rotate(180deg)',
-                      maxHeight: 100,
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                    } : { textAlign: 'center', display: 'block', width: '100%' }}
-                    title={cluster}
-                  >
-                    {cluster.replace(/-eks$/, '')}
-                  </span>
+                <div className="text-[11px] font-medium text-gray-700 dark:text-gray-300">
+                  {row.addon_name}
+                </div>
+                <div className="mt-0.5 font-mono text-[9px] text-gray-400 dark:text-gray-500">
+                  v{row.catalog_version}
                 </div>
               </th>
             ))}
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-          {addons.map((row) => {
-            const activeCells = Object.values(row.cells).filter(c => c.health !== 'not_enabled')
-            if (activeCells.length === 0) return null
+          {clusters.map((cluster) => {
+            // Only show clusters that have at least one active addon
+            const hasActive = activeAddons.some((row) => {
+              const cell = row.cells[cluster]
+              return cell && cell.health !== 'not_enabled'
+            })
+            if (!hasActive) return null
 
             return (
-              <tr key={row.addon_name} className="hover:bg-gray-50/50 dark:hover:bg-gray-800">
+              <tr key={cluster} className="hover:bg-gray-50/50 dark:hover:bg-gray-800">
                 <td className="sticky left-0 z-10 border-r border-gray-200 bg-white px-4 py-2 dark:border-gray-700 dark:bg-gray-800">
-                  <span className="text-sm font-medium text-gray-900 dark:text-white">{row.addon_name}</span>
+                  <span className="text-sm font-medium text-gray-900 dark:text-white">
+                    {cluster.replace(/-eks$/, '')}
+                  </span>
                 </td>
-                <td className="border-r border-gray-100 px-2 py-2 text-center font-mono text-[11px] text-gray-400 dark:border-gray-700 dark:text-gray-500">
-                  {row.catalog_version}
-                </td>
-                {clusters.map((cluster) => (
+                {activeAddons.map((row) => (
                   <MatrixCell
-                    key={cluster}
+                    key={row.addon_name}
                     cell={row.cells[cluster]}
                     cluster={cluster}
                     addonName={row.addon_name}
@@ -160,10 +153,10 @@ function MatrixTable({ addons, clusters }: { addons: VersionMatrixRow[]; cluster
               </tr>
             )
           })}
-          {addons.length === 0 && (
+          {clusters.length === 0 && (
             <tr>
               <td
-                colSpan={clusters.length + 2}
+                colSpan={activeAddons.length + 1}
                 className="px-6 py-8 text-center text-gray-400 dark:text-gray-500"
               >
                 No addons match the current filters.
