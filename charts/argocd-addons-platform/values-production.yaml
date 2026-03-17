@@ -1,5 +1,5 @@
-# Production values — no secrets in this file.
-# Secrets are passed via --set on the command line or from env vars.
+# Production values for merck-ahtl deployment.
+# Secrets are passed via --set from .env.secrets — never in this file.
 
 replicaCount: 1
 
@@ -18,12 +18,23 @@ config:
         repo: argocd-cluster-addons
         token: ${GITHUB_TOKEN}
       argocd:
+        server_url: ${ARGOCD_NONPROD_SERVER_URL}
+        token: ${ARGOCD_TOKEN}
         namespace: argocd
         insecure: true
 
 rbac:
   create: true
   argocdNamespace: argocd
+
+ai:
+  enabled: true
+  provider: gemini
+  cloudModel: gemini-2.5-flash
+
+datadog:
+  enabled: true
+  site: datadoghq.com
 
 ingress:
   enabled: true

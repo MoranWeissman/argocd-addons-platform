@@ -47,7 +47,11 @@ spec:
               value: {{ .Values.ai.provider | quote }}
             {{- if eq .Values.ai.provider "ollama" }}
             - name: AI_OLLAMA_URL
-              value: {{ .Values.ai.ollama.url | quote }}
+              {{- if .Values.ai.ollama.deploy }}
+              value: "http://{{ include "aap.fullname" . }}-ollama:11434"
+              {{- else }}
+              value: {{ .Values.ai.ollama.url | default "http://localhost:11434" | quote }}
+              {{- end }}
             - name: AI_OLLAMA_MODEL
               value: {{ .Values.ai.ollama.model | quote }}
             {{- if .Values.ai.ollama.agentModel }}

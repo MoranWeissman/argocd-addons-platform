@@ -71,11 +71,27 @@ ai:
   provider: ""
   apiKey: ""       # For claude/openai/gemini (stored in secret)
   cloudModel: ""   # e.g., claude-sonnet-4-20250514, gpt-4o, gemini-2.5-flash
-  # Ollama settings (if provider=ollama, deploy ollama separately)
+  # Ollama settings
   ollama:
-    url: "http://ollama.ollama.svc.cluster.local:11434"
+    # Deploy an Ollama pod alongside AAP (set to true to auto-deploy)
+    deploy: false
+    image: "ollama/ollama:latest"
+    # URL is auto-set when deploy=true, override for external Ollama
+    url: ""
     model: "llama3.2"
     agentModel: ""
+    # GPU support (requires nvidia device plugin on the cluster)
+    gpu: false
+    # Persist downloaded models across restarts
+    persistence: false
+    storageSize: "10Gi"
+    resources:
+      requests:
+        memory: "2Gi"
+        cpu: "500m"
+      limits:
+        memory: "4Gi"
+        cpu: "2000m"
 
 # ---------------------------------------------------------------------------
 # Datadog Metrics (optional)
