@@ -1,0 +1,45 @@
+# Production values — no secrets in this file.
+# Secrets are passed via --set on the command line or from env vars.
+
+replicaCount: 1
+
+image:
+  repository: aap-server
+  tag: "1.0.0"
+  pullPolicy: IfNotPresent
+
+config:
+  connections:
+    - name: dev
+      default: true
+      git:
+        provider: github
+        owner: merck-ahtl
+        repo: argocd-cluster-addons
+        token: ${GITHUB_TOKEN}
+      argocd:
+        namespace: argocd
+        insecure: true
+
+rbac:
+  create: true
+  argocdNamespace: argocd
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+  hosts:
+    - host: aap.argocd-addons.local
+      paths:
+        - path: /
+          pathType: Prefix
+
+resources:
+  requests:
+    memory: "128Mi"
+    cpu: "100m"
+  limits:
+    memory: "512Mi"
+    cpu: "500m"
