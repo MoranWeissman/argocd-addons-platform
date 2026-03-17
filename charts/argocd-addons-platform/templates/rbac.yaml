@@ -1,0 +1,52 @@
+{{- if .Values.rbac.create }}
+# ClusterRole: read access to ArgoCD resources
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "aap.fullname" . }}
+  labels:
+    {{- include "aap.labels" . | nindent 4 }}
+rules:
+  # ArgoCD applications
+  - apiGroups: ["argoproj.io"]
+    resources: ["applications", "appprojects"]
+    verbs: ["get", "list", "watch"]
+  # ArgoCD clusters (stored as secrets in argocd namespace)
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list"]
+    # Restricted to ArgoCD namespace via the RoleBinding below
+---
+# Bind to the AAP service account
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "aap.fullname" . }}
+  labels:
+    {{- include "aap.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "aap.fullname" . }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "aap.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+---
+# RoleBinding in ArgoCD namespace for secret read access (cluster connection info)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "aap.fullname" . }}-argocd-reader
+  namespace: {{ include "aap.argocdNamespace" . }}
+  labels:
+    {{- include "aap.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "aap.fullname" . }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "aap.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+{{- end }}
