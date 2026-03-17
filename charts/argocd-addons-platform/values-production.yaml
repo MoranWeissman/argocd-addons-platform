@@ -36,16 +36,12 @@ datadog:
   enabled: true
   site: datadoghq.com
 
+service:
+  type: LoadBalancer
+  port: 8080
+
 ingress:
-  enabled: true
-  className: nginx
-  annotations:
-    nginx.ingress.kubernetes.io/ssl-redirect: "false"
-  hosts:
-    - host: aap.argocd-addons.local
-      paths:
-        - path: /
-          pathType: Prefix
+  enabled: false
 
 resources:
   requests:
