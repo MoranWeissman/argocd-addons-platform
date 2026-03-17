@@ -82,7 +82,7 @@ function TreeNode({ name, value, defaultExpanded = true }: { name: string; value
           )}
           <span className="font-semibold text-cyan-400">{name}</span>
           {!expanded && (
-            <span className="text-gray-600 text-xs ml-1">({entries.length} keys)</span>
+            <span className="text-gray-400 text-xs ml-1">({entries.length} keys)</span>
           )}
         </button>
         {expanded && (
@@ -110,7 +110,7 @@ function TreeNode({ name, value, defaultExpanded = true }: { name: string; value
             <ChevronRight className="h-3.5 w-3.5 text-gray-500 shrink-0" />
           )}
           <span className="font-semibold text-cyan-400">{name}</span>
-          <span className="text-gray-600 text-xs ml-1">[{value.length}]</span>
+          <span className="text-gray-400 text-xs ml-1">[{value.length}]</span>
         </button>
         {expanded && (
           <div className="ml-4 border-l border-gray-700 pl-2">

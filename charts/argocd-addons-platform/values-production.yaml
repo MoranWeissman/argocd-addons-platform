@@ -1,0 +1,52 @@
+# Production values.
+# Secrets are passed via --set from .env.secrets — never in this file.
+
+replicaCount: 1
+
+image:
+  repository: ghcr.io/moran/argocd-addons-platform
+  tag: "1.5.0"
+  pullPolicy: IfNotPresent
+
+config:
+  connections:
+    - name: dev
+      default: true
+      git:
+        provider: github
+        owner: your-org
+        repo: your-addons-repo
+        token: ${GITHUB_TOKEN}
+      argocd:
+        server_url: ${ARGOCD_NONPROD_SERVER_URL}
+        token: ${ARGOCD_TOKEN}
+        namespace: argocd
+        insecure: true
+
+rbac:
+  create: true
+  argocdNamespace: argocd
+
+ai:
+  enabled: true
+  provider: gemini
+  cloudModel: gemini-2.5-flash
+
+datadog:
+  enabled: true
+  site: datadoghq.com
+
+service:
+  type: LoadBalancer
+  port: 8080
+
+ingress:
+  enabled: false
+
+resources:
+  requests:
+    memory: "128Mi"
+    cpu: "100m"
+  limits:
+    memory: "512Mi"
+    cpu: "500m"

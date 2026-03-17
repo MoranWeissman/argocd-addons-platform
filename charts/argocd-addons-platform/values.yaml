@@ -1,0 +1,188 @@
+# ArgoCD Addons Platform - Helm Values
+# See README for full documentation of all options.
+
+replicaCount: 1
+
+image:
+  repository: ghcr.io/moran/argocd-addons-platform
+  tag: ""  # Defaults to appVersion from Chart.yaml
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+# ---------------------------------------------------------------------------
+# Service Account & RBAC
+# ---------------------------------------------------------------------------
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+# Grant read access to ArgoCD resources (required for in-cluster mode)
+rbac:
+  create: true
+  # The namespace where ArgoCD is installed
+  argocdNamespace: argocd
+
+# ---------------------------------------------------------------------------
+# Connection Configuration
+# ---------------------------------------------------------------------------
+# The config.yaml is mounted into the pod at /etc/aap/config.yaml.
+# Environment variables like ${GITHUB_TOKEN} are resolved at runtime from
+# the secret referenced below.
+config:
+  connections:
+    - name: default
+      default: true
+      git:
+        provider: github
+        owner: ""
+        repo: ""
+        token: ${GITHUB_TOKEN}
+      argocd:
+        # In-cluster mode: leave server_url empty to auto-discover via K8s DNS
+        # The chart sets ARGOCD_NAMESPACE env var for service discovery.
+        server_url: ""
+        token: ""
+        namespace: argocd
+        insecure: true
+
+# ---------------------------------------------------------------------------
+# Secrets
+# ---------------------------------------------------------------------------
+# Existing secret with env vars (GITHUB_TOKEN, AI_API_KEY, DATADOG_API_KEY, etc.)
+# If set, the chart will NOT create a secret — use your own.
+existingSecret: ""
+
+# If existingSecret is empty, these values are used to create one.
+# In production, use existingSecret or sealed-secrets instead.
+secrets:
+  GITHUB_TOKEN: ""
+  # ARGOCD_TOKEN: ""  # Not needed in in-cluster mode with RBAC
+
+# ---------------------------------------------------------------------------
+# AI Provider (optional)
+# ---------------------------------------------------------------------------
+ai:
+  enabled: false
+  # One of: ollama, claude, openai, gemini
+  provider: ""
+  apiKey: ""       # For claude/openai/gemini (stored in secret)
+  cloudModel: ""   # e.g., claude-sonnet-4-20250514, gpt-4o, gemini-2.5-flash
+  # Ollama settings
+  ollama:
+    # Deploy an Ollama pod alongside AAP (set to true to auto-deploy)
+    deploy: false
+    image: "ollama/ollama:latest"
+    # URL is auto-set when deploy=true, override for external Ollama
+    url: ""
+    model: "llama3.2"
+    agentModel: ""
+    # GPU support (requires nvidia device plugin on the cluster)
+    gpu: false
+    # Persist downloaded models across restarts
+    persistence: false
+    storageSize: "10Gi"
+    resources:
+      requests:
+        memory: "2Gi"
+        cpu: "500m"
+      limits:
+        memory: "4Gi"
+        cpu: "2000m"
+
+# ---------------------------------------------------------------------------
+# Datadog Metrics (optional)
+# ---------------------------------------------------------------------------
+datadog:
+  enabled: false
+  apiKey: ""       # Stored in secret
+  appKey: ""       # Stored in secret
+  site: "datadoghq.com"  # or datadoghq.eu
+
+# ---------------------------------------------------------------------------
+# Service
+# ---------------------------------------------------------------------------
+service:
+  type: ClusterIP
+  port: 8080
+
+# ---------------------------------------------------------------------------
+# Ingress
+# ---------------------------------------------------------------------------
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+    # nginx.ingress.kubernetes.io/ssl-redirect: "false"
+  hosts:
+    - host: aap.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+  #  - secretName: aap-tls
+  #    hosts:
+  #      - aap.example.com
+
+# ---------------------------------------------------------------------------
+# Resources
+# ---------------------------------------------------------------------------
+resources:
+  requests:
+    memory: "128Mi"
+    cpu: "100m"
+  limits:
+    memory: "512Mi"
+    cpu: "500m"
+
+# ---------------------------------------------------------------------------
+# Security
+# ---------------------------------------------------------------------------
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1001
+  runAsGroup: 1001
+  fsGroup: 1001
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 1001
+  runAsGroup: 1001
+  capabilities:
+    drop:
+      - ALL
+
+# ---------------------------------------------------------------------------
+# Probes
+# ---------------------------------------------------------------------------
+livenessProbe:
+  httpGet:
+    path: /api/v1/health
+    port: http
+  initialDelaySeconds: 5
+  periodSeconds: 10
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /api/v1/health
+    port: http
+  initialDelaySeconds: 3
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# Extra environment variables (name/value pairs)
+extraEnv: []
+#  - name: MY_VAR
+#    value: "my-value"

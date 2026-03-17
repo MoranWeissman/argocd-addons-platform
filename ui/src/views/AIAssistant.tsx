@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Sparkles, Send, User, RotateCcw, RefreshCw } from 'lucide-react'
+import { Sparkles, Send, User, RotateCcw, RefreshCw, Wrench, Database, Search, Shield } from 'lucide-react'
 import { api } from '@/services/api'
 
 interface ChatMessage {
@@ -7,7 +7,66 @@ interface ChatMessage {
   role: 'user' | 'assistant'
   content: string
   timestamp: Date
+  streaming?: boolean
 }
+
+// ---------------------------------------------------------------------------
+// localStorage persistence
+// ---------------------------------------------------------------------------
+
+const STORAGE_KEY = 'aap-ai-chat'
+
+interface PersistedState {
+  sessionId: string
+  messages: Array<{ id: string; role: 'user' | 'assistant'; content: string; timestamp: string }>
+}
+
+function loadPersistedState(): { sessionId: string; messages: ChatMessage[] } | null {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (!raw) return null
+    const parsed: PersistedState = JSON.parse(raw)
+    if (!parsed.sessionId || !Array.isArray(parsed.messages)) return null
+    return {
+      sessionId: parsed.sessionId,
+      messages: parsed.messages.map((m) => ({
+        ...m,
+        timestamp: new Date(m.timestamp),
+      })),
+    }
+  } catch {
+    return null
+  }
+}
+
+function persistState(sessionId: string, messages: ChatMessage[]) {
+  try {
+    const data: PersistedState = {
+      sessionId,
+      messages: messages.map((m) => ({
+        id: m.id,
+        role: m.role,
+        content: m.content,
+        timestamp: m.timestamp.toISOString(),
+      })),
+    }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
+  } catch {
+    // Storage full or unavailable — ignore
+  }
+}
+
+function clearPersistedState() {
+  try {
+    localStorage.removeItem(STORAGE_KEY)
+  } catch {
+    // ignore
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Suggested prompts
+// ---------------------------------------------------------------------------
 
 const SUGGESTED_PROMPTS = [
   'What addons are deployed across my clusters?',
@@ -18,6 +77,10 @@ const SUGGESTED_PROMPTS = [
   'Which clusters have the most addons?',
 ]
 
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
 function formatRelativeTime(date: Date): string {
   const seconds = Math.floor((Date.now() - date.getTime()) / 1000)
   if (seconds < 10) return 'just now'
@@ -25,13 +88,20 @@ function formatRelativeTime(date: Date): string {
   const minutes = Math.floor(seconds / 60)
   if (minutes < 60) return `${minutes}m ago`
   const hours = Math.floor(minutes / 60)
-  return `${hours}h ago`
+  if (hours < 24) return `${hours}h ago`
+  const days = Math.floor(hours / 24)
+  return `${days}d ago`
 }
+
+// ---------------------------------------------------------------------------
+// Markdown renderer
+// ---------------------------------------------------------------------------
 
 function renderFormattedContent(content: string) {
   const lines = content.split('\n')
   const elements: React.ReactNode[] = []
   let listBuffer: { type: 'ul' | 'ol'; items: React.ReactNode[] } | null = null
+  let codeBlockBuffer: string[] | null = null
 
   function flushList() {
     if (listBuffer) {
@@ -56,6 +126,20 @@ function renderFormattedContent(content: string) {
     }
   }
 
+  function flushCodeBlock() {
+    if (codeBlockBuffer) {
+      elements.push(
+        <pre
+          key={`code-${elements.length}`}
+          className="overflow-x-auto rounded-lg bg-gray-900 p-3 text-xs text-gray-100 dark:bg-gray-950"
+        >
+          <code>{codeBlockBuffer.join('\n')}</code>
+        </pre>,
+      )
+      codeBlockBuffer = null
+    }
+  }
+
   function formatInline(text: string): React.ReactNode {
     const parts: React.ReactNode[] = []
     const regex = /(\*\*(.+?)\*\*|`(.+?)`)/g
@@ -72,7 +156,7 @@ function renderFormattedContent(content: string) {
         parts.push(
           <code
             key={match.index}
-            className="rounded bg-gray-200 px-1 py-0.5 text-xs dark:bg-gray-700"
+            className="break-all rounded bg-gray-200 px-1 py-0.5 text-xs dark:bg-gray-700"
           >
             {match[3]}
           </code>,
@@ -87,6 +171,20 @@ function renderFormattedContent(content: string) {
   }
 
   for (const line of lines) {
+    if (line.trimStart().startsWith('```')) {
+      if (codeBlockBuffer !== null) {
+        flushCodeBlock()
+      } else {
+        flushList()
+        codeBlockBuffer = []
+      }
+      continue
+    }
+    if (codeBlockBuffer !== null) {
+      codeBlockBuffer.push(line)
+      continue
+    }
+
     const bulletMatch = line.match(/^[-*]\s+(.*)/)
     const numberMatch = line.match(/^(\d+)\.\s+(.*)/)
 
@@ -108,44 +206,121 @@ function renderFormattedContent(content: string) {
         elements.push(<div key={`br-${elements.length}`} className="h-2" />)
       } else {
         elements.push(
-          <p key={`p-${elements.length}`}>{formatInline(line)}</p>,
+          <p key={`p-${elements.length}`} className="break-words">{formatInline(line)}</p>,
         )
       }
     }
   }
   flushList()
+  flushCodeBlock()
 
   return <div className="space-y-1">{elements}</div>
 }
 
-const thinkingSteps = [
-  'Analyzing your question...',
-  'Querying cluster data...',
-  'Checking addon configurations...',
-  'Reading ArgoCD health status...',
-  'Comparing versions...',
-  'Preparing response...',
+// ---------------------------------------------------------------------------
+// Typewriter hook for simulated streaming
+// ---------------------------------------------------------------------------
+
+function useTypewriter(fullText: string, enabled: boolean, speed = 12) {
+  const [displayed, setDisplayed] = useState(enabled ? '' : fullText)
+  const [done, setDone] = useState(!enabled)
+
+  useEffect(() => {
+    if (!enabled) {
+      setDisplayed(fullText)
+      setDone(true)
+      return
+    }
+    setDisplayed('')
+    setDone(false)
+    let i = 0
+    const timer = setInterval(() => {
+      // Advance by chunks for speed — larger chunks for long responses
+      const chunkSize = fullText.length > 500 ? 4 : fullText.length > 200 ? 3 : 2
+      i = Math.min(i + chunkSize, fullText.length)
+      setDisplayed(fullText.slice(0, i))
+      if (i >= fullText.length) {
+        setDone(true)
+        clearInterval(timer)
+      }
+    }, speed)
+    return () => clearInterval(timer)
+  }, [fullText, enabled, speed])
+
+  return { displayed, done }
+}
+
+function StreamingMessage({ content, onDone }: { content: string; onDone: () => void }) {
+  const { displayed, done } = useTypewriter(content, true)
+
+  useEffect(() => {
+    if (done) onDone()
+  }, [done, onDone])
+
+  return (
+    <>
+      {renderFormattedContent(displayed)}
+      {!done && <span className="inline-block h-4 w-1 animate-pulse bg-violet-500" />}
+    </>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Thinking indicator with tool-specific steps
+// ---------------------------------------------------------------------------
+
+const toolSteps = [
+  { icon: Search, text: 'Analyzing your question...', color: 'text-blue-500' },
+  { icon: Database, text: 'Querying cluster data...', color: 'text-cyan-500' },
+  { icon: Wrench, text: 'Calling list_clusters...', color: 'text-violet-500' },
+  { icon: Shield, text: 'Checking addon health...', color: 'text-green-500' },
+  { icon: Wrench, text: 'Calling get_addon_values...', color: 'text-violet-500' },
+  { icon: Database, text: 'Comparing versions...', color: 'text-amber-500' },
+  { icon: Wrench, text: 'Calling find_addon_deployments...', color: 'text-violet-500' },
+  { icon: RefreshCw, text: 'Processing tool results...', color: 'text-blue-400' },
+  { icon: Sparkles, text: 'Generating response...', color: 'text-violet-500' },
 ]
 
 function ThinkingProcess() {
   const [stepIndex, setStepIndex] = useState(0)
+  const [completedSteps, setCompletedSteps] = useState<number[]>([])
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setStepIndex(i => (i + 1) % thinkingSteps.length)
-    }, 3000)
+      setStepIndex((prev) => {
+        const next = (prev + 1) % toolSteps.length
+        setCompletedSteps((cs) => [...cs, prev])
+        return next
+      })
+    }, 2200)
     return () => clearInterval(interval)
   }, [])
+
+  const currentStep = toolSteps[stepIndex]
+  const Icon = currentStep.icon
+  const recentCompleted = completedSteps.slice(-2)
 
   return (
     <div className="flex gap-3">
       <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-violet-100 dark:bg-violet-900/40">
         <Sparkles className="h-4 w-4 animate-pulse text-violet-600 dark:text-violet-400" />
       </div>
-      <div className="space-y-1.5 rounded-2xl border border-violet-200 bg-violet-50 px-4 py-2.5 dark:border-violet-800 dark:bg-violet-950/30">
+      <div className="space-y-1 rounded-2xl border border-violet-200 bg-violet-50 px-4 py-2.5 dark:border-violet-800 dark:bg-violet-950/30">
+        {/* Completed steps (faded) */}
+        {recentCompleted.map((si) => {
+          const step = toolSteps[si]
+          const StepIcon = step.icon
+          return (
+            <div key={si} className="flex items-center gap-2 text-xs text-gray-400 dark:text-gray-500">
+              <StepIcon className="h-3 w-3" />
+              <span className="line-through">{step.text}</span>
+            </div>
+          )
+        })}
+        {/* Current step */}
         <div className="flex items-center gap-2 text-sm text-violet-700 dark:text-violet-300">
-          <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-          {thinkingSteps[stepIndex]}
+          <Icon className={`h-3.5 w-3.5 animate-spin ${currentStep.color}`} />
+          {currentStep.text}
         </div>
         <div className="flex items-center gap-1">
           <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-violet-400 [animation-delay:0ms]" />
@@ -157,11 +332,16 @@ function ThinkingProcess() {
   )
 }
 
+// ---------------------------------------------------------------------------
+// Main component
+// ---------------------------------------------------------------------------
+
 export function AIAssistant() {
-  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const persisted = loadPersistedState()
+  const [messages, setMessages] = useState<ChatMessage[]>(persisted?.messages ?? [])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
-  const [sessionId, setSessionId] = useState(() => crypto.randomUUID())
+  const [sessionId, setSessionId] = useState(() => persisted?.sessionId ?? crypto.randomUUID())
   const [aiEnabled, setAiEnabled] = useState<boolean | null>(null)
   const [, setTick] = useState(0)
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -174,6 +354,14 @@ export function AIAssistant() {
       .then((res) => setAiEnabled(res.enabled))
       .catch(() => setAiEnabled(false))
   }, [])
+
+  // Persist messages whenever they change (skip streaming state)
+  useEffect(() => {
+    const toSave = messages.filter((m) => !m.streaming)
+    if (toSave.length > 0) {
+      persistState(sessionId, toSave)
+    }
+  }, [messages, sessionId])
 
   // Auto-scroll on new messages
   useEffect(() => {
@@ -208,6 +396,7 @@ export function AIAssistant() {
           role: 'assistant',
           content: res.response,
           timestamp: new Date(),
+          streaming: true,
         }
         setMessages((prev) => [...prev, assistantMsg])
       } catch (err) {
@@ -226,6 +415,12 @@ export function AIAssistant() {
     [loading, sessionId],
   )
 
+  const markStreamingDone = useCallback((msgId: string) => {
+    setMessages((prev) =>
+      prev.map((m) => (m.id === msgId ? { ...m, streaming: false } : m)),
+    )
+  }, [])
+
   const handleNewConversation = useCallback(async () => {
     try {
       await api.agentReset(sessionId)
@@ -237,6 +432,7 @@ export function AIAssistant() {
     setMessages([])
     setInput('')
     setLoading(false)
+    clearPersistedState()
   }, [sessionId])
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -286,9 +482,11 @@ export function AIAssistant() {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <span className="rounded-full bg-violet-100 px-2.5 py-0.5 text-[10px] font-medium text-violet-700 dark:bg-violet-900/40 dark:text-violet-300">
-            Powered by Ollama
-          </span>
+          {messages.length > 0 && (
+            <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] text-gray-500 dark:bg-gray-800 dark:text-gray-400">
+              {messages.length} messages
+            </span>
+          )}
           <button
             onClick={handleNewConversation}
             className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
@@ -349,14 +547,21 @@ export function AIAssistant() {
 
                 {/* Bubble */}
                 <div
-                  className={`max-w-[75%] rounded-2xl px-4 py-2.5 text-sm ${
+                  className={`max-w-[75%] overflow-hidden rounded-2xl px-4 py-2.5 text-sm ${
                     msg.role === 'user'
                       ? 'bg-cyan-600 text-white dark:bg-cyan-700'
                       : 'border border-gray-200 bg-gray-100 text-gray-800 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200'
                   }`}
                 >
                   {msg.role === 'assistant' ? (
-                    renderFormattedContent(msg.content)
+                    msg.streaming ? (
+                      <StreamingMessage
+                        content={msg.content}
+                        onDone={() => markStreamingDone(msg.id)}
+                      />
+                    ) : (
+                      renderFormattedContent(msg.content)
+                    )
                   ) : (
                     <p className="whitespace-pre-wrap">{msg.content}</p>
                   )}

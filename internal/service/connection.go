@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"github.com/moran/argocd-addons-platform/internal/argocd"
 	"github.com/moran/argocd-addons-platform/internal/config"
@@ -62,6 +63,7 @@ func (s *ConnectionService) Delete(name string) error {
 
 // SetActive sets the active connection.
 func (s *ConnectionService) SetActive(name string) error {
+	slog.Info("active connection changed", "connection", name)
 	return s.store.SetActiveConnection(name)
 }
 

@@ -7,7 +7,7 @@ connections:
     default: true
     git:
       provider: github
-      owner: merck-ahtl
+      owner: your-org
       repo: argocd-cluster-addons
       token: ${GITHUB_TOKEN}
     argocd:
@@ -20,7 +20,7 @@ connections:
   # - name: prod
   #   git:
   #     provider: github
-  #     owner: merck-ahtl
+  #     owner: your-org
   #     repo: argocd-cluster-addons
   #     token: ${GITHUB_TOKEN}
   #   argocd:

@@ -87,7 +87,19 @@ export function ClustersOverview() {
       allClusters
         .filter((cluster) => {
           if (statusFilter === 'all') return true;
-          return cluster.connection_status?.toLowerCase() === statusFilter;
+          const cs = cluster.connection_status?.toLowerCase() ?? '';
+          switch (statusFilter) {
+            case 'connected':
+              return cs === 'connected' || cs === 'successful';
+            case 'failed':
+              return cs === 'failed';
+            case 'missing_from_argocd':
+              return cs === 'missing';
+            case 'not_in_git':
+              return cs === 'not_in_git';
+            default:
+              return true;
+          }
         })
         .filter((cluster) => {
           const nameMatch = cluster.name

@@ -7,8 +7,8 @@ import {
   ChevronDown,
   ChevronUp,
   Package,
-  Server,
-  Rocket,
+  CheckCircle,
+  XCircle,
   AlertTriangle,
   ExternalLink,
   LayoutGrid,
@@ -100,9 +100,15 @@ function AddonCard({ addon }: { addon: AddonCatalogItem }) {
             <p className="truncate text-xs text-gray-500 dark:text-gray-400">
               Namespace: {namespace}
             </p>
-            <p className="mt-1 text-sm font-semibold text-cyan-600 dark:text-cyan-400">
-              {enabledApps} Active Applications
-            </p>
+            {enabledApps > 0 ? (
+              <p className="mt-1 text-sm font-semibold text-cyan-600 dark:text-cyan-400">
+                {enabledApps} Active Applications
+              </p>
+            ) : (
+              <p className="mt-1 text-sm font-semibold text-amber-600 dark:text-amber-400">
+                Not Assigned
+              </p>
+            )}
           </div>
           <button
             type="button"
@@ -296,7 +302,13 @@ function AddonListTable({ addons }: { addons: AddonCatalogItem[] }) {
                 {addon.version}
               </td>
               <td className="px-6 py-3 text-gray-700 dark:text-gray-300">
-                {addon.enabled_clusters} / {addon.total_clusters}
+                {addon.enabled_clusters === 0 ? (
+                  <span className="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                    Not Assigned
+                  </span>
+                ) : (
+                  `${addon.enabled_clusters} / ${addon.total_clusters}`
+                )}
               </td>
               <td className="px-6 py-3">
                 {addon.healthy_applications > 0 && (
@@ -404,9 +416,24 @@ export function AddonCatalog() {
     return filteredAddons.slice(start, start + pageSize)
   }, [filteredAddons, page, pageSize])
 
-  const activeDeployments = catalogData
-    ? catalogData.addons.reduce((sum, a) => sum + a.enabled_clusters, 0)
+  const healthyCount = catalogData
+    ? catalogData.addons.filter(
+        (a) =>
+          a.enabled_clusters > 0 &&
+          a.degraded_applications === 0 &&
+          a.missing_applications === 0,
+      ).length
     : 0
+
+  const unhealthyCount = catalogData
+    ? catalogData.addons.filter(
+        (a) => a.degraded_applications > 0 || a.missing_applications > 0,
+      ).length
+    : 0
+
+  const handleStatFilter = (filter: FilterType) => {
+    setFilterType(filterType === filter ? 'all' : filter)
+  }
 
   if (loading) {
     return (
@@ -446,29 +473,38 @@ export function AddonCatalog() {
         </p>
       </div>
 
-      {/* Summary stat cards */}
+      {/* Summary stat cards — click to filter */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
-          title="Total Addons"
+          title="All Addons"
           value={catalogData.total_addons}
           icon={<Package className="h-5 w-5" />}
+          onClick={() => handleStatFilter('all')}
+          selected={filterType === 'all'}
         />
         <StatCard
-          title="Total Clusters"
-          value={catalogData.total_clusters}
-          icon={<Server className="h-5 w-5" />}
-        />
-        <StatCard
-          title="Active Deployments"
-          value={activeDeployments}
-          icon={<Rocket className="h-5 w-5" />}
+          title="Healthy"
+          value={healthyCount}
+          icon={<CheckCircle className="h-5 w-5" />}
           color="success"
+          onClick={() => handleStatFilter('healthy')}
+          selected={filterType === 'healthy'}
+        />
+        <StatCard
+          title="Unhealthy"
+          value={unhealthyCount}
+          icon={<XCircle className="h-5 w-5" />}
+          color="error"
+          onClick={() => handleStatFilter('unhealthy')}
+          selected={filterType === 'unhealthy'}
         />
         <StatCard
           title="Not Deployed"
           value={catalogData.addons_only_in_git}
           icon={<AlertTriangle className="h-5 w-5" />}
           color="warning"
+          onClick={() => handleStatFilter('git-only')}
+          selected={filterType === 'git-only'}
           subtitle="Enabled in Git but not found in ArgoCD"
         />
       </div>

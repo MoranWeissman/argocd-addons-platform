@@ -124,13 +124,14 @@ describe('ClusterDetail', () => {
       expect(screen.getByText('prod-eu')).toBeInTheDocument();
     });
 
-    // Stat cards
+    // Stat cards — zero-count cards (Unmanaged, Not Enabled) are hidden
     expect(screen.getByText('All Addons')).toBeInTheDocument();
     expect(screen.getByText('Healthy')).toBeInTheDocument();
     expect(screen.getByText('With Issues')).toBeInTheDocument();
     expect(screen.getAllByText('Not Deployed').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText('Unmanaged')).toBeInTheDocument();
-    expect(screen.getByText('Not Enabled')).toBeInTheDocument();
+    // Unmanaged (0) and Not Enabled (0) should be hidden
+    expect(screen.queryByText('Unmanaged')).not.toBeInTheDocument();
+    expect(screen.queryByText('Not Enabled')).not.toBeInTheDocument();
 
     // Table rows
     expect(screen.getByText('Ingress-nginx')).toBeInTheDocument();

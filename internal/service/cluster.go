@@ -206,10 +206,10 @@ func (s *ClusterService) GetClusterComparison(ctx context.Context, clusterName s
 	comparisons := make([]models.AddonComparisonStatus, 0)
 	trackedArgocdApps := make(map[string]bool)
 
-	gitEnabled, gitDisabled := 0, 0
-	totalHealthy, totalIssues, totalMissing, totalDisabled := 0, 0, 0, 0
+	totalHealthy, totalIssues, totalMissing := 0, 0, 0
 
 	for _, addon := range gitAddons {
+		// GetEnabledAddons now only returns enabled addons, so no need to check addon.Enabled
 		comp := models.AddonComparisonStatus{
 			AddonName:          addon.AddonName,
 			GitConfigured:      true,
@@ -217,19 +217,11 @@ func (s *ClusterService) GetClusterComparison(ctx context.Context, clusterName s
 			GitRepoURL:         addon.RepoURL,
 			GitVersion:         addon.CurrentVersion,
 			GitNamespace:       addon.Namespace,
-			GitEnabled:         addon.Enabled,
+			GitEnabled:         true,
 			EnvironmentVersion: addon.EnvironmentVersion,
 			CustomVersion:      addon.CustomVersion,
 			HasVersionOverride: addon.HasVersionOverride,
 			Issues:             []string{},
-		}
-
-		if addon.Enabled {
-			gitEnabled++
-		} else {
-			gitDisabled++
-			comp.Status = "disabled_in_git"
-			totalDisabled++
 		}
 
 		// Try to find matching ArgoCD app
@@ -254,15 +246,13 @@ func (s *ClusterService) GetClusterComparison(ctx context.Context, clusterName s
 			comp.ArgocdDestinationServer = app.DestinationServer
 			comp.ArgocdOperationState = app.OperationState
 
-			if addon.Enabled {
-				comp.Status = classifyHealth(app.HealthStatus, app.SyncStatus)
-				if comp.Status == "healthy" {
-					totalHealthy++
-				} else {
-					totalIssues++
-				}
+			comp.Status = classifyHealth(app.HealthStatus, app.SyncStatus)
+			if comp.Status == "healthy" {
+				totalHealthy++
+			} else {
+				totalIssues++
 			}
-		} else if addon.Enabled {
+		} else {
 			comp.Status = "missing_in_argocd"
 			totalMissing++
 		}
@@ -319,8 +309,8 @@ func (s *ClusterService) GetClusterComparison(ctx context.Context, clusterName s
 	return &models.ClusterComparisonResponse{
 		Cluster:                      *cluster,
 		GitTotalAddons:               len(gitAddons),
-		GitEnabledAddons:             gitEnabled,
-		GitDisabledAddons:            gitDisabled,
+		GitEnabledAddons:             len(gitAddons),
+		GitDisabledAddons:            0,
 		ArgocdTotalApplications:      len(argocdApps),
 		ArgocdHealthyApplications:    argocdHealthy,
 		ArgocdSyncedApplications:     argocdSynced,
@@ -331,7 +321,7 @@ func (s *ClusterService) GetClusterComparison(ctx context.Context, clusterName s
 		TotalWithIssues:              totalIssues,
 		TotalMissingInArgocd:         totalMissing,
 		TotalUntrackedInArgocd:       totalUntracked,
-		TotalDisabledInGit:           totalDisabled,
+		TotalDisabledInGit:           0,
 		ClusterConnectionState:       connState,
 	}, nil
 }

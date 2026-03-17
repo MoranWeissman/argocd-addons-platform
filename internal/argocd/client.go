@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"strings"
@@ -53,6 +54,7 @@ func NewInClusterClient(namespace string) (*Client, error) {
 
 	// In-cluster communication typically uses cluster-internal CAs that the
 	// default system pool may not trust, so we skip verification.
+	slog.Info("argocd in-cluster client initialized", "server", serverURL, "namespace", namespace)
 	return NewClient(serverURL, strings.TrimSpace(string(tokenBytes)), true), nil
 }
 
@@ -162,6 +164,7 @@ func (c *Client) doGet(ctx context.Context, path string) ([]byte, error) {
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
+		slog.Error("argocd call failed", "error", err, "endpoint", path)
 		return nil, fmt.Errorf("executing request to %s: %w", path, err)
 	}
 	defer resp.Body.Close()
@@ -172,6 +175,7 @@ func (c *Client) doGet(ctx context.Context, path string) ([]byte, error) {
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		slog.Error("argocd call failed", "endpoint", path, "status", resp.StatusCode)
 		return nil, fmt.Errorf("unexpected status %d from %s: %s", resp.StatusCode, path, string(body))
 	}
 

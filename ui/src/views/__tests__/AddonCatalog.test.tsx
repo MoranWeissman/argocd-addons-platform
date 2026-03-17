@@ -92,13 +92,11 @@ describe('AddonCatalog', () => {
       expect(screen.getByText('Addon Catalog')).toBeInTheDocument()
     })
 
-    // Summary stat cards
-    expect(screen.getByText('Total Addons')).toBeInTheDocument()
+    // Summary stat cards — now clickable filters
+    expect(screen.getAllByText('All Addons').length).toBeGreaterThanOrEqual(1)
     expect(screen.getByText('2')).toBeInTheDocument()
-    expect(screen.getByText('Total Clusters')).toBeInTheDocument()
-    expect(screen.getByText('10')).toBeInTheDocument()
-    expect(screen.getByText('Active Deployments')).toBeInTheDocument()
-    expect(screen.getByText('13')).toBeInTheDocument()
+    expect(screen.getAllByText('Healthy').length).toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByText('Unhealthy').length).toBeGreaterThanOrEqual(1)
     expect(screen.getAllByText('Not Deployed').length).toBeGreaterThanOrEqual(1)
 
     // Addon cards
@@ -136,8 +134,8 @@ describe('AddonCatalog', () => {
       expect(screen.getByText('Addon Catalog')).toBeInTheDocument()
     })
 
-    // Filter options
-    expect(screen.getByText('All Addons')).toBeInTheDocument()
+    // Filter options — "All Addons" appears in both stat card and dropdown
+    expect(screen.getAllByText('All Addons').length).toBeGreaterThanOrEqual(1)
 
     // Page size
     expect(screen.getByText('15 per page')).toBeInTheDocument()

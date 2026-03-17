@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"time"
@@ -78,12 +79,14 @@ func (c *Client) QueryMetrics(ctx context.Context, query string, from, to time.T
 
 	resp, err := c.http.Do(req)
 	if err != nil {
+		slog.Error("datadog query failed", "error", err, "query", query)
 		return nil, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
 		body, _ := io.ReadAll(resp.Body)
+		slog.Error("datadog query failed", "status", resp.StatusCode, "query", query)
 		return nil, fmt.Errorf("datadog returned %d: %s", resp.StatusCode, string(body))
 	}
 
@@ -238,6 +241,7 @@ func (c *Client) GetClusterAddonMetrics(ctx context.Context, clusterName string,
 	from := now.Add(-duration)
 
 	result := &ClusterMetrics{ClusterName: clusterName}
+	slog.Info("datadog fetching cluster metrics", "cluster", clusterName, "namespaces", len(namespaces))
 
 	for _, ns := range namespaces {
 		addon := AddonMetrics{AddonName: ns, Namespace: ns}
@@ -294,5 +298,6 @@ func (c *Client) GetClusterAddonMetrics(ctx context.Context, clusterName string,
 		result.Addons = append(result.Addons, addon)
 	}
 
+	slog.Info("datadog cluster metrics fetched", "cluster", clusterName, "addons", len(result.Addons))
 	return result, nil
 }

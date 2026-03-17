@@ -3,6 +3,7 @@ package gitprovider
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"github.com/google/go-github/v68/github"
 	"golang.org/x/oauth2"
@@ -33,6 +34,7 @@ func (g *GitHubProvider) GetFileContent(ctx context.Context, path, ref string) (
 
 	fileContent, _, resp, err := g.client.Repositories.GetContents(ctx, g.owner, g.repo, path, opts)
 	if err != nil {
+		slog.Error("github get file content failed", "error", err, "path", path, "ref", ref)
 		return nil, fmt.Errorf("get file content: %w", err)
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
@@ -46,6 +48,7 @@ func (g *GitHubProvider) GetFileContent(ctx context.Context, path, ref string) (
 	if err != nil {
 		return nil, fmt.Errorf("decode file content: %w", err)
 	}
+	slog.Info("github file fetched", "path", path, "ref", ref, "size", len(content))
 	return []byte(content), nil
 }
 
@@ -85,6 +88,7 @@ func (g *GitHubProvider) ListPullRequests(ctx context.Context, state string) ([]
 	for {
 		prs, resp, err := g.client.PullRequests.List(ctx, g.owner, g.repo, opts)
 		if err != nil {
+			slog.Error("github list pull requests failed", "error", err, "state", state)
 			return nil, fmt.Errorf("list pull requests: %w", err)
 		}
 
@@ -127,6 +131,7 @@ func (g *GitHubProvider) ListPullRequests(ctx context.Context, state string) ([]
 		opts.Page = resp.NextPage
 	}
 
+	slog.Info("github pull requests listed", "state", state, "count", len(allPRs))
 	return allPRs, nil
 }
 
