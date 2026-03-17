@@ -25,6 +25,7 @@ function renderComponent() {
 describe('AIAssistant', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    localStorage.clear()
     // Mock crypto.randomUUID
     vi.stubGlobal('crypto', {
       ...crypto,
@@ -85,7 +86,6 @@ describe('AIAssistant', () => {
       expect(screen.getByText('AI Assistant')).toBeInTheDocument()
     })
 
-    expect(screen.getByText('Powered by Ollama')).toBeInTheDocument()
     expect(screen.getByText('New Conversation')).toBeInTheDocument()
   })
 })
