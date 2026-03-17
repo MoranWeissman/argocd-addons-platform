@@ -6,7 +6,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
+	"time"
 )
 
 // ChatMessage represents a message in the conversation.
@@ -120,6 +122,7 @@ func (a *Agent) initContext() {
 	a.messages = []ChatMessage{
 		{Role: "system", Content: systemPrompt + contextInfo},
 	}
+	slog.Info("agent session initialized")
 }
 
 // Chat sends a user message and returns the assistant's response.
@@ -131,6 +134,7 @@ func (a *Agent) Chat(ctx context.Context, userMessage string) (string, error) {
 
 	a.messages = append(a.messages, ChatMessage{Role: "user", Content: userMessage})
 
+	chatStart := time.Now()
 	for i := 0; i < 5; i++ {
 		resp, err := a.callLLM(ctx)
 		if err != nil {
@@ -140,6 +144,7 @@ func (a *Agent) Chat(ctx context.Context, userMessage string) (string, error) {
 		// If no tool calls, we have the final response
 		if len(resp.ToolCalls) == 0 {
 			a.messages = append(a.messages, ChatMessage{Role: "assistant", Content: resp.Content})
+			slog.Info("agent chat completed", "iterations", i+1, "duration", time.Since(chatStart))
 			return resp.Content, nil
 		}
 
@@ -151,6 +156,7 @@ func (a *Agent) Chat(ctx context.Context, userMessage string) (string, error) {
 		})
 
 		for _, tc := range resp.ToolCalls {
+			slog.Info("agent tool call", "tool", tc.Function.Name)
 			result, err := a.executor.ExecuteTool(ctx, tc.Function.Name, tc.Function.Arguments)
 			if err != nil {
 				result = fmt.Sprintf("Error executing %s: %v", tc.Function.Name, err)
@@ -730,5 +736,6 @@ func convertMessagesToGemini(messages []ChatMessage) []map[string]interface{} {
 
 // Reset clears conversation history (keeps system prompt).
 func (a *Agent) Reset() {
+	slog.Info("agent session reset")
 	a.initContext()
 }
