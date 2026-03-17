@@ -23,10 +23,16 @@ if [[ ! -f "${SECRETS_FILE}" ]]; then
 fi
 
 # Source the file (skip comments and empty lines)
+set +u  # Allow unset/empty vars during sourcing
 set -a
-# shellcheck source=/dev/null
-source <(grep -v '^\s*#' "${SECRETS_FILE}" | grep -v '^\s*$')
+while IFS='=' read -r key value; do
+  [[ -z "$key" || "$key" =~ ^[[:space:]]*# ]] && continue
+  value="${value%\"}"
+  value="${value#\"}"
+  export "$key=$value"
+done < "${SECRETS_FILE}"
 set +a
+set -u
 
 # --- Validate required vars ---
 if [[ -z "${GITHUB_TOKEN:-}" ]]; then
