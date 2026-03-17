@@ -32,6 +32,8 @@ function renderFormattedContent(content: string) {
   const lines = content.split('\n')
   const elements: React.ReactNode[] = []
   let listBuffer: { type: 'ul' | 'ol'; items: React.ReactNode[] } | null = null
+  let codeBlockBuffer: string[] | null = null
+  let codeBlockLang = ''
 
   function flushList() {
     if (listBuffer) {
@@ -56,6 +58,21 @@ function renderFormattedContent(content: string) {
     }
   }
 
+  function flushCodeBlock() {
+    if (codeBlockBuffer) {
+      elements.push(
+        <pre
+          key={`code-${elements.length}`}
+          className="overflow-x-auto rounded-lg bg-gray-900 p-3 text-xs text-gray-100 dark:bg-gray-950"
+        >
+          <code>{codeBlockBuffer.join('\n')}</code>
+        </pre>,
+      )
+      codeBlockBuffer = null
+      codeBlockLang = ''
+    }
+  }
+
   function formatInline(text: string): React.ReactNode {
     const parts: React.ReactNode[] = []
     const regex = /(\*\*(.+?)\*\*|`(.+?)`)/g
@@ -72,7 +89,7 @@ function renderFormattedContent(content: string) {
         parts.push(
           <code
             key={match.index}
-            className="rounded bg-gray-200 px-1 py-0.5 text-xs dark:bg-gray-700"
+            className="break-all rounded bg-gray-200 px-1 py-0.5 text-xs dark:bg-gray-700"
           >
             {match[3]}
           </code>,
@@ -87,6 +104,22 @@ function renderFormattedContent(content: string) {
   }
 
   for (const line of lines) {
+    // Handle fenced code blocks
+    if (line.trimStart().startsWith('```')) {
+      if (codeBlockBuffer !== null) {
+        flushCodeBlock()
+      } else {
+        flushList()
+        codeBlockBuffer = []
+        codeBlockLang = line.trimStart().slice(3).trim()
+      }
+      continue
+    }
+    if (codeBlockBuffer !== null) {
+      codeBlockBuffer.push(line)
+      continue
+    }
+
     const bulletMatch = line.match(/^[-*]\s+(.*)/)
     const numberMatch = line.match(/^(\d+)\.\s+(.*)/)
 
@@ -108,12 +141,13 @@ function renderFormattedContent(content: string) {
         elements.push(<div key={`br-${elements.length}`} className="h-2" />)
       } else {
         elements.push(
-          <p key={`p-${elements.length}`}>{formatInline(line)}</p>,
+          <p key={`p-${elements.length}`} className="break-words">{formatInline(line)}</p>,
         )
       }
     }
   }
   flushList()
+  flushCodeBlock()
 
   return <div className="space-y-1">{elements}</div>
 }
@@ -349,7 +383,7 @@ export function AIAssistant() {
 
                 {/* Bubble */}
                 <div
-                  className={`max-w-[75%] rounded-2xl px-4 py-2.5 text-sm ${
+                  className={`max-w-[75%] overflow-hidden rounded-2xl px-4 py-2.5 text-sm ${
                     msg.role === 'user'
                       ? 'bg-cyan-600 text-white dark:bg-cyan-700'
                       : 'border border-gray-200 bg-gray-100 text-gray-800 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200'

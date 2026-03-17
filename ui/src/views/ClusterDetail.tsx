@@ -258,19 +258,22 @@ export function ClusterDetail() {
 
       {activeTab === 'comparison' && (
         <>
-          {/* Status filter cards */}
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
-            {statItems.map((item) => (
-              <StatCard
-                key={item.key}
-                title={item.title}
-                value={item.value}
-                icon={item.icon}
-                color={item.color}
-                selected={statusFilter === item.key}
-                onClick={() => handleStatusFilter(item.key)}
-              />
-            ))}
+          {/* Status filter cards — hide zero-count categories */}
+          <div className="flex flex-wrap gap-4">
+            {statItems
+              .filter((item) => item.key === 'all' || item.value > 0)
+              .map((item) => (
+                <div key={item.key} className="min-w-[140px] flex-1">
+                  <StatCard
+                    title={item.title}
+                    value={item.value}
+                    icon={item.icon}
+                    color={item.color}
+                    selected={statusFilter === item.key}
+                    onClick={() => handleStatusFilter(item.key)}
+                  />
+                </div>
+              ))}
           </div>
 
           {/* Comparison table */}
