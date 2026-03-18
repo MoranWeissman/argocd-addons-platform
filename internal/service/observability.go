@@ -361,14 +361,17 @@ func (s *ObservabilityService) checkResourceAlerts(ctx context.Context, gp gitpr
 }
 
 // checkMissingResources checks if an addon's global values file contains resource configuration.
+// Returns false (no alert) if the addon has no values file — likely a CRD-only chart with no workloads.
 func checkMissingResources(ctx context.Context, gp gitprovider.GitProvider, addonName string) (bool, string) {
 	path := fmt.Sprintf("configuration/addons-global-values/%s.yaml", addonName)
 	data, err := gp.GetFileContent(ctx, path, "main")
 	if err != nil {
-		return true, "No global values file found"
+		// No values file = likely a CRD-only or config-only chart (no pods to configure)
+		return false, ""
 	}
 	content := string(data)
 	if !strings.Contains(content, "resources:") {
+		// Has a values file but no resources section — might need attention
 		return true, "No resource requests/limits configured in global values"
 	}
 	return false, ""
