@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"log"
+	"strings"
 
 	"github.com/moran/argocd-addons-platform/internal/argocd"
 	"github.com/moran/argocd-addons-platform/internal/config"
@@ -74,12 +75,30 @@ func (s *DashboardService) GetStats(ctx context.Context, gp gitprovider.GitProvi
 		log.Printf("Warning: could not fetch ArgoCD clusters for dashboard: %v", err)
 	}
 
-	// Application stats from ArgoCD
+	// Application stats from ArgoCD — only count addon apps (not bootstrap/infrastructure)
+	// Addon apps follow the pattern: {addon-name}-{cluster-name}
+	addonNames := make(map[string]bool)
+	for _, addon := range repoCfg.Addons {
+		addonNames[addon.AppName] = true
+	}
+
 	appStats := models.DashboardApplicationStats{}
 	apps, err := ac.ListApplications(ctx)
 	if err == nil {
-		appStats.Total = len(apps)
 		for _, app := range apps {
+			// Check if this app belongs to a known addon (prefix match)
+			isAddon := false
+			for name := range addonNames {
+				if strings.HasPrefix(app.Name, name+"-") {
+					isAddon = true
+					break
+				}
+			}
+			if !isAddon {
+				continue
+			}
+
+			appStats.Total++
 			switch app.SyncStatus {
 			case "Synced":
 				appStats.BySyncStatus.Synced++
@@ -104,21 +123,18 @@ func (s *DashboardService) GetStats(ctx context.Context, gp gitprovider.GitProvi
 		log.Printf("Warning: could not fetch ArgoCD applications for dashboard: %v", err)
 	}
 
-	// Addon stats
+	// Addon stats — only count enabled deployments
 	addonStats := models.DashboardAddonStats{
 		TotalAvailable: len(repoCfg.Addons),
 	}
 	for _, cluster := range repoCfg.Clusters {
 		for _, addon := range repoCfg.Addons {
-			labelVal, has := cluster.Labels[addon.AppName]
-			if has {
-				addonStats.TotalDeployments++
-				if labelVal == "enabled" {
-					addonStats.EnabledDeployments++
-				}
+			if cluster.Labels[addon.AppName] == "enabled" {
+				addonStats.EnabledDeployments++
 			}
 		}
 	}
+	addonStats.TotalDeployments = addonStats.EnabledDeployments
 
 	return &models.DashboardStatisticsResponse{
 		Connections:  connStats,
