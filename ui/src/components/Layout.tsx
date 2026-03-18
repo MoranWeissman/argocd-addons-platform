@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard,
@@ -13,7 +13,6 @@ import {
   Settings,
   ChevronLeft,
   ChevronRight,
-  ChevronDown,
   Plug,
   Sun,
   Moon,
@@ -38,13 +37,10 @@ const navItems = [
 export function Layout() {
   const navigate = useNavigate()
   const [collapsed, setCollapsed] = useState(false)
-  const [dropdownOpen, setDropdownOpen] = useState(false)
-  const dropdownRef = useRef<HTMLDivElement>(null)
   const { theme, toggleTheme } = useTheme()
 
   const [appVersion, setAppVersion] = useState('')
-  const { connections, activeConnection, setActiveConnection, loading } =
-    useConnections()
+  const { activeConnection, loading } = useConnections()
 
   useEffect(() => {
     fetch('/api/v1/health')
@@ -52,25 +48,6 @@ export function Layout() {
       .then((d) => setAppVersion(d.version ?? ''))
       .catch(() => {})
   }, [])
-
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(e.target as Node)
-      ) {
-        setDropdownOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
-
-  const handleConnectionSelect = async (name: string) => {
-    await setActiveConnection(name)
-    setDropdownOpen(false)
-  }
 
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-gray-950">
