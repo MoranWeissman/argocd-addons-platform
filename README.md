@@ -11,6 +11,17 @@ Centralized visibility and AI-powered insights for Kubernetes addon deployments 
 
 <!-- TODO: Add screenshots -->
 
+## Companion Project: ArgoCD Cluster Addons
+
+AAP is designed as the **visibility and intelligence layer** for [ArgoCD Cluster Addons](https://github.com/MoranWeissman/argocd-cluster-addons) — a GitOps solution for managing Kubernetes addons (Datadog, Istio, Kyverno, External Secrets, etc.) across multiple clusters using ArgoCD ApplicationSets.
+
+| Repository | Purpose |
+|-----------|---------|
+| [argocd-cluster-addons](https://github.com/MoranWeissman/argocd-cluster-addons) | The **engine** — GitOps config that ArgoCD watches to deploy addons |
+| [argocd-addons-platform](https://github.com/MoranWeissman/argocd-addons-platform) (this repo) | The **dashboard** — read-only visibility, AI assistant, observability |
+
+AAP reads the same Git configuration and queries the same ArgoCD instance. It never modifies deployments — all changes go through Git PRs to the cluster-addons repo.
+
 ## Features
 
 ### Dashboard and Overview
