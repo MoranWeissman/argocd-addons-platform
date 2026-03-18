@@ -8,6 +8,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -198,7 +199,11 @@ func (a *Agent) Chat(ctx context.Context, userMessage string) (string, error) {
 	a.messages = append(a.messages, ChatMessage{Role: "user", Content: userMessage})
 
 	chatStart := time.Now()
-	for i := 0; i < 8; i++ {
+	maxIter := a.client.config.MaxIterations
+	if maxIter <= 0 {
+		maxIter = 8
+	}
+	for i := 0; i < maxIter; i++ {
 		resp, err := a.callLLM(ctx)
 		if err != nil {
 			return "", err
@@ -266,6 +271,8 @@ func (a *Agent) callLLM(ctx context.Context) (*ChatResponse, error) {
 		return a.callOpenAIChat(ctx)
 	case ProviderGemini:
 		return a.callGeminiChat(ctx)
+	case ProviderCustomOpenAI:
+		return a.callCustomOpenAIChat(ctx)
 	default:
 		return nil, fmt.Errorf("unsupported provider: %s", a.client.config.Provider)
 	}
@@ -447,6 +454,91 @@ func (a *Agent) callOpenAIChat(ctx context.Context) (*ChatResponse, error) {
 
 	if len(result.Choices) == 0 {
 		return nil, fmt.Errorf("empty response from OpenAI")
+	}
+
+	choice := result.Choices[0]
+	chatResp := &ChatResponse{
+		Content: choice.Message.Content,
+	}
+
+	for _, tc := range choice.Message.ToolCalls {
+		chatResp.ToolCalls = append(chatResp.ToolCalls, ToolCall{
+			ID:   tc.ID,
+			Type: "function",
+			Function: ToolCallFunc{
+				Name:      tc.Function.Name,
+				Arguments: json.RawMessage(tc.Function.Arguments),
+			},
+		})
+	}
+
+	return chatResp, nil
+}
+
+// callCustomOpenAIChat sends messages to a custom OpenAI-compatible API with tool calling support.
+func (a *Agent) callCustomOpenAIChat(ctx context.Context) (*ChatResponse, error) {
+	// Reuse the same OpenAI tool and message format
+	openaiTools := convertToolsToOpenAI(GetToolDefinitions())
+	openaiMessages := convertMessagesToOpenAI(a.messages)
+
+	model := a.client.config.GetAgentModel()
+
+	reqBody := map[string]interface{}{
+		"model":    model,
+		"messages": openaiMessages,
+		"tools":    openaiTools,
+	}
+
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("marshaling custom-openai chat request: %w", err)
+	}
+
+	apiURL := fmt.Sprintf("%s/v2/%s/chat/completions",
+		strings.TrimRight(a.client.config.BaseURL, "/"), model)
+
+	req, err := http.NewRequestWithContext(ctx, "POST", apiURL, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	authHeader, authValue := a.client.customOpenAIAuthHeader()
+	req.Header.Set(authHeader, authValue)
+
+	resp, err := a.client.http.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("custom-openai chat request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		respBody, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("custom-openai returned %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	var result struct {
+		Choices []struct {
+			Message struct {
+				Role      string `json:"role"`
+				Content   string `json:"content"`
+				ToolCalls []struct {
+					ID       string `json:"id"`
+					Type     string `json:"type"`
+					Function struct {
+						Name      string `json:"name"`
+						Arguments string `json:"arguments"`
+					} `json:"function"`
+				} `json:"tool_calls,omitempty"`
+			} `json:"message"`
+			FinishReason string `json:"finish_reason"`
+		} `json:"choices"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("parsing custom-openai chat response: %w", err)
+	}
+
+	if len(result.Choices) == 0 {
+		return nil, fmt.Errorf("empty response from custom OpenAI provider")
 	}
 
 	choice := result.Choices[0]

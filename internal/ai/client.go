@@ -17,8 +17,9 @@ const (
 	ProviderOllama Provider = "ollama"
 	ProviderClaude Provider = "claude"
 	ProviderOpenAI Provider = "openai"
-	ProviderGemini Provider = "gemini"
-	ProviderNone   Provider = "none"
+	ProviderGemini       Provider = "gemini"
+	ProviderCustomOpenAI Provider = "custom-openai"
+	ProviderNone         Provider = "none"
 )
 
 // Config holds AI provider settings.
@@ -27,14 +28,18 @@ type Config struct {
 	OllamaURL   string   `yaml:"ollama_url"`
 	OllamaModel string   `yaml:"ollama_model"`
 	AgentModel  string   `yaml:"agent_model"`  // Separate model for agent (tool calling needs larger model)
-	APIKey      string   `yaml:"api_key"`       // API key for Claude/OpenAI
-	CloudModel  string   `yaml:"cloud_model"`   // Model name for cloud providers (e.g., "claude-sonnet-4-20250514", "gpt-4o")
+	APIKey        string   `yaml:"api_key"`         // API key for Claude/OpenAI
+	CloudModel    string   `yaml:"cloud_model"`     // Model name for cloud providers (e.g., "claude-sonnet-4-20250514", "gpt-4o")
+	BaseURL       string   `yaml:"base_url"`        // Base URL for custom OpenAI-compatible providers
+	AuthHeader    string   `yaml:"auth_header"`     // Custom auth header name (default: "Authorization")
+	AuthPrefix    string   `yaml:"auth_prefix"`     // Custom auth value prefix (default: "Bearer " when using Authorization header)
+	MaxIterations int      `yaml:"max_iterations"`  // Max agent tool-calling iterations (default: 8)
 }
 
 // GetAgentModel returns the model to use for agent conversations.
 // Cloud providers always use CloudModel. Ollama uses AgentModel or falls back to OllamaModel.
 func (c Config) GetAgentModel() string {
-	if c.Provider == ProviderClaude || c.Provider == ProviderOpenAI || c.Provider == ProviderGemini {
+	if c.Provider == ProviderClaude || c.Provider == ProviderOpenAI || c.Provider == ProviderGemini || c.Provider == ProviderCustomOpenAI {
 		if c.CloudModel != "" {
 			return c.CloudModel
 		}
@@ -93,6 +98,8 @@ func (c *Client) Summarize(ctx context.Context, prompt string) (string, error) {
 		return c.openaiSummarize(ctx, prompt)
 	case ProviderGemini:
 		return c.geminiSummarize(ctx, prompt)
+	case ProviderCustomOpenAI:
+		return c.customOpenAISummarize(ctx, prompt)
 	default:
 		return "", fmt.Errorf("unsupported AI provider: %s", c.config.Provider)
 	}
@@ -288,6 +295,70 @@ func (c *Client) geminiSummarize(ctx context.Context, prompt string) (string, er
 		return result.Candidates[0].Content.Parts[0].Text, nil
 	}
 	return "", fmt.Errorf("empty response from Gemini")
+}
+
+// customOpenAIAuthHeader returns the header name and value for custom OpenAI-compatible auth.
+func (c *Client) customOpenAIAuthHeader() (string, string) {
+	header := c.config.AuthHeader
+	if header == "" {
+		header = "Authorization"
+	}
+	prefix := c.config.AuthPrefix
+	if prefix == "" && (header == "Authorization" || c.config.AuthHeader == "") {
+		prefix = "Bearer "
+	}
+	return header, prefix + c.config.APIKey
+}
+
+func (c *Client) customOpenAISummarize(ctx context.Context, prompt string) (string, error) {
+	body, err := json.Marshal(map[string]interface{}{
+		"model":      c.config.CloudModel,
+		"max_tokens": 4096,
+		"messages": []map[string]interface{}{
+			{"role": "user", "content": prompt},
+		},
+	})
+	if err != nil {
+		return "", fmt.Errorf("marshaling custom-openai request: %w", err)
+	}
+
+	apiURL := fmt.Sprintf("%s/v2/%s/chat/completions",
+		strings.TrimRight(c.config.BaseURL, "/"), c.config.CloudModel)
+
+	req, err := http.NewRequestWithContext(ctx, "POST", apiURL, bytes.NewReader(body))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	authHeader, authValue := c.customOpenAIAuthHeader()
+	req.Header.Set(authHeader, authValue)
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("custom-openai request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		respBody, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("custom-openai returned %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	var result struct {
+		Choices []struct {
+			Message struct {
+				Content string `json:"content"`
+			} `json:"message"`
+		} `json:"choices"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", fmt.Errorf("parsing custom-openai response: %w", err)
+	}
+
+	if len(result.Choices) > 0 {
+		return result.Choices[0].Message.Content, nil
+	}
+	return "", fmt.Errorf("empty response from custom OpenAI provider")
 }
 
 // BuildUpgradePrompt creates a concise prompt for analyzing an upgrade.
