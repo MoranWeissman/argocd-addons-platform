@@ -32,6 +32,22 @@ func (f *fakeGitProvider) TestConnection(_ context.Context) error {
 	return nil
 }
 
+func (f *fakeGitProvider) CreateBranch(_ context.Context, _, _ string) error {
+	return nil
+}
+
+func (f *fakeGitProvider) CreateOrUpdateFile(_ context.Context, _ string, _ []byte, _, _ string) error {
+	return nil
+}
+
+func (f *fakeGitProvider) DeleteFile(_ context.Context, _, _, _ string) error {
+	return nil
+}
+
+func (f *fakeGitProvider) CreatePullRequest(_ context.Context, _, _, _, _ string) (*gitprovider.PullRequest, error) {
+	return nil, nil
+}
+
 func TestGetVersionMatrix(t *testing.T) {
 	clusterAddonsYAML := []byte(`
 clusters:

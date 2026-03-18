@@ -78,14 +78,25 @@ secrets:
 #   password: ""   # maps to AAP_AUTH_PASSWORD env var
 
 # ---------------------------------------------------------------------------
+# GitOps Actions (v2 — PR creation from UI/AI)
+# ---------------------------------------------------------------------------
+gitops:
+  actions:
+    enabled: false  # Set to true to enable write operations (PR creation)
+
+# ---------------------------------------------------------------------------
 # AI Provider (optional)
 # ---------------------------------------------------------------------------
 ai:
   enabled: false
-  # One of: ollama, claude, openai, gemini
+  # One of: ollama, claude, openai, gemini, custom-openai
   provider: ""
   apiKey: ""       # For claude/openai/gemini (stored in secret)
   cloudModel: ""   # e.g., claude-sonnet-4-20250514, gpt-4o, gemini-2.5-flash
+  # Custom OpenAI-compatible provider (e.g., enterprise LLM gateways)
+  baseURL: ""       # e.g., https://your-gateway.example.com/api
+  authHeader: ""    # Custom auth header (default: "Authorization")
+  maxIterations: 8  # Agent tool-calling loop limit (increase for migration workflows)
   # Ollama settings
   ollama:
     # Deploy an Ollama pod alongside AAP (set to true to auto-deploy)

@@ -28,11 +28,17 @@ RELEASE="aap"
 VERSION="$(cat "${PROJECT_ROOT}/VERSION" 2>/dev/null || echo "0.0.0")"
 
 # --- Source secrets ---
-SECRETS_FILE="${1:-${PROJECT_ROOT}/.env.secrets}"
-if [[ ! -f "${SECRETS_FILE}" ]]; then
-  echo "ERROR: Secrets file not found: ${SECRETS_FILE}"
-  echo "Usage: $0 [path-to-.env.secrets]"
-  exit 1
+SECRETS_FILE="${1:-}"
+if [[ -z "${SECRETS_FILE}" ]]; then
+  if [[ -f "${PROJECT_ROOT}/secrets.env" ]]; then
+    SECRETS_FILE="${PROJECT_ROOT}/secrets.env"
+  elif [[ -f "${PROJECT_ROOT}/.env.secrets" ]]; then
+    SECRETS_FILE="${PROJECT_ROOT}/.env.secrets"
+  else
+    echo "ERROR: No secrets file found. Create secrets.env (see secrets.env.example) or .env.secrets"
+    echo "Usage: $0 [path-to-secrets-file]"
+    exit 1
+  fi
 fi
 
 # Source the file (skip comments and empty lines)
@@ -146,6 +152,12 @@ SECRET_ARGS=(
 if [[ -n "${AI_API_KEY:-}" ]]; then
   SECRET_ARGS+=(--set "ai.apiKey=${AI_API_KEY}")
 fi
+[[ -n "${AI_BASE_URL:-}" ]] && SECRET_ARGS+=(--set "ai.baseURL=${AI_BASE_URL}")
+[[ -n "${AI_AUTH_HEADER:-}" ]] && SECRET_ARGS+=(--set "ai.authHeader=${AI_AUTH_HEADER}")
+[[ -n "${AI_MAX_ITERATIONS:-}" ]] && SECRET_ARGS+=(--set "ai.maxIterations=${AI_MAX_ITERATIONS}")
+
+# GitOps actions
+[[ "${GITOPS_ACTIONS_ENABLED:-}" == "true" ]] && SECRET_ARGS+=(--set "gitops.actions.enabled=true")
 
 # Datadog
 if [[ -n "${DATADOG_API_KEY:-}" ]]; then

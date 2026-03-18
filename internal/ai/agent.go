@@ -8,6 +8,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -130,6 +131,37 @@ Save things like:
 Do NOT save trivial or transient information. Only save genuinely useful learnings.
 Your LEARNED MEMORIES above (if any) are from previous conversations — use them.
 
+=== GITOPS WRITE OPERATIONS ===
+When GitOps actions are enabled, you can make infrastructure changes by creating Git PRs.
+
+PRINCIPLE: You NEVER deploy directly. You create PRs. ArgoCD handles deployment after PR is merged.
+
+Available write tools:
+- enable_addon(cluster_name, addon_name) — Enable an addon on a cluster via PR
+- disable_addon(cluster_name, addon_name) — Disable an addon on a cluster via PR
+- update_addon_version(addon_name, version) — Update addon catalog version via PR
+- sync_argocd_app(app_name) — Trigger ArgoCD sync for an application
+- refresh_argocd_app(app_name, hard) — Trigger ArgoCD refresh (set hard="true" for hard refresh)
+
+MIGRATION WORKFLOW (10 steps):
+When asked to migrate an addon from OLD ArgoCD to NEW ArgoCD:
+1. Verify addon exists in addons-catalog.yaml with inMigration: true
+2. Enable addon on the cluster in NEW repo (enable_addon)
+3. Verify application created in NEW ArgoCD (get_app_details)
+4. Disable addon on the cluster in OLD repo (disable_addon)
+5. Sync the clusters app in OLD ArgoCD (sync_argocd_app)
+6. Verify application removed from OLD ArgoCD
+7. Verify application exists in NEW ArgoCD (get_app_details)
+8. Hard refresh in NEW ArgoCD (refresh_argocd_app with hard=true)
+9. Verify application healthy (get_app_details — expect Synced + Healthy)
+10. Report migration complete
+
+IMPORTANT:
+- Always confirm with the user before creating PRs
+- One addon at a time for migrations
+- Check health status between steps
+- If anything looks wrong, STOP and report to the user
+
 === CRITICAL: CLUSTER NAME MATCHING ===
 Match partial names against the KNOWN CLUSTERS list:
 - "addons cluster" → cluster containing "addons" in its name
@@ -198,7 +230,11 @@ func (a *Agent) Chat(ctx context.Context, userMessage string) (string, error) {
 	a.messages = append(a.messages, ChatMessage{Role: "user", Content: userMessage})
 
 	chatStart := time.Now()
-	for i := 0; i < 8; i++ {
+	maxIter := a.client.config.MaxIterations
+	if maxIter <= 0 {
+		maxIter = 8
+	}
+	for i := 0; i < maxIter; i++ {
 		resp, err := a.callLLM(ctx)
 		if err != nil {
 			return "", err
@@ -266,6 +302,8 @@ func (a *Agent) callLLM(ctx context.Context) (*ChatResponse, error) {
 		return a.callOpenAIChat(ctx)
 	case ProviderGemini:
 		return a.callGeminiChat(ctx)
+	case ProviderCustomOpenAI:
+		return a.callCustomOpenAIChat(ctx)
 	default:
 		return nil, fmt.Errorf("unsupported provider: %s", a.client.config.Provider)
 	}
@@ -275,7 +313,7 @@ func (a *Agent) callOllamaChat(ctx context.Context) (*ChatResponse, error) {
 	reqBody := ollamaChatRequest{
 		Model:    a.client.config.GetAgentModel(),
 		Messages: a.messages,
-		Tools:    GetToolDefinitions(),
+		Tools:    GetToolDefinitions(a.client.config.GitOpsEnabled),
 		Stream:   false,
 		Options: map[string]interface{}{
 			"temperature": 0.3,
@@ -316,7 +354,7 @@ func (a *Agent) callOllamaChat(ctx context.Context) (*ChatResponse, error) {
 // callClaudeChat sends messages to the Claude API with tool calling support.
 func (a *Agent) callClaudeChat(ctx context.Context) (*ChatResponse, error) {
 	// Convert tool definitions to Claude format
-	claudeTools := convertToolsToClaude(GetToolDefinitions())
+	claudeTools := convertToolsToClaude(GetToolDefinitions(a.client.config.GitOpsEnabled))
 
 	// Convert messages to Claude format (separate system from messages)
 	claudeMessages := convertMessagesToClaude(a.messages)
@@ -390,7 +428,7 @@ func (a *Agent) callClaudeChat(ctx context.Context) (*ChatResponse, error) {
 // callOpenAIChat sends messages to the OpenAI API with tool calling support.
 func (a *Agent) callOpenAIChat(ctx context.Context) (*ChatResponse, error) {
 	// Convert tool definitions to OpenAI format
-	openaiTools := convertToolsToOpenAI(GetToolDefinitions())
+	openaiTools := convertToolsToOpenAI(GetToolDefinitions(a.client.config.GitOpsEnabled))
 
 	// Convert messages to OpenAI format
 	openaiMessages := convertMessagesToOpenAI(a.messages)
@@ -447,6 +485,91 @@ func (a *Agent) callOpenAIChat(ctx context.Context) (*ChatResponse, error) {
 
 	if len(result.Choices) == 0 {
 		return nil, fmt.Errorf("empty response from OpenAI")
+	}
+
+	choice := result.Choices[0]
+	chatResp := &ChatResponse{
+		Content: choice.Message.Content,
+	}
+
+	for _, tc := range choice.Message.ToolCalls {
+		chatResp.ToolCalls = append(chatResp.ToolCalls, ToolCall{
+			ID:   tc.ID,
+			Type: "function",
+			Function: ToolCallFunc{
+				Name:      tc.Function.Name,
+				Arguments: json.RawMessage(tc.Function.Arguments),
+			},
+		})
+	}
+
+	return chatResp, nil
+}
+
+// callCustomOpenAIChat sends messages to a custom OpenAI-compatible API with tool calling support.
+func (a *Agent) callCustomOpenAIChat(ctx context.Context) (*ChatResponse, error) {
+	// Reuse the same OpenAI tool and message format
+	openaiTools := convertToolsToOpenAI(GetToolDefinitions(a.client.config.GitOpsEnabled))
+	openaiMessages := convertMessagesToOpenAI(a.messages)
+
+	model := a.client.config.GetAgentModel()
+
+	reqBody := map[string]interface{}{
+		"model":    model,
+		"messages": openaiMessages,
+		"tools":    openaiTools,
+	}
+
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("marshaling custom-openai chat request: %w", err)
+	}
+
+	apiURL := fmt.Sprintf("%s/v2/%s/chat/completions",
+		strings.TrimRight(a.client.config.BaseURL, "/"), model)
+
+	req, err := http.NewRequestWithContext(ctx, "POST", apiURL, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	authHeader, authValue := a.client.customOpenAIAuthHeader()
+	req.Header.Set(authHeader, authValue)
+
+	resp, err := a.client.http.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("custom-openai chat request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		respBody, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("custom-openai returned %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	var result struct {
+		Choices []struct {
+			Message struct {
+				Role      string `json:"role"`
+				Content   string `json:"content"`
+				ToolCalls []struct {
+					ID       string `json:"id"`
+					Type     string `json:"type"`
+					Function struct {
+						Name      string `json:"name"`
+						Arguments string `json:"arguments"`
+					} `json:"function"`
+				} `json:"tool_calls,omitempty"`
+			} `json:"message"`
+			FinishReason string `json:"finish_reason"`
+		} `json:"choices"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("parsing custom-openai chat response: %w", err)
+	}
+
+	if len(result.Choices) == 0 {
+		return nil, fmt.Errorf("empty response from custom OpenAI provider")
 	}
 
 	choice := result.Choices[0]
@@ -609,7 +732,7 @@ func convertMessagesToOpenAI(messages []ChatMessage) []map[string]interface{} {
 // callGeminiChat sends messages to the Gemini API with tool calling support.
 func (a *Agent) callGeminiChat(ctx context.Context) (*ChatResponse, error) {
 	// Convert tool definitions to Gemini format
-	geminiTools := convertToolsToGemini(GetToolDefinitions())
+	geminiTools := convertToolsToGemini(GetToolDefinitions(a.client.config.GitOpsEnabled))
 
 	// Convert messages to Gemini format (separate system from messages)
 	geminiContents := convertMessagesToGemini(a.messages)

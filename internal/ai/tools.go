@@ -29,27 +29,42 @@ type ToolFunction struct {
 
 // ToolExecutor can execute tools against the platform's data sources.
 type ToolExecutor struct {
-	parser  *config.Parser
-	fetcher *helm.Fetcher
-	gp      gitprovider.GitProvider
-	ac      *argocd.Client
-	memory  *MemoryStore
+	parser      *config.Parser
+	fetcher     *helm.Fetcher
+	gp          gitprovider.GitProvider            // default/active connection
+	ac          *argocd.Client
+	memory      *MemoryStore
+	connections map[string]gitprovider.GitProvider  // named connections for multi-repo operations
 }
 
 // NewToolExecutor creates a new ToolExecutor with the given providers.
-func NewToolExecutor(gp gitprovider.GitProvider, ac *argocd.Client, memory *MemoryStore) *ToolExecutor {
+// connections is an optional map of named GitProviders for multi-repo operations (can be nil).
+func NewToolExecutor(gp gitprovider.GitProvider, ac *argocd.Client, memory *MemoryStore, connections map[string]gitprovider.GitProvider) *ToolExecutor {
 	return &ToolExecutor{
-		parser:  config.NewParser(),
-		fetcher: helm.NewFetcher(),
-		gp:      gp,
-		ac:      ac,
-		memory:  memory,
+		parser:      config.NewParser(),
+		fetcher:     helm.NewFetcher(),
+		gp:          gp,
+		ac:          ac,
+		memory:      memory,
+		connections: connections,
 	}
 }
 
-// GetToolDefinitions returns all available tool definitions for Ollama.
-func GetToolDefinitions() []ToolDefinition {
-	return []ToolDefinition{
+// resolveProvider returns the GitProvider for the given connection name,
+// falling back to the default provider if the name is empty or not found.
+func (e *ToolExecutor) resolveProvider(connectionName string) gitprovider.GitProvider {
+	if connectionName != "" && e.connections != nil {
+		if gp, ok := e.connections[connectionName]; ok {
+			return gp
+		}
+	}
+	return e.gp
+}
+
+// GetToolDefinitions returns all available tool definitions.
+// When writeEnabled is true, write tools (enable_addon, disable_addon, etc.) are included.
+func GetToolDefinitions(writeEnabled bool) []ToolDefinition {
+	tools := []ToolDefinition{
 		{
 			Type: "function",
 			Function: ToolFunction{
@@ -243,6 +258,10 @@ func GetToolDefinitions() []ToolDefinition {
 			},
 		},
 	}
+	if writeEnabled {
+		tools = append(tools, GetWriteToolDefinitions()...)
+	}
+	return tools
 }
 
 // ExecuteTool runs a tool and returns the result as a string.
@@ -331,6 +350,21 @@ func (e *ToolExecutor) ExecuteTool(ctx context.Context, name string, args json.R
 			return e.memory.Search(params["query"]), nil
 		}
 		return "Memory system not available.", nil
+	case "enable_addon":
+		return e.enableAddon(ctx, params["connection"], params["cluster_name"], params["addon_name"])
+	case "disable_addon":
+		return e.disableAddon(ctx, params["connection"], params["cluster_name"], params["addon_name"])
+	case "update_addon_version":
+		return e.updateAddonVersion(ctx, params["connection"], params["addon_name"], params["version"])
+	case "sync_argocd_app":
+		an := params["app_name"]
+		if an == "" { an = params["name"] }
+		return e.syncArgocdApp(ctx, an)
+	case "refresh_argocd_app":
+		an := params["app_name"]
+		if an == "" { an = params["name"] }
+		hard := strings.EqualFold(params["hard"], "true")
+		return e.refreshArgocdApp(ctx, an, hard)
 	default:
 		return "", fmt.Errorf("unknown tool: %s", name)
 	}

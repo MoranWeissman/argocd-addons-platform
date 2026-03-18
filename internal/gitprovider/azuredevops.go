@@ -47,3 +47,23 @@ func (a *AzureDevOpsProvider) ListPullRequests(_ context.Context, _ string) ([]P
 func (a *AzureDevOpsProvider) TestConnection(_ context.Context) error {
 	return fmt.Errorf("azure devops: TestConnection not implemented")
 }
+
+// CreateBranch is not yet implemented for Azure DevOps.
+func (a *AzureDevOpsProvider) CreateBranch(_ context.Context, _, _ string) error {
+	return fmt.Errorf("azure devops: write operations not implemented")
+}
+
+// CreateOrUpdateFile is not yet implemented for Azure DevOps.
+func (a *AzureDevOpsProvider) CreateOrUpdateFile(_ context.Context, _ string, _ []byte, _, _ string) error {
+	return fmt.Errorf("azure devops: write operations not implemented")
+}
+
+// DeleteFile is not yet implemented for Azure DevOps.
+func (a *AzureDevOpsProvider) DeleteFile(_ context.Context, _, _, _ string) error {
+	return fmt.Errorf("azure devops: write operations not implemented")
+}
+
+// CreatePullRequest is not yet implemented for Azure DevOps.
+func (a *AzureDevOpsProvider) CreatePullRequest(_ context.Context, _, _, _, _ string) (*PullRequest, error) {
+	return nil, fmt.Errorf("azure devops: write operations not implemented")
+}
