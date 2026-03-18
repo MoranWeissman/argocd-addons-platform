@@ -8,6 +8,7 @@ import (
 	"log"
 	"log/slog"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -50,6 +51,10 @@ func NewServer(
 
 	// Initialize auth store (auto-detects K8s vs local mode)
 	authStore := auth.NewStore()
+
+	if !authStore.HasUsers() {
+		slog.Warn("WARNING: Authentication is DISABLED — all API endpoints are publicly accessible. Configure users via K8s ConfigMap or AAP_AUTH_USER env var.")
+	}
 
 	return &Server{
 		connSvc:          connSvc,
@@ -251,7 +256,6 @@ func (s *Server) handleUpdatePassword(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		Username        string `json:"username"`
 		CurrentPassword string `json:"current_password"`
 		NewPassword     string `json:"new_password"`
 	}
@@ -264,11 +268,7 @@ func (s *Server) handleUpdatePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Default to "admin" if no username provided (backward compat)
-	username := req.Username
-	if username == "" {
-		username = "admin"
-	}
+	username := "admin" // Currently single-user; multi-user needs session-to-user binding
 
 	if err := s.authStore.UpdatePassword(username, req.CurrentPassword, req.NewPassword); err != nil {
 		if strings.Contains(err.Error(), "incorrect") {
@@ -315,10 +315,39 @@ func (s *Server) handleHashPassword(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"hash": string(hash)})
 }
 
-// corsMiddleware adds CORS headers.
+// corsMiddleware adds CORS and security headers.
 func corsMiddleware(next http.Handler) http.Handler {
+	corsOrigin := os.Getenv("AAP_CORS_ORIGIN")
+
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
+		// Security headers
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+
+		// CORS origin
+		origin := r.Header.Get("Origin")
+		if corsOrigin == "*" {
+			// Dev mode: allow all origins
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+		} else if corsOrigin != "" {
+			// Explicit origin configured
+			if origin == corsOrigin {
+				w.Header().Set("Access-Control-Allow-Origin", corsOrigin)
+				w.Header().Set("Vary", "Origin")
+			}
+		} else {
+			// Default: same-origin only — reflect Origin if it matches Host
+			if origin != "" {
+				host := r.Host
+				// Check if origin matches the host (same-origin)
+				if strings.Contains(origin, "://"+host) {
+					w.Header().Set("Access-Control-Allow-Origin", origin)
+					w.Header().Set("Vary", "Origin")
+				}
+			}
+		}
+
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-AAP-Connection")
 

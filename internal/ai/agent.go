@@ -627,12 +627,13 @@ func (a *Agent) callGeminiChat(ctx context.Context) (*ChatResponse, error) {
 		return nil, fmt.Errorf("marshaling gemini chat request: %w", err)
 	}
 
-	url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s", model, a.client.config.APIKey)
-	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(body))
+	apiURL := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent", model)
+	req, err := http.NewRequestWithContext(ctx, "POST", apiURL, bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-goog-api-key", a.client.config.APIKey)
 
 	resp, err := a.client.http.Do(req)
 	if err != nil {

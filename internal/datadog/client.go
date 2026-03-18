@@ -124,10 +124,11 @@ func (c *Client) QueryMetrics(ctx context.Context, query string, from, to time.T
 // Validate checks if the API keys are valid.
 func (c *Client) Validate(ctx context.Context) error {
 	u := fmt.Sprintf("https://api.%s/api/v1/validate", c.config.Site)
-	req, err := http.NewRequestWithContext(ctx, "GET", u+"?api_key="+c.config.APIKey, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
 	if err != nil {
 		return fmt.Errorf("creating request: %w", err)
 	}
+	req.Header.Set("DD-API-KEY", c.config.APIKey)
 	resp, err := c.http.Do(req)
 	if err != nil {
 		return err

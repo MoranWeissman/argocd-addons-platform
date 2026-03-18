@@ -51,7 +51,7 @@ func (m *MemoryStore) save() {
 		slog.Error("failed to marshal agent memory", "error", err)
 		return
 	}
-	if err := os.WriteFile(m.path, data, 0644); err != nil {
+	if err := os.WriteFile(m.path, data, 0600); err != nil {
 		slog.Error("failed to save agent memory", "path", m.path, "error", err)
 	}
 }
