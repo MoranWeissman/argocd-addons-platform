@@ -23,7 +23,7 @@ interface PersistedState {
 
 function loadPersistedState(): { sessionId: string; messages: ChatMessage[] } | null {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
+    const raw = sessionStorage.getItem(STORAGE_KEY)
     if (!raw) return null
     const parsed: PersistedState = JSON.parse(raw)
     if (!parsed.sessionId || !Array.isArray(parsed.messages)) return null
@@ -50,7 +50,7 @@ function persistState(sessionId: string, messages: ChatMessage[]) {
         timestamp: m.timestamp.toISOString(),
       })),
     }
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(data))
   } catch {
     // Storage full or unavailable — ignore
   }
@@ -58,7 +58,7 @@ function persistState(sessionId: string, messages: ChatMessage[]) {
 
 function clearPersistedState() {
   try {
-    localStorage.removeItem(STORAGE_KEY)
+    sessionStorage.removeItem(STORAGE_KEY)
   } catch {
     // ignore
   }

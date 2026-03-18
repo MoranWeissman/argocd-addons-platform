@@ -328,25 +328,41 @@ func (e *ToolExecutor) findAddonDeployments(ctx context.Context, addonName strin
 		return "", err
 	}
 
-	var sb strings.Builder
-	found := 0
+	var enabledSB, disabledSB strings.Builder
+	enabledCount, disabledCount := 0, 0
 	for _, c := range clusters {
 		labelVal, has := c.Labels[addonName]
-		if has {
-			found++
-			versionKey := addonName + "-version"
-			version := ""
-			if v, ok := c.Labels[versionKey]; ok {
-				version = " (version override: " + v + ")"
-			}
-			fmt.Fprintf(&sb, "- %s: %s%s\n", c.Name, labelVal, version)
+		if !has {
+			continue
+		}
+		versionKey := addonName + "-version"
+		version := ""
+		if v, ok := c.Labels[versionKey]; ok {
+			version = " (version: " + v + ")"
+		}
+		if strings.EqualFold(labelVal, "enabled") {
+			enabledCount++
+			fmt.Fprintf(&enabledSB, "- %s%s\n", c.Name, version)
+		} else {
+			disabledCount++
+			fmt.Fprintf(&disabledSB, "- %s (disabled)\n", c.Name)
 		}
 	}
 
-	if found == 0 {
+	if enabledCount == 0 && disabledCount == 0 {
 		return fmt.Sprintf("Addon '%s' is not configured on any cluster.", addonName), nil
 	}
-	return fmt.Sprintf("Addon '%s' found on %d clusters:\n%s", addonName, found, sb.String()), nil
+
+	var sb strings.Builder
+	if enabledCount > 0 {
+		fmt.Fprintf(&sb, "Addon '%s' is ENABLED on %d cluster(s):\n%s", addonName, enabledCount, enabledSB.String())
+	} else {
+		fmt.Fprintf(&sb, "Addon '%s' is not enabled on any cluster.\n", addonName)
+	}
+	if disabledCount > 0 {
+		fmt.Fprintf(&sb, "\nDisabled on %d cluster(s):\n%s", disabledCount, disabledSB.String())
+	}
+	return sb.String(), nil
 }
 
 func (e *ToolExecutor) getClusterAddons(ctx context.Context, clusterName string) (string, error) {
