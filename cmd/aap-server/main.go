@@ -61,12 +61,18 @@ func main() {
 
 	// AI configuration
 	aiCfg := ai.Config{
-		Provider:    ai.Provider(os.Getenv("AI_PROVIDER")),
-		OllamaURL:   getEnvDefault("AI_OLLAMA_URL", "http://localhost:11434"),
-		OllamaModel: getEnvDefault("AI_OLLAMA_MODEL", "llama3.2"),
-		AgentModel:  os.Getenv("AI_AGENT_MODEL"),
-		APIKey:      os.Getenv("AI_API_KEY"),
-		CloudModel:  os.Getenv("AI_CLOUD_MODEL"),
+		Provider:      ai.Provider(os.Getenv("AI_PROVIDER")),
+		OllamaURL:    getEnvDefault("AI_OLLAMA_URL", "http://localhost:11434"),
+		OllamaModel:  getEnvDefault("AI_OLLAMA_MODEL", "llama3.2"),
+		AgentModel:   os.Getenv("AI_AGENT_MODEL"),
+		APIKey:       os.Getenv("AI_API_KEY"),
+		CloudModel:   os.Getenv("AI_CLOUD_MODEL"),
+		BaseURL:      os.Getenv("AI_BASE_URL"),
+		AuthHeader:   os.Getenv("AI_AUTH_HEADER"),
+		GitOpsEnabled: os.Getenv("GITOPS_ACTIONS_ENABLED") == "true",
+	}
+	if v := os.Getenv("AI_MAX_ITERATIONS"); v != "" {
+		fmt.Sscanf(v, "%d", &aiCfg.MaxIterations)
 	}
 	aiClient := ai.NewClient(aiCfg)
 	if aiClient.IsEnabled() {

@@ -25,7 +25,7 @@ func GetWriteToolDefinitions() []ToolDefinition {
 			Function: ToolFunction{
 				Name:        "enable_addon",
 				Description: "Enable an addon on a cluster by creating a pull request that sets the addon label to enabled in cluster-addons.yaml.",
-				Parameters:  json.RawMessage(`{"type":"object","properties":{"cluster_name":{"type":"string","description":"Name of the cluster"},"addon_name":{"type":"string","description":"Name of the addon to enable"}},"required":["cluster_name","addon_name"]}`),
+				Parameters:  json.RawMessage(`{"type":"object","properties":{"cluster_name":{"type":"string","description":"Name of the cluster"},"addon_name":{"type":"string","description":"Name of the addon to enable"},"connection":{"type":"string","description":"Optional: connection name to target a specific Git repo (for multi-repo operations)"}},"required":["cluster_name","addon_name"]}`),
 			},
 		},
 		{
@@ -33,7 +33,7 @@ func GetWriteToolDefinitions() []ToolDefinition {
 			Function: ToolFunction{
 				Name:        "disable_addon",
 				Description: "Disable an addon on a cluster by creating a pull request that sets the addon label to disabled in cluster-addons.yaml.",
-				Parameters:  json.RawMessage(`{"type":"object","properties":{"cluster_name":{"type":"string","description":"Name of the cluster"},"addon_name":{"type":"string","description":"Name of the addon to disable"}},"required":["cluster_name","addon_name"]}`),
+				Parameters:  json.RawMessage(`{"type":"object","properties":{"cluster_name":{"type":"string","description":"Name of the cluster"},"addon_name":{"type":"string","description":"Name of the addon to disable"},"connection":{"type":"string","description":"Optional: connection name to target a specific Git repo (for multi-repo operations)"}},"required":["cluster_name","addon_name"]}`),
 			},
 		},
 		{
@@ -41,7 +41,7 @@ func GetWriteToolDefinitions() []ToolDefinition {
 			Function: ToolFunction{
 				Name:        "update_addon_version",
 				Description: "Update the version of an addon in the catalog by creating a pull request that modifies addons-catalog.yaml.",
-				Parameters:  json.RawMessage(`{"type":"object","properties":{"addon_name":{"type":"string","description":"Name of the addon"},"version":{"type":"string","description":"New version to set"}},"required":["addon_name","version"]}`),
+				Parameters:  json.RawMessage(`{"type":"object","properties":{"addon_name":{"type":"string","description":"Name of the addon"},"version":{"type":"string","description":"New version to set"},"connection":{"type":"string","description":"Optional: connection name to target a specific Git repo (for multi-repo operations)"}},"required":["addon_name","version"]}`),
 			},
 		},
 		{
@@ -63,7 +63,7 @@ func GetWriteToolDefinitions() []ToolDefinition {
 	}
 }
 
-func (e *ToolExecutor) enableAddon(ctx context.Context, clusterName, addonName string) (string, error) {
+func (e *ToolExecutor) enableAddon(ctx context.Context, connectionName, clusterName, addonName string) (string, error) {
 	if clusterName == "" {
 		return "Please specify a cluster name.", nil
 	}
@@ -71,7 +71,8 @@ func (e *ToolExecutor) enableAddon(ctx context.Context, clusterName, addonName s
 		return "Please specify an addon name.", nil
 	}
 
-	data, err := e.gp.GetFileContent(ctx, "configuration/cluster-addons.yaml", "main")
+	gp := e.resolveProvider(connectionName)
+	data, err := gp.GetFileContent(ctx, "configuration/cluster-addons.yaml", "main")
 	if err != nil {
 		return "", fmt.Errorf("reading cluster-addons.yaml: %w", err)
 	}
@@ -84,19 +85,19 @@ func (e *ToolExecutor) enableAddon(ctx context.Context, clusterName, addonName s
 	branch := fmt.Sprintf("aap/enable-addon/%s/%s/%d",
 		sanitizeBranchName(addonName), sanitizeBranchName(clusterName), time.Now().Unix())
 
-	if err := e.gp.CreateBranch(ctx, branch, "main"); err != nil {
+	if err := gp.CreateBranch(ctx, branch, "main"); err != nil {
 		return "", fmt.Errorf("creating branch: %w", err)
 	}
 
 	commitMsg := fmt.Sprintf("Enable %s on %s", addonName, clusterName)
-	if err := e.gp.CreateOrUpdateFile(ctx, "configuration/cluster-addons.yaml", mutated, branch, commitMsg); err != nil {
+	if err := gp.CreateOrUpdateFile(ctx, "configuration/cluster-addons.yaml", mutated, branch, commitMsg); err != nil {
 		return "", fmt.Errorf("updating file: %w", err)
 	}
 
 	title := fmt.Sprintf("[AAP] Enable %s on %s", addonName, clusterName)
 	body := fmt.Sprintf("Automated by ArgoCD Addons Platform.\n\n**Change:** Enable addon %s on cluster %s.", addonName, clusterName)
 
-	pr, err := e.gp.CreatePullRequest(ctx, title, body, branch, "main")
+	pr, err := gp.CreatePullRequest(ctx, title, body, branch, "main")
 	if err != nil {
 		return "", fmt.Errorf("creating pull request: %w", err)
 	}
@@ -104,7 +105,7 @@ func (e *ToolExecutor) enableAddon(ctx context.Context, clusterName, addonName s
 	return fmt.Sprintf("Pull request created: %s", pr.URL), nil
 }
 
-func (e *ToolExecutor) disableAddon(ctx context.Context, clusterName, addonName string) (string, error) {
+func (e *ToolExecutor) disableAddon(ctx context.Context, connectionName, clusterName, addonName string) (string, error) {
 	if clusterName == "" {
 		return "Please specify a cluster name.", nil
 	}
@@ -112,7 +113,8 @@ func (e *ToolExecutor) disableAddon(ctx context.Context, clusterName, addonName 
 		return "Please specify an addon name.", nil
 	}
 
-	data, err := e.gp.GetFileContent(ctx, "configuration/cluster-addons.yaml", "main")
+	gp := e.resolveProvider(connectionName)
+	data, err := gp.GetFileContent(ctx, "configuration/cluster-addons.yaml", "main")
 	if err != nil {
 		return "", fmt.Errorf("reading cluster-addons.yaml: %w", err)
 	}
@@ -125,19 +127,19 @@ func (e *ToolExecutor) disableAddon(ctx context.Context, clusterName, addonName 
 	branch := fmt.Sprintf("aap/disable-addon/%s/%s/%d",
 		sanitizeBranchName(addonName), sanitizeBranchName(clusterName), time.Now().Unix())
 
-	if err := e.gp.CreateBranch(ctx, branch, "main"); err != nil {
+	if err := gp.CreateBranch(ctx, branch, "main"); err != nil {
 		return "", fmt.Errorf("creating branch: %w", err)
 	}
 
 	commitMsg := fmt.Sprintf("Disable %s on %s", addonName, clusterName)
-	if err := e.gp.CreateOrUpdateFile(ctx, "configuration/cluster-addons.yaml", mutated, branch, commitMsg); err != nil {
+	if err := gp.CreateOrUpdateFile(ctx, "configuration/cluster-addons.yaml", mutated, branch, commitMsg); err != nil {
 		return "", fmt.Errorf("updating file: %w", err)
 	}
 
 	title := fmt.Sprintf("[AAP] Disable %s on %s", addonName, clusterName)
 	body := fmt.Sprintf("Automated by ArgoCD Addons Platform.\n\n**Change:** Disable addon %s on cluster %s.", addonName, clusterName)
 
-	pr, err := e.gp.CreatePullRequest(ctx, title, body, branch, "main")
+	pr, err := gp.CreatePullRequest(ctx, title, body, branch, "main")
 	if err != nil {
 		return "", fmt.Errorf("creating pull request: %w", err)
 	}
@@ -145,7 +147,7 @@ func (e *ToolExecutor) disableAddon(ctx context.Context, clusterName, addonName 
 	return fmt.Sprintf("Pull request created: %s", pr.URL), nil
 }
 
-func (e *ToolExecutor) updateAddonVersion(ctx context.Context, addonName, version string) (string, error) {
+func (e *ToolExecutor) updateAddonVersion(ctx context.Context, connectionName, addonName, version string) (string, error) {
 	if addonName == "" {
 		return "Please specify an addon name.", nil
 	}
@@ -153,7 +155,8 @@ func (e *ToolExecutor) updateAddonVersion(ctx context.Context, addonName, versio
 		return "Please specify a version.", nil
 	}
 
-	data, err := e.gp.GetFileContent(ctx, "configuration/addons-catalog.yaml", "main")
+	gp := e.resolveProvider(connectionName)
+	data, err := gp.GetFileContent(ctx, "configuration/addons-catalog.yaml", "main")
 	if err != nil {
 		return "", fmt.Errorf("reading addons-catalog.yaml: %w", err)
 	}
@@ -166,19 +169,19 @@ func (e *ToolExecutor) updateAddonVersion(ctx context.Context, addonName, versio
 	branch := fmt.Sprintf("aap/update-version/%s/%d",
 		sanitizeBranchName(addonName), time.Now().Unix())
 
-	if err := e.gp.CreateBranch(ctx, branch, "main"); err != nil {
+	if err := gp.CreateBranch(ctx, branch, "main"); err != nil {
 		return "", fmt.Errorf("creating branch: %w", err)
 	}
 
 	commitMsg := fmt.Sprintf("Update %s to version %s", addonName, version)
-	if err := e.gp.CreateOrUpdateFile(ctx, "configuration/addons-catalog.yaml", mutated, branch, commitMsg); err != nil {
+	if err := gp.CreateOrUpdateFile(ctx, "configuration/addons-catalog.yaml", mutated, branch, commitMsg); err != nil {
 		return "", fmt.Errorf("updating file: %w", err)
 	}
 
 	title := fmt.Sprintf("[AAP] Update %s to %s", addonName, version)
 	body := fmt.Sprintf("Automated by ArgoCD Addons Platform.\n\n**Change:** Update addon %s version to %s.", addonName, version)
 
-	pr, err := e.gp.CreatePullRequest(ctx, title, body, branch, "main")
+	pr, err := gp.CreatePullRequest(ctx, title, body, branch, "main")
 	if err != nil {
 		return "", fmt.Errorf("creating pull request: %w", err)
 	}

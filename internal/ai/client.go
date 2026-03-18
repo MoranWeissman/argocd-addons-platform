@@ -34,6 +34,7 @@ type Config struct {
 	AuthHeader    string   `yaml:"auth_header"`     // Custom auth header name (default: "Authorization")
 	AuthPrefix    string   `yaml:"auth_prefix"`     // Custom auth value prefix (default: "Bearer " when using Authorization header)
 	MaxIterations int      `yaml:"max_iterations"`  // Max agent tool-calling iterations (default: 8)
+	GitOpsEnabled bool     `yaml:"gitops_enabled"`  // Enable write tools (enable_addon, disable_addon, etc.)
 }
 
 // GetAgentModel returns the model to use for agent conversations.

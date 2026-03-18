@@ -131,6 +131,37 @@ Save things like:
 Do NOT save trivial or transient information. Only save genuinely useful learnings.
 Your LEARNED MEMORIES above (if any) are from previous conversations — use them.
 
+=== GITOPS WRITE OPERATIONS ===
+When GitOps actions are enabled, you can make infrastructure changes by creating Git PRs.
+
+PRINCIPLE: You NEVER deploy directly. You create PRs. ArgoCD handles deployment after PR is merged.
+
+Available write tools:
+- enable_addon(cluster_name, addon_name) — Enable an addon on a cluster via PR
+- disable_addon(cluster_name, addon_name) — Disable an addon on a cluster via PR
+- update_addon_version(addon_name, version) — Update addon catalog version via PR
+- sync_argocd_app(app_name) — Trigger ArgoCD sync for an application
+- refresh_argocd_app(app_name, hard) — Trigger ArgoCD refresh (set hard="true" for hard refresh)
+
+MIGRATION WORKFLOW (10 steps):
+When asked to migrate an addon from OLD ArgoCD to NEW ArgoCD:
+1. Verify addon exists in addons-catalog.yaml with inMigration: true
+2. Enable addon on the cluster in NEW repo (enable_addon)
+3. Verify application created in NEW ArgoCD (get_app_details)
+4. Disable addon on the cluster in OLD repo (disable_addon)
+5. Sync the clusters app in OLD ArgoCD (sync_argocd_app)
+6. Verify application removed from OLD ArgoCD
+7. Verify application exists in NEW ArgoCD (get_app_details)
+8. Hard refresh in NEW ArgoCD (refresh_argocd_app with hard=true)
+9. Verify application healthy (get_app_details — expect Synced + Healthy)
+10. Report migration complete
+
+IMPORTANT:
+- Always confirm with the user before creating PRs
+- One addon at a time for migrations
+- Check health status between steps
+- If anything looks wrong, STOP and report to the user
+
 === CRITICAL: CLUSTER NAME MATCHING ===
 Match partial names against the KNOWN CLUSTERS list:
 - "addons cluster" → cluster containing "addons" in its name
@@ -282,7 +313,7 @@ func (a *Agent) callOllamaChat(ctx context.Context) (*ChatResponse, error) {
 	reqBody := ollamaChatRequest{
 		Model:    a.client.config.GetAgentModel(),
 		Messages: a.messages,
-		Tools:    GetToolDefinitions(),
+		Tools:    GetToolDefinitions(a.client.config.GitOpsEnabled),
 		Stream:   false,
 		Options: map[string]interface{}{
 			"temperature": 0.3,
@@ -323,7 +354,7 @@ func (a *Agent) callOllamaChat(ctx context.Context) (*ChatResponse, error) {
 // callClaudeChat sends messages to the Claude API with tool calling support.
 func (a *Agent) callClaudeChat(ctx context.Context) (*ChatResponse, error) {
 	// Convert tool definitions to Claude format
-	claudeTools := convertToolsToClaude(GetToolDefinitions())
+	claudeTools := convertToolsToClaude(GetToolDefinitions(a.client.config.GitOpsEnabled))
 
 	// Convert messages to Claude format (separate system from messages)
 	claudeMessages := convertMessagesToClaude(a.messages)
@@ -397,7 +428,7 @@ func (a *Agent) callClaudeChat(ctx context.Context) (*ChatResponse, error) {
 // callOpenAIChat sends messages to the OpenAI API with tool calling support.
 func (a *Agent) callOpenAIChat(ctx context.Context) (*ChatResponse, error) {
 	// Convert tool definitions to OpenAI format
-	openaiTools := convertToolsToOpenAI(GetToolDefinitions())
+	openaiTools := convertToolsToOpenAI(GetToolDefinitions(a.client.config.GitOpsEnabled))
 
 	// Convert messages to OpenAI format
 	openaiMessages := convertMessagesToOpenAI(a.messages)
@@ -478,7 +509,7 @@ func (a *Agent) callOpenAIChat(ctx context.Context) (*ChatResponse, error) {
 // callCustomOpenAIChat sends messages to a custom OpenAI-compatible API with tool calling support.
 func (a *Agent) callCustomOpenAIChat(ctx context.Context) (*ChatResponse, error) {
 	// Reuse the same OpenAI tool and message format
-	openaiTools := convertToolsToOpenAI(GetToolDefinitions())
+	openaiTools := convertToolsToOpenAI(GetToolDefinitions(a.client.config.GitOpsEnabled))
 	openaiMessages := convertMessagesToOpenAI(a.messages)
 
 	model := a.client.config.GetAgentModel()
@@ -701,7 +732,7 @@ func convertMessagesToOpenAI(messages []ChatMessage) []map[string]interface{} {
 // callGeminiChat sends messages to the Gemini API with tool calling support.
 func (a *Agent) callGeminiChat(ctx context.Context) (*ChatResponse, error) {
 	// Convert tool definitions to Gemini format
-	geminiTools := convertToolsToGemini(GetToolDefinitions())
+	geminiTools := convertToolsToGemini(GetToolDefinitions(a.client.config.GitOpsEnabled))
 
 	// Convert messages to Gemini format (separate system from messages)
 	geminiContents := convertMessagesToGemini(a.messages)
