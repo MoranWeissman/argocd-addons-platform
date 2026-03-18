@@ -202,6 +202,26 @@ func (c *Client) GetApplicationEvents(ctx context.Context, appName string) ([]ma
 	return raw.Items, nil
 }
 
+// GetPodLogs returns recent log lines for a pod managed by an ArgoCD application.
+// ArgoCD proxies the log request to the remote cluster.
+func (c *Client) GetPodLogs(ctx context.Context, appName, namespace, podName, container string, tailLines int) (string, error) {
+	if tailLines <= 0 {
+		tailLines = 50
+	}
+	path := fmt.Sprintf("/api/v1/applications/%s/logs?namespace=%s&podName=%s&tailLines=%d&follow=false",
+		appName, namespace, podName, tailLines)
+	if container != "" {
+		path += "&container=" + container
+	}
+
+	body, err := c.doGet(ctx, path)
+	if err != nil {
+		return "", fmt.Errorf("getting logs for pod %q in app %q: %w", podName, appName, err)
+	}
+
+	return string(body), nil
+}
+
 // ListApplicationsSummary returns all applications with summary data (no history/resources).
 // This is the same as ListApplications and is suitable for list views and health overviews.
 func (c *Client) ListApplicationsSummary(ctx context.Context) ([]models.ArgocdApplication, error) {

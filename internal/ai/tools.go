@@ -221,6 +221,14 @@ func GetToolDefinitions() []ToolDefinition {
 		{
 			Type: "function",
 			Function: ToolFunction{
+				Name:        "get_pod_logs",
+				Description: "Get recent log lines from a pod managed by an ArgoCD application. ArgoCD proxies the request to the remote cluster. Use this to debug pod issues, check error messages, or understand what a pod is doing.",
+				Parameters:  json.RawMessage(`{"type":"object","properties":{"app_name":{"type":"string","description":"ArgoCD application name (e.g. datadog-devops-argocd-addons-dev-eks)"},"namespace":{"type":"string","description":"Kubernetes namespace of the pod"},"pod_name":{"type":"string","description":"Name of the pod"},"container":{"type":"string","description":"Optional: specific container name"},"tail_lines":{"type":"string","description":"Number of log lines to return (default 50)"}},"required":["app_name","namespace","pod_name"]}`),
+			},
+		},
+		{
+			Type: "function",
+			Function: ToolFunction{
 				Name:        "save_memory",
 				Description: "Save an important observation or learning for future conversations. Use this to remember user preferences, platform patterns, frequently asked questions, or useful discoveries. Only save genuinely useful information.",
 				Parameters:  json.RawMessage(`{"type":"object","properties":{"content":{"type":"string","description":"The observation or learning to remember"},"category":{"type":"string","description":"Category: user_preference, platform_observation, addon_info, troubleshooting, or faq"}},"required":["content","category"]}`),
@@ -304,6 +312,14 @@ func (e *ToolExecutor) ExecuteTool(ctx context.Context, name string, args json.R
 		q := params["query"]
 		if q == "" { q = params["q"] }
 		return e.webSearch(ctx, q)
+	case "get_pod_logs":
+		an := params["app_name"]
+		if an == "" { an = params["name"] }
+		tailLines := 50
+		if t, ok := params["tail_lines"]; ok && t != "" {
+			fmt.Sscanf(t, "%d", &tailLines)
+		}
+		return e.getPodLogs(ctx, an, params["namespace"], params["pod_name"], params["container"], tailLines)
 	case "save_memory":
 		if e.memory != nil {
 			e.memory.Add(params["content"], params["category"])
@@ -913,32 +929,69 @@ func (e *ToolExecutor) getAppResources(ctx context.Context, appName, resourceKin
 		return "Please specify an application name.", nil
 	}
 
-	app, err := e.ac.GetApplication(ctx, appName)
-	if err != nil {
-		return "", fmt.Errorf("getting application %q: %w", appName, err)
-	}
+	// Try resource tree first (richer data), fall back to app resources
+	tree, treeErr := e.ac.GetResourceTree(ctx, appName)
 
 	var sb strings.Builder
 	count := 0
-	for _, r := range app.Resources {
-		// Never return secrets
-		if strings.EqualFold(r.Kind, "Secret") {
-			continue
+
+	if treeErr == nil && tree != nil {
+		// Parse resource tree nodes
+		nodes, _ := tree["nodes"].([]interface{})
+		for _, n := range nodes {
+			node, ok := n.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			kind, _ := node["kind"].(string)
+			name, _ := node["name"].(string)
+			namespace, _ := node["namespace"].(string)
+			group, _ := node["group"].(string)
+
+			// Never return secrets
+			if strings.EqualFold(kind, "Secret") {
+				continue
+			}
+			// Filter by kind if requested
+			if resourceKind != "" && !strings.EqualFold(kind, resourceKind) {
+				continue
+			}
+
+			health := "N/A"
+			if h, ok := node["health"].(map[string]interface{}); ok {
+				if s, ok := h["status"].(string); ok {
+					health = s
+				}
+			}
+
+			count++
+			groupPrefix := ""
+			if group != "" {
+				groupPrefix = group + "/"
+			}
+			fmt.Fprintf(&sb, "- %s%s/%s (ns: %s) health=%s\n", groupPrefix, kind, name, namespace, health)
 		}
-		// Filter by kind if requested
-		if resourceKind != "" && !strings.EqualFold(r.Kind, resourceKind) {
-			continue
+	} else {
+		// Fall back to app.Resources from basic application fetch
+		app, err := e.ac.GetApplication(ctx, appName)
+		if err != nil {
+			return "", fmt.Errorf("getting application %q: %w", appName, err)
 		}
-		count++
-		health := r.Health
-		if health == "" {
-			health = "N/A"
+
+		for _, r := range app.Resources {
+			if strings.EqualFold(r.Kind, "Secret") {
+				continue
+			}
+			if resourceKind != "" && !strings.EqualFold(r.Kind, resourceKind) {
+				continue
+			}
+			count++
+			health := r.Health
+			if health == "" {
+				health = "N/A"
+			}
+			fmt.Fprintf(&sb, "- %s/%s (ns: %s) health=%s sync=%s\n", r.Kind, r.Name, r.Namespace, health, r.Status)
 		}
-		syncStatus := r.Status
-		if syncStatus == "" {
-			syncStatus = "N/A"
-		}
-		fmt.Fprintf(&sb, "- %s/%s (ns: %s) health=%s sync=%s\n", r.Kind, r.Name, r.Namespace, health, syncStatus)
 	}
 
 	if count == 0 {
@@ -1064,6 +1117,33 @@ func (e *ToolExecutor) getAppDetails(ctx context.Context, appName string) (strin
 	}
 
 	return sb.String(), nil
+}
+
+func (e *ToolExecutor) getPodLogs(ctx context.Context, appName, namespace, podName, container string, tailLines int) (string, error) {
+	if appName == "" {
+		return "Please specify an application name.", nil
+	}
+	if podName == "" {
+		return "Please specify a pod name. Use get_app_resources first to find pod names.", nil
+	}
+	if namespace == "" {
+		namespace = "default"
+	}
+
+	logs, err := e.ac.GetPodLogs(ctx, appName, namespace, podName, container, tailLines)
+	if err != nil {
+		return fmt.Sprintf("Could not fetch logs for pod %s: %v", podName, err), nil
+	}
+
+	// Truncate to 3000 chars to keep context manageable
+	if len(logs) > 3000 {
+		logs = logs[len(logs)-3000:] + "\n... (showing last 3000 chars)"
+	}
+
+	if logs == "" {
+		return fmt.Sprintf("No logs found for pod %s.", podName), nil
+	}
+	return fmt.Sprintf("Logs for pod %s (last %d lines):\n%s", podName, tailLines, logs), nil
 }
 
 func (e *ToolExecutor) webSearch(ctx context.Context, query string) (string, error) {
