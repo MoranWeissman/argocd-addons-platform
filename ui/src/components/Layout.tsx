@@ -16,9 +16,12 @@ import {
   Plug,
   Sun,
   Moon,
+  LogOut,
+  User,
 } from 'lucide-react'
 import { useConnections } from '@/hooks/useConnections'
 import { useTheme } from '@/hooks/useTheme'
+import { useAuth } from '@/hooks/useAuth'
 import { DateTimeDisplay } from '@/components/DateTimeDisplay'
 
 const navItems = [
@@ -32,12 +35,14 @@ const navItems = [
   { to: '/dashboards', label: 'Dashboards', icon: BarChart3 },
   { to: '/docs', label: 'Docs', icon: BookOpen },
   { to: '/settings', label: 'Settings', icon: Settings },
+  { to: '/user', label: 'User Info', icon: User },
 ]
 
 export function Layout() {
   const navigate = useNavigate()
   const [collapsed, setCollapsed] = useState(false)
   const { theme, toggleTheme } = useTheme()
+  const { logout } = useAuth()
 
   const [appVersion, setAppVersion] = useState('')
   const { activeConnection, loading } = useConnections()
@@ -108,6 +113,7 @@ export function Layout() {
               <ChevronLeft className="h-5 w-5" />
             )}
           </button>
+
           {appVersion && !collapsed && (
             <p className="mt-1 text-center text-[10px] text-slate-500">v{appVersion}</p>
           )}
@@ -143,6 +149,15 @@ export function Layout() {
             )}
 
             <DateTimeDisplay />
+
+            {/* Log out */}
+            <button
+              onClick={logout}
+              className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
+            >
+              <LogOut className="h-4 w-4" />
+              <span>Log out</span>
+            </button>
           </div>
         </header>
 

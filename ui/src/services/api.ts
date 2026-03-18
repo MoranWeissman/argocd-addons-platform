@@ -142,6 +142,9 @@ export const api = {
   getDatadogNamespaceMetrics: (namespace: string) => fetchJSON<DatadogNamespaceMetrics>(`/datadog/metrics/${namespace}`),
   getClusterMetrics: (clusterName: string) => fetchJSON<ClusterMetricsData>(`/datadog/cluster-metrics/${clusterName}`),
 
+  // Auth
+  updatePassword: (currentPassword: string, newPassword: string) => postJSON<{ status: string }>('/auth/update-password', { current_password: currentPassword, new_password: newPassword }),
+
   // Agent Chat
   agentChat: (sessionId: string, message: string) => postJSON<{ session_id: string; response: string }>('/agent/chat', { session_id: sessionId, message }),
   agentReset: (sessionId: string) => postJSON<{ status: string }>('/agent/reset', { session_id: sessionId }),
