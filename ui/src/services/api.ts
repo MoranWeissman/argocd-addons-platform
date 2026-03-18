@@ -18,9 +18,22 @@ import type {
 } from './models'
 
 const BASE_URL = '/api/v1'
+const TOKEN_KEY = 'aap-auth-token'
+
+function authHeaders(): Record<string, string> {
+  const token = sessionStorage.getItem(TOKEN_KEY)
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
 
 async function fetchJSON<T>(path: string): Promise<T> {
-  const res = await fetch(`${BASE_URL}${path}`)
+  const res = await fetch(`${BASE_URL}${path}`, {
+    headers: authHeaders(),
+  })
+  if (res.status === 401) {
+    sessionStorage.removeItem(TOKEN_KEY)
+    window.location.reload()
+    throw new Error('Session expired')
+  }
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }))
     throw new Error(err.error || res.statusText)
@@ -31,9 +44,14 @@ async function fetchJSON<T>(path: string): Promise<T> {
 async function postJSON<T>(path: string, body?: unknown): Promise<T> {
   const res = await fetch(`${BASE_URL}${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: body ? JSON.stringify(body) : undefined,
   })
+  if (res.status === 401) {
+    sessionStorage.removeItem(TOKEN_KEY)
+    window.location.reload()
+    throw new Error('Session expired')
+  }
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }))
     throw new Error(err.error || res.statusText)
@@ -44,9 +62,14 @@ async function postJSON<T>(path: string, body?: unknown): Promise<T> {
 async function putJSON<T>(path: string, body?: unknown): Promise<T> {
   const res = await fetch(`${BASE_URL}${path}`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: body ? JSON.stringify(body) : undefined,
   })
+  if (res.status === 401) {
+    sessionStorage.removeItem(TOKEN_KEY)
+    window.location.reload()
+    throw new Error('Session expired')
+  }
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }))
     throw new Error(err.error || res.statusText)
@@ -55,7 +78,15 @@ async function putJSON<T>(path: string, body?: unknown): Promise<T> {
 }
 
 async function deleteJSON<T>(path: string): Promise<T> {
-  const res = await fetch(`${BASE_URL}${path}`, { method: 'DELETE' })
+  const res = await fetch(`${BASE_URL}${path}`, {
+    method: 'DELETE',
+    headers: authHeaders(),
+  })
+  if (res.status === 401) {
+    sessionStorage.removeItem(TOKEN_KEY)
+    window.location.reload()
+    throw new Error('Session expired')
+  }
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }))
     throw new Error(err.error || res.statusText)
