@@ -106,7 +106,7 @@ function AddonCard({ addon }: { addon: AddonCatalogItem }) {
               </p>
             ) : (
               <p className="mt-1 text-sm font-semibold text-amber-600 dark:text-amber-400">
-                Not Assigned
+                Not Deployed
               </p>
             )}
           </div>
@@ -129,7 +129,9 @@ function AddonCard({ addon }: { addon: AddonCatalogItem }) {
 
         {/* Stats */}
         <p className="mb-2 text-xs text-gray-500 dark:text-gray-400">
-          Deployed on {enabledApps} of {addon.total_clusters} clusters
+          {enabledApps > 0
+            ? `Deployed on ${enabledApps} ${enabledApps === 1 ? 'cluster' : 'clusters'}`
+            : 'Not deployed on any cluster'}
         </p>
 
         <HealthProgressBar healthy={addon.healthy_applications} total={enabledApps} />
@@ -282,7 +284,7 @@ function AddonListTable({ addons }: { addons: AddonCatalogItem[] }) {
           <tr>
             <th className="px-6 py-3">Addon Name</th>
             <th className="px-6 py-3">Version</th>
-            <th className="px-6 py-3">Enabled / Total</th>
+            <th className="px-6 py-3">Deployed</th>
             <th className="px-6 py-3">Healthy</th>
             <th className="px-6 py-3">Degraded</th>
             <th className="px-6 py-3">Not Deployed</th>
@@ -304,10 +306,12 @@ function AddonListTable({ addons }: { addons: AddonCatalogItem[] }) {
               <td className="px-6 py-3 text-gray-700 dark:text-gray-300">
                 {addon.enabled_clusters === 0 ? (
                   <span className="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-                    Not Assigned
+                    Not Deployed
                   </span>
                 ) : (
-                  `${addon.enabled_clusters} / ${addon.total_clusters}`
+                  <span className="inline-flex items-center rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                    {addon.enabled_clusters} {addon.enabled_clusters === 1 ? 'cluster' : 'clusters'}
+                  </span>
                 )}
               </td>
               <td className="px-6 py-3">

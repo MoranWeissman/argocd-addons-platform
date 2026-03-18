@@ -25,7 +25,7 @@ function renderComponent() {
 describe('AIAssistant', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    localStorage.clear()
+    sessionStorage.clear()
     // Mock crypto.randomUUID
     vi.stubGlobal('crypto', {
       ...crypto,

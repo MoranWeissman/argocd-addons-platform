@@ -49,8 +49,8 @@ func (s *Server) handleAgentChat(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		executor := ai.NewToolExecutor(gp, ac)
-		agent = ai.NewAgent(s.aiClient, executor)
+		executor := ai.NewToolExecutor(gp, ac, s.agentMemory)
+		agent = ai.NewAgent(s.aiClient, executor, s.agentMemory)
 
 		if req.SessionID == "" {
 			req.SessionID = fmt.Sprintf("session-%d", time.Now().UnixNano())

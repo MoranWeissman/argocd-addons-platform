@@ -6,11 +6,14 @@ import (
 	"log"
 	"log/slog"
 	"net/http"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/moran/argocd-addons-platform/internal/ai"
 	"github.com/moran/argocd-addons-platform/internal/datadog"
 	"github.com/moran/argocd-addons-platform/internal/service"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // Server holds the HTTP handlers and their dependencies.
@@ -23,6 +26,7 @@ type Server struct {
 	upgradeSvc       *service.UpgradeService
 	aiClient         *ai.Client
 	ddClient         *datadog.Client
+	agentMemory      *ai.MemoryStore
 }
 
 // NewServer creates a new API server.
@@ -36,6 +40,10 @@ func NewServer(
 	aiClient *ai.Client,
 	ddClient *datadog.Client,
 ) *Server {
+	// Initialize agent memory — store in /tmp for containers (writable), or local dir for dev
+	memoryPath := "/tmp/aap-agent-memory.json"
+	agentMemory := ai.NewMemoryStore(memoryPath)
+
 	return &Server{
 		connSvc:          connSvc,
 		clusterSvc:       clusterSvc,
@@ -45,6 +53,7 @@ func NewServer(
 		upgradeSvc:       upgradeSvc,
 		aiClient:         aiClient,
 		ddClient:         ddClient,
+		agentMemory:      agentMemory,
 	}
 }
 
@@ -104,6 +113,12 @@ func NewRouter(srv *Server, staticFS fs.FS) http.Handler {
 	mux.HandleFunc("POST /api/v1/agent/chat", srv.handleAgentChat)
 	mux.HandleFunc("POST /api/v1/agent/reset", srv.handleAgentReset)
 
+	// Cluster info
+	mux.HandleFunc("GET /api/v1/cluster/nodes", srv.handleGetNodeInfo)
+
+	// Auth utilities
+	mux.HandleFunc("POST /api/v1/auth/hash", handleHashPassword)
+
 	// Static files (SPA)
 	if staticFS != nil {
 		fileServer := http.FileServer(http.FS(staticFS))
@@ -123,10 +138,87 @@ func NewRouter(srv *Server, staticFS fs.FS) http.Handler {
 
 	// Wrap with middleware
 	var handler http.Handler = mux
+	handler = basicAuthMiddleware(handler)
 	handler = corsMiddleware(handler)
 	handler = loggingMiddleware(handler)
 
 	return handler
+}
+
+// basicAuthMiddleware enforces HTTP basic auth on all routes except health checks.
+// Credentials are read from AAP_AUTH_USER and AAP_AUTH_PASSWORD env vars.
+// If neither is set, auth is disabled (open access).
+// AAP_AUTH_PASSWORD can be a bcrypt hash (starting with "$2") or plaintext for backwards compatibility.
+func basicAuthMiddleware(next http.Handler) http.Handler {
+	user := os.Getenv("AAP_AUTH_USER")
+	pass := os.Getenv("AAP_AUTH_PASSWORD")
+
+	// If no credentials configured, skip auth entirely
+	if user == "" && pass == "" {
+		return next
+	}
+
+	isBcrypt := strings.HasPrefix(pass, "$2")
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Skip auth for health endpoint (K8s probes)
+		if r.URL.Path == "/api/v1/health" {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		u, p, ok := r.BasicAuth()
+		if !ok || u != user {
+			w.Header().Set("WWW-Authenticate", `Basic realm="ArgoCD Addons Platform"`)
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		var passwordMatch bool
+		if isBcrypt {
+			err := bcrypt.CompareHashAndPassword([]byte(pass), []byte(p))
+			passwordMatch = err == nil
+		} else {
+			passwordMatch = p == pass
+		}
+
+		if !passwordMatch {
+			w.Header().Set("WWW-Authenticate", `Basic realm="ArgoCD Addons Platform"`)
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
+// handleHashPassword generates a bcrypt hash from a plaintext password.
+// Only available when auth is disabled (no AAP_AUTH_USER set) for initial setup.
+func handleHashPassword(w http.ResponseWriter, r *http.Request) {
+	if os.Getenv("AAP_AUTH_USER") != "" {
+		writeError(w, http.StatusForbidden, "hash endpoint is only available when auth is disabled")
+		return
+	}
+
+	var req struct {
+		Password string `json:"password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if req.Password == "" {
+		writeError(w, http.StatusBadRequest, "password is required")
+		return
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to generate hash")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"hash": string(hash)})
 }
 
 // corsMiddleware adds CORS headers.

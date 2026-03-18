@@ -40,9 +40,10 @@ func NewClient(serverURL, token string, insecure bool) *Client {
 }
 
 // NewInClusterClient creates an ArgoCD client for in-cluster use.
-// It discovers the ArgoCD server via Kubernetes service DNS and reads the
-// ServiceAccount token from the standard mount path.
-func NewInClusterClient(namespace string) (*Client, error) {
+// It reads the ServiceAccount token from the standard mount path.
+// If serverURL is provided, it's used directly. If empty, it falls back
+// to the default argocd-server.<namespace>.svc.cluster.local.
+func NewInClusterClient(serverURL, namespace string) (*Client, error) {
 	const saTokenPath = "/var/run/secrets/kubernetes.io/serviceaccount/token"
 
 	tokenBytes, err := os.ReadFile(saTokenPath)
@@ -50,10 +51,13 @@ func NewInClusterClient(namespace string) (*Client, error) {
 		return nil, fmt.Errorf("reading service account token: %w", err)
 	}
 
-	serverURL := fmt.Sprintf("https://argocd-server.%s.svc.cluster.local", namespace)
+	if serverURL == "" {
+		if namespace == "" {
+			namespace = "argocd"
+		}
+		serverURL = fmt.Sprintf("https://argocd-server.%s.svc.cluster.local", namespace)
+	}
 
-	// In-cluster communication typically uses cluster-internal CAs that the
-	// default system pool may not trust, so we skip verification.
 	slog.Info("argocd in-cluster client initialized", "server", serverURL, "namespace", namespace)
 	return NewClient(serverURL, strings.TrimSpace(string(tokenBytes)), true), nil
 }
@@ -144,6 +148,78 @@ func (c *Client) GetVersion(ctx context.Context) (map[string]string, error) {
 		}
 	}
 	return result, nil
+}
+
+// GetResourceTree returns the full resource tree for an ArgoCD application as raw JSON.
+func (c *Client) GetResourceTree(ctx context.Context, appName string) (map[string]interface{}, error) {
+	body, err := c.doGet(ctx, "/api/v1/applications/"+appName+"/resource-tree")
+	if err != nil {
+		return nil, fmt.Errorf("getting resource tree for %q: %w", appName, err)
+	}
+
+	var raw map[string]interface{}
+	if err := json.Unmarshal(body, &raw); err != nil {
+		return nil, fmt.Errorf("decoding resource tree response: %w", err)
+	}
+	return raw, nil
+}
+
+// GetManagedResource returns the live manifest of a specific managed resource.
+// It filters out Secret kind to prevent leaking sensitive data.
+func (c *Client) GetManagedResource(ctx context.Context, appName, namespace, resourceName, group, kind string) (map[string]interface{}, error) {
+	if strings.EqualFold(kind, "Secret") {
+		return nil, fmt.Errorf("refusing to return Secret resources for security reasons")
+	}
+
+	path := fmt.Sprintf("/api/v1/applications/%s/managed-resources?namespace=%s&resourceName=%s&group=%s&kind=%s",
+		appName, namespace, resourceName, group, kind)
+
+	body, err := c.doGet(ctx, path)
+	if err != nil {
+		return nil, fmt.Errorf("getting managed resource for %q: %w", appName, err)
+	}
+
+	var raw map[string]interface{}
+	if err := json.Unmarshal(body, &raw); err != nil {
+		return nil, fmt.Errorf("decoding managed resource response: %w", err)
+	}
+	return raw, nil
+}
+
+// GetApplicationEvents returns recent Kubernetes events for an ArgoCD application.
+func (c *Client) GetApplicationEvents(ctx context.Context, appName string) ([]map[string]interface{}, error) {
+	body, err := c.doGet(ctx, "/api/v1/applications/"+appName+"/events")
+	if err != nil {
+		return nil, fmt.Errorf("getting events for %q: %w", appName, err)
+	}
+
+	var raw struct {
+		Items []map[string]interface{} `json:"items"`
+	}
+	if err := json.Unmarshal(body, &raw); err != nil {
+		return nil, fmt.Errorf("decoding events response: %w", err)
+	}
+	return raw.Items, nil
+}
+
+// GetPodLogs returns recent log lines for a pod managed by an ArgoCD application.
+// ArgoCD proxies the log request to the remote cluster.
+func (c *Client) GetPodLogs(ctx context.Context, appName, namespace, podName, container string, tailLines int) (string, error) {
+	if tailLines <= 0 {
+		tailLines = 50
+	}
+	path := fmt.Sprintf("/api/v1/applications/%s/logs?namespace=%s&podName=%s&tailLines=%d&follow=false",
+		appName, namespace, podName, tailLines)
+	if container != "" {
+		path += "&container=" + container
+	}
+
+	body, err := c.doGet(ctx, path)
+	if err != nil {
+		return "", fmt.Errorf("getting logs for pod %q in app %q: %w", podName, appName, err)
+	}
+
+	return string(body), nil
 }
 
 // ListApplicationsSummary returns all applications with summary data (no history/resources).

@@ -828,6 +828,38 @@ function AIConfigSection() {
               const isActive = provider.id === aiConfig.current_provider
               const canSwitch = provider.configured && !isActive
 
+              const providerMeta: Record<string, { privacy: string; privacyColor: string; toolCalling: string; toolColor: string; note: string }> = {
+                ollama: {
+                  privacy: 'Local — no data leaves the cluster',
+                  privacyColor: 'text-green-600 dark:text-green-400',
+                  toolCalling: 'Depends on model (3B weak, 8B+ moderate, 70B+ good)',
+                  toolColor: 'text-amber-600 dark:text-amber-400',
+                  note: 'Requires persistent storage. Image ~3GB. Models 2-40+ GB RAM.',
+                },
+                claude: {
+                  privacy: 'Data sent to Anthropic (external)',
+                  privacyColor: 'text-amber-600 dark:text-amber-400',
+                  toolCalling: 'Excellent — best reasoning and tool use',
+                  toolColor: 'text-green-600 dark:text-green-400',
+                  note: 'Cluster names, addon configs, and health data are sent to the API.',
+                },
+                openai: {
+                  privacy: 'Data sent to OpenAI (external)',
+                  privacyColor: 'text-amber-600 dark:text-amber-400',
+                  toolCalling: 'Very good',
+                  toolColor: 'text-green-600 dark:text-green-400',
+                  note: 'Cluster names, addon configs, and health data are sent to the API.',
+                },
+                gemini: {
+                  privacy: 'Data sent to Google (external)',
+                  privacyColor: 'text-amber-600 dark:text-amber-400',
+                  toolCalling: 'Good — free tier available',
+                  toolColor: 'text-green-600 dark:text-green-400',
+                  note: 'Cluster names, addon configs, and health data are sent to the API.',
+                },
+              }
+              const meta = providerMeta[provider.id]
+
               return (
                 <div
                   key={provider.id}
@@ -859,6 +891,20 @@ function AIConfigSection() {
                       ? provider.model
                       : 'Not configured'}
                   </p>
+
+                  {meta && (
+                    <div className="mt-2 space-y-1 border-t border-gray-100 pt-2 dark:border-gray-700">
+                      <p className={`text-[10px] ${meta.privacyColor}`}>
+                        {meta.privacy}
+                      </p>
+                      <p className={`text-[10px] ${meta.toolColor}`}>
+                        Tool calling: {meta.toolCalling}
+                      </p>
+                      <p className="text-[10px] text-gray-400 dark:text-gray-500">
+                        {meta.note}
+                      </p>
+                    </div>
+                  )}
 
                   <div className="mt-3">
                     {isActive ? (
