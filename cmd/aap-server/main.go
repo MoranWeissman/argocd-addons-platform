@@ -101,16 +101,59 @@ func main() {
 		store = config.NewFileStore(*configPath)
 	}
 
-	// AI configuration
+	// AI configuration — resolve per-provider API key and model
+	aiProvider := ai.Provider(os.Getenv("AI_PROVIDER"))
+	aiAPIKey := os.Getenv("AI_API_KEY")     // generic fallback
+	aiModel := os.Getenv("AI_CLOUD_MODEL")  // generic fallback
+	aiBaseURL := os.Getenv("AI_BASE_URL")
+	aiAuthHeader := os.Getenv("AI_AUTH_HEADER")
+
+	switch aiProvider {
+	case ai.ProviderOpenAI:
+		if k := os.Getenv("OPENAI_API_KEY"); k != "" {
+			aiAPIKey = k
+		}
+		if m := os.Getenv("OPENAI_MODEL"); m != "" {
+			aiModel = m
+		}
+	case ai.ProviderClaude:
+		if k := os.Getenv("CLAUDE_API_KEY"); k != "" {
+			aiAPIKey = k
+		}
+		if m := os.Getenv("CLAUDE_MODEL"); m != "" {
+			aiModel = m
+		}
+	case ai.ProviderGemini:
+		if k := os.Getenv("GEMINI_API_KEY"); k != "" {
+			aiAPIKey = k
+		}
+		if m := os.Getenv("GEMINI_MODEL"); m != "" {
+			aiModel = m
+		}
+	case ai.ProviderCustomOpenAI:
+		if k := os.Getenv("CUSTOM_OPENAI_API_KEY"); k != "" {
+			aiAPIKey = k
+		}
+		if m := os.Getenv("CUSTOM_OPENAI_MODEL"); m != "" {
+			aiModel = m
+		}
+		if u := os.Getenv("CUSTOM_OPENAI_BASE_URL"); u != "" {
+			aiBaseURL = u
+		}
+		if h := os.Getenv("CUSTOM_OPENAI_AUTH_HEADER"); h != "" {
+			aiAuthHeader = h
+		}
+	}
+
 	aiCfg := ai.Config{
-		Provider:      ai.Provider(os.Getenv("AI_PROVIDER")),
+		Provider:      aiProvider,
 		OllamaURL:    getEnvDefault("AI_OLLAMA_URL", "http://localhost:11434"),
 		OllamaModel:  getEnvDefault("AI_OLLAMA_MODEL", "llama3.2"),
 		AgentModel:   os.Getenv("AI_AGENT_MODEL"),
-		APIKey:       os.Getenv("AI_API_KEY"),
-		CloudModel:   os.Getenv("AI_CLOUD_MODEL"),
-		BaseURL:      os.Getenv("AI_BASE_URL"),
-		AuthHeader:   os.Getenv("AI_AUTH_HEADER"),
+		APIKey:       aiAPIKey,
+		CloudModel:   aiModel,
+		BaseURL:      aiBaseURL,
+		AuthHeader:   aiAuthHeader,
 		GitOpsEnabled: os.Getenv("GITOPS_ACTIONS_ENABLED") == "true",
 	}
 	if v := os.Getenv("AI_MAX_ITERATIONS"); v != "" {
