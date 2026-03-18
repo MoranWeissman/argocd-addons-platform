@@ -108,3 +108,4 @@ k8s/
 
 # SonarQube
 sonar-project.properties
+.superpowers/
