@@ -129,8 +129,15 @@ func NewRouter(srv *Server, staticFS fs.FS) http.Handler {
 	// Cluster info
 	mux.HandleFunc("GET /api/v1/cluster/nodes", srv.handleGetNodeInfo)
 
-	// Auth
-	mux.HandleFunc("POST /api/v1/auth/login", srv.handleLogin)
+	// Auth (login is rate-limited: 10 attempts per IP per minute)
+	loginRL := newLoginRateLimiter(10, 1*time.Minute)
+	mux.HandleFunc("POST /api/v1/auth/login", func(w http.ResponseWriter, r *http.Request) {
+		if !loginRL.Allow(clientIP(r)) {
+			writeError(w, http.StatusTooManyRequests, "too many login attempts, please try again later")
+			return
+		}
+		srv.handleLogin(w, r)
+	})
 	mux.HandleFunc("POST /api/v1/auth/update-password", srv.handleUpdatePassword)
 	mux.HandleFunc("POST /api/v1/auth/hash", srv.handleHashPassword)
 
@@ -158,6 +165,71 @@ func NewRouter(srv *Server, staticFS fs.FS) http.Handler {
 	handler = loggingMiddleware(handler)
 
 	return handler
+}
+
+// --- Login rate limiter ---
+
+type loginRateLimiter struct {
+	mu       sync.Mutex
+	attempts map[string][]time.Time
+	limit    int
+	window   time.Duration
+}
+
+func newLoginRateLimiter(limit int, window time.Duration) *loginRateLimiter {
+	return &loginRateLimiter{
+		attempts: make(map[string][]time.Time),
+		limit:    limit,
+		window:   window,
+	}
+}
+
+// Allow checks whether the given IP is within the rate limit.
+// It cleans up expired entries on each call.
+func (rl *loginRateLimiter) Allow(ip string) bool {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+
+	now := time.Now()
+	cutoff := now.Add(-rl.window)
+
+	// Clean up all stale entries periodically (every call is cheap enough for login traffic)
+	for k, times := range rl.attempts {
+		filtered := times[:0]
+		for _, t := range times {
+			if t.After(cutoff) {
+				filtered = append(filtered, t)
+			}
+		}
+		if len(filtered) == 0 {
+			delete(rl.attempts, k)
+		} else {
+			rl.attempts[k] = filtered
+		}
+	}
+
+	if len(rl.attempts[ip]) >= rl.limit {
+		return false
+	}
+	rl.attempts[ip] = append(rl.attempts[ip], now)
+	return true
+}
+
+// clientIP extracts the client IP, preferring X-Forwarded-For (behind ALB/proxy).
+func clientIP(r *http.Request) string {
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		// X-Forwarded-For may contain multiple IPs; the first is the real client
+		if idx := strings.IndexByte(xff, ','); idx != -1 {
+			return strings.TrimSpace(xff[:idx])
+		}
+		return strings.TrimSpace(xff)
+	}
+	// Fall back to RemoteAddr (strip port)
+	addr := r.RemoteAddr
+	if idx := strings.LastIndex(addr, ":"); idx != -1 {
+		return addr[:idx]
+	}
+	return addr
 }
 
 // --- Session token auth ---
