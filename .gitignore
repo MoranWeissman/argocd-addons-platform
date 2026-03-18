@@ -99,3 +99,12 @@ bin/
 # Temporary analysis files
 tests.txt
 COVERAGE_ACTION_PLAN.md
+
+# Old k8s manifests (replaced by Helm)
+k8s/
+
+# IDE plugins
+.serena/
+
+# SonarQube
+sonar-project.properties
