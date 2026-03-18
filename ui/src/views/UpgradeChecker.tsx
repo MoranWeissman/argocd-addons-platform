@@ -9,7 +9,6 @@ import {
   ChevronDown,
   Search,
   Sparkles,
-  Info,
   FileText,
 } from 'lucide-react';
 import { api } from '@/services/api';
@@ -659,9 +658,18 @@ export function UpgradeChecker() {
               </div>
             </div>
           ) : (
-            <div className="flex items-center gap-2 rounded-lg bg-gray-50 px-4 py-2.5 text-xs text-gray-500 dark:bg-gray-800/50 dark:text-gray-400">
-              <Info className="h-3.5 w-3.5 shrink-0" />
-              AI analysis available — configure in Settings.
+            <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-500 dark:border-gray-700 dark:bg-gray-800/50 dark:text-gray-400">
+              <Sparkles className="h-4 w-4 shrink-0 text-gray-400" />
+              <span>
+                Enable an AI provider in{' '}
+                <a
+                  href="/settings"
+                  className="font-medium text-cyan-600 underline hover:text-cyan-700 dark:text-cyan-400 dark:hover:text-cyan-300"
+                >
+                  Settings
+                </a>{' '}
+                to get AI-powered upgrade analysis.
+              </span>
             </div>
           )}
 
