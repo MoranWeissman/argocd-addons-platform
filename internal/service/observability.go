@@ -52,8 +52,17 @@ func (s *ObservabilityService) GetOverview(ctx context.Context, ac *argocd.Clien
 		return nil, fmt.Errorf("listing applications: %w", err)
 	}
 
-	healthSummary := make(map[string]int)
+	// 4. Filter to addon apps only (exclude bootstrap/infrastructure)
+	var addonApps []models.ArgocdApplication
 	for _, app := range appsSummary {
+		if isInfrastructureApp(app.Name) {
+			continue
+		}
+		addonApps = append(addonApps, app)
+	}
+
+	healthSummary := make(map[string]int)
+	for _, app := range addonApps {
 		h := app.HealthStatus
 		if h == "" {
 			h = "Unknown"
@@ -61,9 +70,9 @@ func (s *ObservabilityService) GetOverview(ctx context.Context, ac *argocd.Clien
 		healthSummary[h]++
 	}
 
-	// 4. Fetch full detail for each app to get history and resources
+	// 5. Fetch full detail for each addon app to get history and resources
 	var fullApps []models.ArgocdApplication
-	for _, app := range appsSummary {
+	for _, app := range addonApps {
 		detail, err := ac.GetApplication(ctx, app.Name)
 		if err != nil {
 			log.Printf("Warning: could not fetch detail for app %s: %v", app.Name, err)
@@ -201,7 +210,7 @@ func (s *ObservabilityService) GetOverview(ctx context.Context, ac *argocd.Clien
 		ArgocdVersion:     versionInfo["Version"],
 		HelmVersion:       versionInfo["HelmVersion"],
 		KubectlVersion:    versionInfo["KubectlVersion"],
-		TotalApps:         len(appsSummary),
+		TotalApps:         len(addonApps),
 		TotalClusters:     len(clusters),
 		ConnectedClusters: connectedClusters,
 		HealthSummary:     healthSummary,
@@ -323,13 +332,22 @@ func healthPriority(health string) int {
 }
 
 // checkResourceAlerts checks Git values files for addons missing resource requests/limits.
-// Only checks addons from the catalog (not infrastructure apps like cluster-addons, clusters, karpenter-nodepools).
-func (s *ObservabilityService) checkResourceAlerts(ctx context.Context, gp gitprovider.GitProvider, _ []models.AddonGroupHealth) []models.ResourceAlert {
+// Only checks addons that are actually deployed (have running ArgoCD applications).
+// Skips CRD-only charts (no values file = no workloads to configure).
+func (s *ObservabilityService) checkResourceAlerts(ctx context.Context, gp gitprovider.GitProvider, addonGroups []models.AddonGroupHealth) []models.ResourceAlert {
 	if gp == nil {
 		return nil
 	}
 
-	// Only check addons from the catalog — not infrastructure apps
+	// Build set of actually deployed addon names from the groups
+	deployedAddons := make(map[string]bool)
+	for _, group := range addonGroups {
+		if group.TotalApps > 0 {
+			deployedAddons[group.AddonName] = true
+		}
+	}
+
+	// Only check addons from the catalog that are actually deployed
 	parser := config.NewParser()
 	catalogData, err := gp.GetFileContent(ctx, "configuration/addons-catalog.yaml", "main")
 	if err != nil {
@@ -342,6 +360,10 @@ func (s *ObservabilityService) checkResourceAlerts(ctx context.Context, gp gitpr
 
 	var alerts []models.ResourceAlert
 	for _, addon := range catalog {
+		// Skip addons that aren't deployed anywhere
+		if !deployedAddons[addon.AppName] {
+			continue
+		}
 		missing, detail := checkMissingResources(ctx, gp, addon.AppName)
 		if missing {
 			alerts = append(alerts, models.ResourceAlert{
