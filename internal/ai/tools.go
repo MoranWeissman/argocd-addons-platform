@@ -33,15 +33,17 @@ type ToolExecutor struct {
 	fetcher *helm.Fetcher
 	gp      gitprovider.GitProvider
 	ac      *argocd.Client
+	memory  *MemoryStore
 }
 
 // NewToolExecutor creates a new ToolExecutor with the given providers.
-func NewToolExecutor(gp gitprovider.GitProvider, ac *argocd.Client) *ToolExecutor {
+func NewToolExecutor(gp gitprovider.GitProvider, ac *argocd.Client, memory *MemoryStore) *ToolExecutor {
 	return &ToolExecutor{
 		parser:  config.NewParser(),
 		fetcher: helm.NewFetcher(),
 		gp:      gp,
 		ac:      ac,
+		memory:  memory,
 	}
 }
 
@@ -216,6 +218,22 @@ func GetToolDefinitions() []ToolDefinition {
 				Parameters:  json.RawMessage(`{"type":"object","properties":{"query":{"type":"string","description":"Search query"}},"required":["query"]}`),
 			},
 		},
+		{
+			Type: "function",
+			Function: ToolFunction{
+				Name:        "save_memory",
+				Description: "Save an important observation or learning for future conversations. Use this to remember user preferences, platform patterns, frequently asked questions, or useful discoveries. Only save genuinely useful information.",
+				Parameters:  json.RawMessage(`{"type":"object","properties":{"content":{"type":"string","description":"The observation or learning to remember"},"category":{"type":"string","description":"Category: user_preference, platform_observation, addon_info, troubleshooting, or faq"}},"required":["content","category"]}`),
+			},
+		},
+		{
+			Type: "function",
+			Function: ToolFunction{
+				Name:        "recall_memories",
+				Description: "Search through saved memories from previous conversations. Use this to recall previously learned information.",
+				Parameters:  json.RawMessage(`{"type":"object","properties":{"query":{"type":"string","description":"Search term to find relevant memories"}},"required":["query"]}`),
+			},
+		},
 	}
 }
 
@@ -286,6 +304,17 @@ func (e *ToolExecutor) ExecuteTool(ctx context.Context, name string, args json.R
 		q := params["query"]
 		if q == "" { q = params["q"] }
 		return e.webSearch(ctx, q)
+	case "save_memory":
+		if e.memory != nil {
+			e.memory.Add(params["content"], params["category"])
+			return "Memory saved.", nil
+		}
+		return "Memory system not available.", nil
+	case "recall_memories":
+		if e.memory != nil {
+			return e.memory.Search(params["query"]), nil
+		}
+		return "Memory system not available.", nil
 	default:
 		return "", fmt.Errorf("unknown tool: %s", name)
 	}

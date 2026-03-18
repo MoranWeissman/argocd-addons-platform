@@ -11,60 +11,6 @@ interface ChatMessage {
 }
 
 // ---------------------------------------------------------------------------
-// localStorage persistence
-// ---------------------------------------------------------------------------
-
-const STORAGE_KEY = 'aap-ai-chat'
-
-interface PersistedState {
-  sessionId: string
-  messages: Array<{ id: string; role: 'user' | 'assistant'; content: string; timestamp: string }>
-}
-
-function loadPersistedState(): { sessionId: string; messages: ChatMessage[] } | null {
-  try {
-    const raw = sessionStorage.getItem(STORAGE_KEY)
-    if (!raw) return null
-    const parsed: PersistedState = JSON.parse(raw)
-    if (!parsed.sessionId || !Array.isArray(parsed.messages)) return null
-    return {
-      sessionId: parsed.sessionId,
-      messages: parsed.messages.map((m) => ({
-        ...m,
-        timestamp: new Date(m.timestamp),
-      })),
-    }
-  } catch {
-    return null
-  }
-}
-
-function persistState(sessionId: string, messages: ChatMessage[]) {
-  try {
-    const data: PersistedState = {
-      sessionId,
-      messages: messages.map((m) => ({
-        id: m.id,
-        role: m.role,
-        content: m.content,
-        timestamp: m.timestamp.toISOString(),
-      })),
-    }
-    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(data))
-  } catch {
-    // Storage full or unavailable — ignore
-  }
-}
-
-function clearPersistedState() {
-  try {
-    sessionStorage.removeItem(STORAGE_KEY)
-  } catch {
-    // ignore
-  }
-}
-
-// ---------------------------------------------------------------------------
 // Suggested prompts
 // ---------------------------------------------------------------------------
 
@@ -337,11 +283,10 @@ function ThinkingProcess() {
 // ---------------------------------------------------------------------------
 
 export function AIAssistant() {
-  const persisted = loadPersistedState()
-  const [messages, setMessages] = useState<ChatMessage[]>(persisted?.messages ?? [])
+  const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
-  const [sessionId, setSessionId] = useState(() => persisted?.sessionId ?? crypto.randomUUID())
+  const [sessionId, setSessionId] = useState(() => crypto.randomUUID())
   const [aiEnabled, setAiEnabled] = useState<boolean | null>(null)
   const [, setTick] = useState(0)
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -354,14 +299,6 @@ export function AIAssistant() {
       .then((res) => setAiEnabled(res.enabled))
       .catch(() => setAiEnabled(false))
   }, [])
-
-  // Persist messages whenever they change (skip streaming state)
-  useEffect(() => {
-    const toSave = messages.filter((m) => !m.streaming)
-    if (toSave.length > 0) {
-      persistState(sessionId, toSave)
-    }
-  }, [messages, sessionId])
 
   // Auto-scroll on new messages
   useEffect(() => {
@@ -432,7 +369,6 @@ export function AIAssistant() {
     setMessages([])
     setInput('')
     setLoading(false)
-    clearPersistedState()
   }, [sessionId])
 
   const handleExport = useCallback(() => {

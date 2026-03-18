@@ -107,6 +107,16 @@ HOW IT WORKS:
 - NEVER respond with "which addon?" if it was already discussed.
 - To get resources/events for an addon on a cluster, the ArgoCD app name is: {addon}-{cluster}
 
+=== LEARNING ===
+You can save important observations and learnings for future conversations using save_memory.
+Save things like:
+- User preferences ("user prefers short answers")
+- Platform observations ("datadog is deployed only on the addons dev cluster")
+- Useful patterns you discover
+- Frequently asked questions and their answers
+Do NOT save trivial or transient information. Only save genuinely useful learnings.
+Your LEARNED MEMORIES above (if any) are from previous conversations — use them.
+
 === CRITICAL: CLUSTER NAME MATCHING ===
 Match partial names against the KNOWN CLUSTERS list:
 - "addons cluster" → cluster containing "addons" in its name
@@ -117,15 +127,17 @@ Match partial names against the KNOWN CLUSTERS list:
 type Agent struct {
 	client   *Client
 	executor *ToolExecutor
+	memory   *MemoryStore
 	messages []ChatMessage
 }
 
 // NewAgent creates a new conversational agent backed by the given AI client and tool executor.
 // It pre-loads cluster and addon context so the LLM always knows what exists.
-func NewAgent(client *Client, executor *ToolExecutor) *Agent {
+func NewAgent(client *Client, executor *ToolExecutor, memory *MemoryStore) *Agent {
 	a := &Agent{
 		client:   client,
 		executor: executor,
+		memory:   memory,
 	}
 	a.initContext()
 	return a
@@ -147,6 +159,14 @@ func (a *Agent) initContext() {
 	addonList, err := a.executor.listAddons(ctx)
 	if err == nil && addonList != "" {
 		contextInfo += "\nKNOWN ADDONS:\n" + addonList
+	}
+
+	// Inject learned memories
+	if a.memory != nil {
+		memories := a.memory.GetAll()
+		if memories != "" {
+			contextInfo += "\nLEARNED MEMORIES (from previous conversations):\n" + memories
+		}
 	}
 
 	a.messages = []ChatMessage{

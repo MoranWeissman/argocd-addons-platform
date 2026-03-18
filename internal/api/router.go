@@ -23,6 +23,7 @@ type Server struct {
 	upgradeSvc       *service.UpgradeService
 	aiClient         *ai.Client
 	ddClient         *datadog.Client
+	agentMemory      *ai.MemoryStore
 }
 
 // NewServer creates a new API server.
@@ -36,6 +37,10 @@ func NewServer(
 	aiClient *ai.Client,
 	ddClient *datadog.Client,
 ) *Server {
+	// Initialize agent memory — store in /tmp for containers (writable), or local dir for dev
+	memoryPath := "/tmp/aap-agent-memory.json"
+	agentMemory := ai.NewMemoryStore(memoryPath)
+
 	return &Server{
 		connSvc:          connSvc,
 		clusterSvc:       clusterSvc,
@@ -45,6 +50,7 @@ func NewServer(
 		upgradeSvc:       upgradeSvc,
 		aiClient:         aiClient,
 		ddClient:         ddClient,
+		agentMemory:      agentMemory,
 	}
 }
 
