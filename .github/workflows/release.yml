@@ -78,7 +78,9 @@ jobs:
         if: steps.tag_check.outputs.exists == 'false'
         run: |
           VERSION="${{ steps.version.outputs.version }}"
+          sed -i "s/^version:.*/version: ${VERSION}/" charts/argocd-addons-platform/Chart.yaml
           sed -i "s/^appVersion:.*/appVersion: \"${VERSION}\"/" charts/argocd-addons-platform/Chart.yaml
+          sed -i "s/tag: \".*\"/tag: \"${VERSION}\"/" charts/argocd-addons-platform/values-production.yaml
 
       - name: Create Git tag
         if: steps.tag_check.outputs.exists == 'false'

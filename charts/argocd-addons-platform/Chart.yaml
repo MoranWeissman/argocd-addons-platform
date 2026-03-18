@@ -2,7 +2,7 @@ apiVersion: v2
 name: argocd-addons-platform
 description: A Helm chart for ArgoCD Addons Platform — centralized addon management, observability, and AI-powered insights
 type: application
-version: 0.2.0
+version: 1.10.8
 appVersion: "1.10.8"
 keywords:
   - argocd
@@ -10,6 +10,6 @@ keywords:
   - addons
   - helm
   - observability
-home: https://github.com/moran/argocd-addons-platform
+home: https://github.com/MoranWeissman/argocd-addons-platform
 maintainers:
-  - name: moran
+  - name: MoranWeissman

@@ -64,10 +64,15 @@ else
 fi
 IMAGE_TAG="${VERSION}"
 
-# --- Update Helm chart with current version ---
+# --- Update Helm chart + values with current version ---
 CHART_YAML="${CHART_DIR}/Chart.yaml"
+VALUES_PROD="${CHART_DIR}/values-production.yaml"
 if [[ -f "${CHART_YAML}" ]]; then
+  sed -i.bak "s/^version:.*/version: ${VERSION}/" "${CHART_YAML}" && rm -f "${CHART_YAML}.bak"
   sed -i.bak "s/^appVersion:.*/appVersion: \"${VERSION}\"/" "${CHART_YAML}" && rm -f "${CHART_YAML}.bak"
+fi
+if [[ -f "${VALUES_PROD}" ]]; then
+  sed -i.bak "s/tag: \".*\"/tag: \"${VERSION}\"/" "${VALUES_PROD}" && rm -f "${VALUES_PROD}.bak"
 fi
 
 echo "=== ArgoCD Addons Platform Installer ==="
