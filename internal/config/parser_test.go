@@ -132,8 +132,9 @@ func TestGetEnabledAddons(t *testing.T) {
 
 	addons := parser.GetEnabledAddons(cluster, catalog)
 
-	if len(addons) != 3 {
-		t.Fatalf("expected 3 addons (not istio-base), got %d", len(addons))
+	// Only enabled addons are returned (keda=disabled and istio-base=no label are excluded)
+	if len(addons) != 2 {
+		t.Fatalf("expected 2 enabled addons (datadog + external-secrets), got %d", len(addons))
 	}
 
 	// Datadog: enabled with version override
@@ -154,13 +155,10 @@ func TestGetEnabledAddons(t *testing.T) {
 		t.Errorf("expected catalog version 3.160.1, got %s", dd.EnvironmentVersion)
 	}
 
-	// Keda: disabled
+	// Keda: disabled — should NOT be in the results
 	keda := findAddon(addons, "keda")
-	if keda == nil {
-		t.Fatal("keda not found")
-	}
-	if keda.Enabled {
-		t.Error("keda should be disabled")
+	if keda != nil {
+		t.Error("keda should not be in results (disabled)")
 	}
 
 	// External-secrets: enabled, no override
