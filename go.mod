@@ -1,6 +1,6 @@
 module github.com/moran/argocd-addons-platform
 
-go 1.25.0
+go 1.25.8
 
 require (
 	github.com/google/go-github/v68 v68.0.0
