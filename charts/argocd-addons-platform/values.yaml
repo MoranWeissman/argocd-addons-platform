@@ -63,13 +63,19 @@ secrets:
   # ARGOCD_TOKEN: ""  # Not needed in in-cluster mode with RBAC
 
 # ---------------------------------------------------------------------------
-# Authentication (optional)
+# Authentication
 # ---------------------------------------------------------------------------
-# HTTP basic auth. If both are empty, auth is disabled (open access).
-# Credentials are stored in the secret and passed as env vars.
-auth:
-  username: ""
-  password: ""
+# Authentication is managed via K8s-native resources:
+# - ConfigMap (aap-users): user accounts (auto-created by Helm)
+# - Secret: bcrypt password hashes (auto-generated on first install)
+#
+# On first install, an admin account is created with a random password.
+# Retrieve it with: kubectl get secret <release-name> -o jsonpath='{.data.admin\.initialPassword}' | base64 -d
+#
+# For local development (outside K8s), set these env vars:
+# auth:
+#   username: ""   # maps to AAP_AUTH_USER env var
+#   password: ""   # maps to AAP_AUTH_PASSWORD env var
 
 # ---------------------------------------------------------------------------
 # AI Provider (optional)
