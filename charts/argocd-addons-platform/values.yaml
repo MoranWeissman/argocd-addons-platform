@@ -84,16 +84,27 @@ ai:
   ollama:
     # Deploy an Ollama pod alongside AAP (set to true to auto-deploy)
     deploy: false
-    image: "ollama/ollama:latest"
+    image: "ollama/ollama:latest"  # ~1.2GB compressed, ~3GB on disk
     # URL is auto-set when deploy=true, override for external Ollama
     url: ""
+    # Model for simple queries. See resource requirements:
+    #   llama3.2 (3B)    — 2-4 GB RAM, weak tool calling
+    #   llama3.1:8b      — 6-8 GB RAM, moderate tool calling
+    #   qwen2.5 (7B)     — 4-6 GB RAM, good tool calling for its size
+    #   mistral (7B)     — 4-6 GB RAM, fast but moderate tool calling
+    #   llama3.1:70b     — 40+ GB RAM, strong tool calling (needs GPU)
+    #   mixtral (8x7B)   — 26+ GB RAM, strong reasoning
     model: "llama3.2"
+    # Separate model for agent (tool calling). Larger models handle tools better.
+    # Leave empty to use the same as 'model'.
     agentModel: ""
     # GPU support (requires nvidia device plugin on the cluster)
     gpu: false
-    # Persist downloaded models across restarts
+    # Persist downloaded models across restarts (STRONGLY RECOMMENDED)
+    # Without persistence, models are re-downloaded on every pod restart (multi-GB)
     persistence: false
-    storageSize: "10Gi"
+    storageClassName: ""  # Leave empty for cluster default, or set e.g. "gp3", "ebs-sc"
+    storageSize: "10Gi"   # 10Gi fits 1-2 small models, 50Gi+ for larger models
     resources:
       requests:
         memory: "2Gi"

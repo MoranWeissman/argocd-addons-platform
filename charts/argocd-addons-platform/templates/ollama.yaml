@@ -20,6 +20,26 @@ spec:
         {{- include "aap.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: ollama
     spec:
+      {{- if .Values.ai.ollama.persistence }}
+      initContainers:
+        - name: pull-model
+          image: "{{ .Values.ai.ollama.image | default "ollama/ollama:latest" }}"
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              ollama serve &
+              sleep 5
+              ollama pull {{ .Values.ai.ollama.model | default "llama3.2" }}
+              {{- if .Values.ai.ollama.agentModel }}
+              ollama pull {{ .Values.ai.ollama.agentModel }}
+              {{- end }}
+              kill %1
+          volumeMounts:
+            - name: ollama-data
+              mountPath: /root/.ollama
+          resources:
+            {{- toYaml (.Values.ai.ollama.resources | default (dict "requests" (dict "memory" "2Gi" "cpu" "500m") "limits" (dict "memory" "4Gi" "cpu" "2000m"))) | nindent 12 }}
+      {{- end }}
       containers:
         - name: ollama
           image: "{{ .Values.ai.ollama.image | default "ollama/ollama:latest" }}"
@@ -89,6 +109,9 @@ metadata:
 spec:
   accessModes:
     - ReadWriteOnce
+  {{- if .Values.ai.ollama.storageClassName }}
+  storageClassName: {{ .Values.ai.ollama.storageClassName | quote }}
+  {{- end }}
   resources:
     requests:
       storage: {{ .Values.ai.ollama.storageSize | default "10Gi" }}
