@@ -5,7 +5,7 @@ replicaCount: 1
 
 image:
   repository: ghcr.io/moranweissman/argocd-addons-platform
-  tag: "1.7.4"
+  tag: "1.8.0"
   pullPolicy: Always
 
 config:
@@ -27,6 +27,9 @@ config:
 rbac:
   create: true
   argocdNamespace: argocd
+
+auth: {}
+  # username and password passed via --set from .env.secrets
 
 ai:
   enabled: true

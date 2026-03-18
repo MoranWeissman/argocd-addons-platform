@@ -6,6 +6,7 @@ import (
 	"log"
 	"log/slog"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/moran/argocd-addons-platform/internal/ai"
@@ -129,10 +130,41 @@ func NewRouter(srv *Server, staticFS fs.FS) http.Handler {
 
 	// Wrap with middleware
 	var handler http.Handler = mux
+	handler = basicAuthMiddleware(handler)
 	handler = corsMiddleware(handler)
 	handler = loggingMiddleware(handler)
 
 	return handler
+}
+
+// basicAuthMiddleware enforces HTTP basic auth on all routes except health checks.
+// Credentials are read from AAP_AUTH_USER and AAP_AUTH_PASSWORD env vars.
+// If neither is set, auth is disabled (open access).
+func basicAuthMiddleware(next http.Handler) http.Handler {
+	user := os.Getenv("AAP_AUTH_USER")
+	pass := os.Getenv("AAP_AUTH_PASSWORD")
+
+	// If no credentials configured, skip auth entirely
+	if user == "" && pass == "" {
+		return next
+	}
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Skip auth for health endpoint (K8s probes)
+		if r.URL.Path == "/api/v1/health" {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		u, p, ok := r.BasicAuth()
+		if !ok || u != user || p != pass {
+			w.Header().Set("WWW-Authenticate", `Basic realm="ArgoCD Addons Platform"`)
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
 }
 
 // corsMiddleware adds CORS headers.

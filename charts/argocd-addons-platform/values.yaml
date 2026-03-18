@@ -63,6 +63,15 @@ secrets:
   # ARGOCD_TOKEN: ""  # Not needed in in-cluster mode with RBAC
 
 # ---------------------------------------------------------------------------
+# Authentication (optional)
+# ---------------------------------------------------------------------------
+# HTTP basic auth. If both are empty, auth is disabled (open access).
+# Credentials are stored in the secret and passed as env vars.
+auth:
+  username: ""
+  password: ""
+
+# ---------------------------------------------------------------------------
 # AI Provider (optional)
 # ---------------------------------------------------------------------------
 ai:

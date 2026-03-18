@@ -150,6 +150,14 @@ if [[ -n "${DATADOG_API_KEY:-}" ]]; then
   )
 fi
 
+# Basic auth
+if [[ -n "${AAP_AUTH_USER:-}" ]]; then
+  SECRET_ARGS+=(
+    --set "auth.username=${AAP_AUTH_USER}"
+    --set "auth.password=${AAP_AUTH_PASSWORD:-}"
+  )
+fi
+
 # If no registry, prevent Kubernetes from trying to pull from Docker Hub
 if [[ -z "${REGISTRY}" ]]; then
   SECRET_ARGS+=(--set "image.pullPolicy=Never")
