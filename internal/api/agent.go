@@ -4,15 +4,27 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sort"
 	"sync"
 	"time"
 
 	"github.com/moran/argocd-addons-platform/internal/ai"
 )
 
+// agentSession wraps an agent with creation time for cleanup.
+type agentSession struct {
+	agent     *ai.Agent
+	createdAt time.Time
+}
+
+const (
+	agentSessionMaxAge   = 1 * time.Hour
+	agentSessionMaxCount = 100
+)
+
 // agentSessions stores per-session agents (in-memory, simple approach).
 var (
-	agentSessions = make(map[string]*ai.Agent)
+	agentSessions = make(map[string]*agentSession)
 	agentMu       sync.Mutex
 )
 
@@ -33,7 +45,11 @@ func (s *Server) handleAgentChat(w http.ResponseWriter, r *http.Request) {
 
 	// Get or create agent session
 	agentMu.Lock()
-	agent, exists := agentSessions[req.SessionID]
+
+	// Prune expired sessions and enforce max count
+	pruneAgentSessions()
+
+	sess, exists := agentSessions[req.SessionID]
 	if !exists || req.SessionID == "" {
 		// Create new agent with active connection's providers
 		gp, err := s.connSvc.GetActiveGitProvider()
@@ -50,16 +66,17 @@ func (s *Server) handleAgentChat(w http.ResponseWriter, r *http.Request) {
 		}
 
 		executor := ai.NewToolExecutor(gp, ac, s.agentMemory)
-		agent = ai.NewAgent(s.aiClient, executor, s.agentMemory)
+		agent := ai.NewAgent(s.aiClient, executor, s.agentMemory)
 
 		if req.SessionID == "" {
 			req.SessionID = fmt.Sprintf("session-%d", time.Now().UnixNano())
 		}
-		agentSessions[req.SessionID] = agent
+		sess = &agentSession{agent: agent, createdAt: time.Now()}
+		agentSessions[req.SessionID] = sess
 	}
 	agentMu.Unlock()
 
-	response, err := agent.Chat(r.Context(), req.Message)
+	response, err := sess.agent.Chat(r.Context(), req.Message)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -81,10 +98,42 @@ func (s *Server) handleAgentReset(w http.ResponseWriter, r *http.Request) {
 	}
 
 	agentMu.Lock()
-	if agent, exists := agentSessions[req.SessionID]; exists {
-		agent.Reset()
+	if sess, exists := agentSessions[req.SessionID]; exists {
+		sess.agent.Reset()
 	}
 	agentMu.Unlock()
 
 	writeJSON(w, http.StatusOK, map[string]string{"status": "reset"})
+}
+
+// pruneAgentSessions removes expired sessions and evicts oldest if over cap.
+// Must be called with agentMu held.
+func pruneAgentSessions() {
+	now := time.Now()
+
+	// Remove expired sessions
+	for id, sess := range agentSessions {
+		if now.Sub(sess.createdAt) > agentSessionMaxAge {
+			delete(agentSessions, id)
+		}
+	}
+
+	// If still over cap, evict oldest
+	if len(agentSessions) > agentSessionMaxCount {
+		type entry struct {
+			id        string
+			createdAt time.Time
+		}
+		entries := make([]entry, 0, len(agentSessions))
+		for id, sess := range agentSessions {
+			entries = append(entries, entry{id: id, createdAt: sess.createdAt})
+		}
+		sort.Slice(entries, func(i, j int) bool {
+			return entries[i].createdAt.Before(entries[j].createdAt)
+		})
+		toRemove := len(agentSessions) - agentSessionMaxCount
+		for i := 0; i < toRemove; i++ {
+			delete(agentSessions, entries[i].id)
+		}
+	}
 }

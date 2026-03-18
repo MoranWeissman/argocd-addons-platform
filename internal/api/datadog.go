@@ -2,8 +2,11 @@ package api
 
 import (
 	"net/http"
+	"regexp"
 	"time"
 )
+
+var validK8sName = regexp.MustCompile(`^[a-zA-Z0-9._-]+$`)
 
 func (s *Server) handleDatadogClusterMetrics(w http.ResponseWriter, r *http.Request) {
 	if s.ddClient == nil || !s.ddClient.IsEnabled() {
@@ -14,6 +17,10 @@ func (s *Server) handleDatadogClusterMetrics(w http.ResponseWriter, r *http.Requ
 	clusterName := r.PathValue("clusterName")
 	if clusterName == "" {
 		writeError(w, http.StatusBadRequest, "clusterName is required")
+		return
+	}
+	if !validK8sName.MatchString(clusterName) {
+		writeError(w, http.StatusBadRequest, "invalid clusterName")
 		return
 	}
 
@@ -79,6 +86,10 @@ func (s *Server) handleDatadogNamespaceMetrics(w http.ResponseWriter, r *http.Re
 	namespace := r.PathValue("namespace")
 	if namespace == "" {
 		writeError(w, http.StatusBadRequest, "namespace is required")
+		return
+	}
+	if !validK8sName.MatchString(namespace) {
+		writeError(w, http.StatusBadRequest, "invalid namespace")
 		return
 	}
 

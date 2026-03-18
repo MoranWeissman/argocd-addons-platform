@@ -238,7 +238,7 @@ func (c *Client) geminiSummarize(ctx context.Context, prompt string) (string, er
 		model = "gemini-2.5-flash"
 	}
 
-	url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s", model, c.config.APIKey)
+	apiURL := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent", model)
 
 	body, err := json.Marshal(map[string]interface{}{
 		"contents": []map[string]interface{}{
@@ -253,11 +253,12 @@ func (c *Client) geminiSummarize(ctx context.Context, prompt string) (string, er
 		return "", fmt.Errorf("marshaling gemini request: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, "POST", apiURL, bytes.NewReader(body))
 	if err != nil {
 		return "", err
 	}
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-goog-api-key", c.config.APIKey)
 
 	resp, err := c.http.Do(req)
 	if err != nil {
