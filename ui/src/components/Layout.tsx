@@ -157,39 +157,11 @@ export function Layout() {
               )}
             </button>
 
-            {/* Connection switcher */}
-            {!loading && (
-              <div ref={dropdownRef} className="relative">
-                <button
-                  onClick={() => setDropdownOpen((o) => !o)}
-                  className="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
-                  aria-haspopup="listbox"
-                  aria-expanded={dropdownOpen}
-                >
-                  <Plug className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-                  <span>{activeConnection ?? 'No connection'}</span>
-                  <ChevronDown className="h-4 w-4 text-gray-400" />
-                </button>
-
-                {dropdownOpen && (
-                  <div className="absolute right-0 z-50 mt-1 w-56 rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-600 dark:bg-gray-800">
-                    {connections.map((conn) => (
-                      <button
-                        key={conn.name}
-                        onClick={() => handleConnectionSelect(conn.name)}
-                        className={`flex w-full items-center px-4 py-2 text-left text-sm ${
-                          conn.name === activeConnection
-                            ? 'bg-cyan-50 font-medium text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400'
-                            : 'text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-700'
-                        }`}
-                        role="option"
-                        aria-selected={conn.name === activeConnection}
-                      >
-                        {conn.name}
-                      </button>
-                    ))}
-                  </div>
-                )}
+            {/* Active connection indicator */}
+            {!loading && activeConnection && (
+              <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm text-gray-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400">
+                <Plug className="h-4 w-4" />
+                <span>{activeConnection}</span>
               </div>
             )}
 

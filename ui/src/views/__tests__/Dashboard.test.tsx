@@ -52,7 +52,7 @@ describe('Dashboard', () => {
     renderDashboard();
 
     await waitFor(() => {
-      expect(screen.getByText('GitOps Platform Dashboard')).toBeInTheDocument();
+      expect(screen.getByText('ArgoCD Addons Platform')).toBeInTheDocument();
     });
 
     // Stat cards
