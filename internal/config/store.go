@@ -59,6 +59,14 @@ func (s *FileStore) load() (*configFile, error) {
 		return nil, fmt.Errorf("parsing config file: %w", err)
 	}
 
+	// Auto-derive connection name from git owner/repo if name is generic
+	for i := range cfg.Connections {
+		c := &cfg.Connections[i]
+		if (c.Name == "" || c.Name == "default") && c.Git.Owner != "" && c.Git.Repo != "" {
+			c.Name = c.Git.Owner + "/" + c.Git.Repo
+		}
+	}
+
 	return &cfg, nil
 }
 
