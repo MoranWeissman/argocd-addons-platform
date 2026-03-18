@@ -68,6 +68,22 @@ spec:
             - name: AI_CLOUD_MODEL
               value: {{ .Values.ai.cloudModel | quote }}
             {{- end }}
+            {{- if .Values.ai.baseURL }}
+            - name: AI_BASE_URL
+              value: {{ .Values.ai.baseURL | quote }}
+            {{- end }}
+            {{- if .Values.ai.authHeader }}
+            - name: AI_AUTH_HEADER
+              value: {{ .Values.ai.authHeader | quote }}
+            {{- end }}
+            {{- if .Values.ai.maxIterations }}
+            - name: AI_MAX_ITERATIONS
+              value: {{ .Values.ai.maxIterations | quote }}
+            {{- end }}
+            {{- end }}
+            {{- if .Values.gitops.actions.enabled }}
+            - name: GITOPS_ACTIONS_ENABLED
+              value: "true"
             {{- end }}
             {{- if .Values.datadog.enabled }}
             - name: DATADOG_SITE
