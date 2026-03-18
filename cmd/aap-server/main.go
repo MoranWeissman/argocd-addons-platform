@@ -1,12 +1,14 @@
 package main
 
 import (
+	"bufio"
 	"flag"
 	"fmt"
 	"io/fs"
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/moran/argocd-addons-platform/internal/ai"
 	"github.com/moran/argocd-addons-platform/internal/api"
@@ -21,6 +23,43 @@ func getEnvDefault(key, defaultVal string) string {
 		return v
 	}
 	return defaultVal
+}
+
+// loadSecretsEnv loads KEY=VALUE pairs from secrets.env into the environment.
+// Lines starting with # and empty lines are skipped. Does not override existing env vars.
+func loadSecretsEnv(path string) {
+	f, err := os.Open(path)
+	if err != nil {
+		return // file doesn't exist, that's fine
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	count := 0
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		key, value, ok := strings.Cut(line, "=")
+		if !ok {
+			continue
+		}
+		key = strings.TrimSpace(key)
+		value = strings.TrimSpace(value)
+		// Remove surrounding quotes if present
+		if len(value) >= 2 && ((value[0] == '"' && value[len(value)-1] == '"') || (value[0] == '\'' && value[len(value)-1] == '\'')) {
+			value = value[1 : len(value)-1]
+		}
+		// Don't override existing env vars
+		if os.Getenv(key) == "" {
+			os.Setenv(key, value)
+			count++
+		}
+	}
+	if count > 0 {
+		log.Printf("Loaded %d secrets from %s", count, path)
+	}
 }
 
 func main() {
@@ -39,6 +78,9 @@ func main() {
 	if envStatic := os.Getenv("AAP_STATIC_DIR"); envStatic != "" {
 		*staticDir = envStatic
 	}
+
+	// Load secrets from secrets.env for local development
+	loadSecretsEnv("secrets.env")
 
 	// Detect runtime mode
 	mode := platform.Detect()
