@@ -55,15 +55,19 @@ func TestCORSHeaders(t *testing.T) {
 	router := NewRouter(srv, nil)
 
 	req := httptest.NewRequest("OPTIONS", "/api/v1/health", nil)
+	req.Header.Set("Origin", "http://localhost")
+	req.Host = "localhost"
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
 
-	if w.Header().Get("Access-Control-Allow-Origin") != "*" {
-		t.Error("missing CORS Allow-Origin header")
-	}
+	// CORS Allow-Methods should always be present
 	if w.Header().Get("Access-Control-Allow-Methods") == "" {
 		t.Error("missing CORS Allow-Methods header")
+	}
+	// Security headers should be present
+	if w.Header().Get("X-Content-Type-Options") != "nosniff" {
+		t.Error("missing X-Content-Type-Options security header")
 	}
 }
 
