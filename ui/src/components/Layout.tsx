@@ -42,8 +42,16 @@ export function Layout() {
   const dropdownRef = useRef<HTMLDivElement>(null)
   const { theme, toggleTheme } = useTheme()
 
+  const [appVersion, setAppVersion] = useState('')
   const { connections, activeConnection, setActiveConnection, loading } =
     useConnections()
+
+  useEffect(() => {
+    fetch('/api/v1/health')
+      .then((r) => r.json())
+      .then((d) => setAppVersion(d.version ?? ''))
+      .catch(() => {})
+  }, [])
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -123,6 +131,9 @@ export function Layout() {
               <ChevronLeft className="h-5 w-5" />
             )}
           </button>
+          {appVersion && !collapsed && (
+            <p className="mt-1 text-center text-[10px] text-slate-500">v{appVersion}</p>
+          )}
         </div>
       </aside>
 
