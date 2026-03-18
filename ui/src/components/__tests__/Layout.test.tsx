@@ -59,11 +59,10 @@ describe('Layout', () => {
     expect(screen.getByText('dev')).toBeInTheDocument()
   })
 
-  it('opens connection dropdown on click', () => {
+  it('shows active connection as static label', () => {
     renderLayout()
-    const switcher = screen.getByRole('button', { name: /dev/i })
-    fireEvent.click(switcher)
-    expect(screen.getByRole('option', { name: 'dev' })).toBeInTheDocument()
+    // Connection is now a static label, not a dropdown
+    expect(screen.getByText('dev')).toBeInTheDocument()
   })
 
   it('renders DateTimeDisplay', () => {

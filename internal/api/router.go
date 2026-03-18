@@ -1,6 +1,8 @@
 package api
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"io/fs"
 	"log"
@@ -8,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/moran/argocd-addons-platform/internal/ai"
@@ -116,7 +119,8 @@ func NewRouter(srv *Server, staticFS fs.FS) http.Handler {
 	// Cluster info
 	mux.HandleFunc("GET /api/v1/cluster/nodes", srv.handleGetNodeInfo)
 
-	// Auth utilities
+	// Auth
+	mux.HandleFunc("POST /api/v1/auth/login", handleLogin)
 	mux.HandleFunc("POST /api/v1/auth/hash", handleHashPassword)
 
 	// Static files (SPA)
@@ -145,10 +149,82 @@ func NewRouter(srv *Server, staticFS fs.FS) http.Handler {
 	return handler
 }
 
-// basicAuthMiddleware enforces HTTP basic auth on all routes except health checks.
-// Credentials are read from AAP_AUTH_USER and AAP_AUTH_PASSWORD env vars.
-// If neither is set, auth is disabled (open access).
-// AAP_AUTH_PASSWORD can be a bcrypt hash (starting with "$2") or plaintext for backwards compatibility.
+// --- Session token auth ---
+
+var (
+	activeSessions   = make(map[string]time.Time) // token -> expiry
+	sessionsMu       sync.RWMutex
+	sessionLifetime  = 24 * time.Hour
+)
+
+func generateToken() string {
+	b := make([]byte, 32)
+	rand.Read(b)
+	return hex.EncodeToString(b)
+}
+
+func isValidSession(token string) bool {
+	sessionsMu.RLock()
+	defer sessionsMu.RUnlock()
+	expiry, ok := activeSessions[token]
+	return ok && time.Now().Before(expiry)
+}
+
+// handleLogin validates credentials and returns a session token.
+func handleLogin(w http.ResponseWriter, r *http.Request) {
+	user := os.Getenv("AAP_AUTH_USER")
+	pass := os.Getenv("AAP_AUTH_PASSWORD")
+
+	var req struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request")
+		return
+	}
+
+	// If no auth configured, allow any login
+	if user == "" && pass == "" {
+		token := generateToken()
+		sessionsMu.Lock()
+		activeSessions[token] = time.Now().Add(sessionLifetime)
+		sessionsMu.Unlock()
+		writeJSON(w, http.StatusOK, map[string]string{"token": token})
+		return
+	}
+
+	if req.Username != user {
+		writeError(w, http.StatusUnauthorized, "invalid credentials")
+		return
+	}
+
+	// Check password (bcrypt or plaintext)
+	var passwordMatch bool
+	if strings.HasPrefix(pass, "$2") {
+		err := bcrypt.CompareHashAndPassword([]byte(pass), []byte(req.Password))
+		passwordMatch = err == nil
+	} else {
+		passwordMatch = req.Password == pass
+	}
+
+	if !passwordMatch {
+		writeError(w, http.StatusUnauthorized, "invalid credentials")
+		return
+	}
+
+	token := generateToken()
+	sessionsMu.Lock()
+	activeSessions[token] = time.Now().Add(sessionLifetime)
+	sessionsMu.Unlock()
+
+	slog.Info("user logged in", "username", req.Username)
+	writeJSON(w, http.StatusOK, map[string]string{"token": token})
+}
+
+// basicAuthMiddleware enforces token-based auth on all API routes.
+// Accepts: Authorization: Bearer <token>
+// Skips: health checks, login endpoint, and static files.
 func basicAuthMiddleware(next http.Handler) http.Handler {
 	user := os.Getenv("AAP_AUTH_USER")
 	pass := os.Getenv("AAP_AUTH_PASSWORD")
@@ -158,37 +234,26 @@ func basicAuthMiddleware(next http.Handler) http.Handler {
 		return next
 	}
 
-	isBcrypt := strings.HasPrefix(pass, "$2")
-
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Skip auth for health endpoint (K8s probes)
-		if r.URL.Path == "/api/v1/health" {
+		path := r.URL.Path
+
+		// Skip auth for: health, login, static files
+		if path == "/api/v1/health" || path == "/api/v1/auth/login" || !strings.HasPrefix(path, "/api/") {
 			next.ServeHTTP(w, r)
 			return
 		}
 
-		u, p, ok := r.BasicAuth()
-		if !ok || u != user {
-			w.Header().Set("WWW-Authenticate", `Basic realm="ArgoCD Addons Platform"`)
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
-			return
+		// Check Bearer token
+		auth := r.Header.Get("Authorization")
+		if strings.HasPrefix(auth, "Bearer ") {
+			token := strings.TrimPrefix(auth, "Bearer ")
+			if isValidSession(token) {
+				next.ServeHTTP(w, r)
+				return
+			}
 		}
 
-		var passwordMatch bool
-		if isBcrypt {
-			err := bcrypt.CompareHashAndPassword([]byte(pass), []byte(p))
-			passwordMatch = err == nil
-		} else {
-			passwordMatch = p == pass
-		}
-
-		if !passwordMatch {
-			w.Header().Set("WWW-Authenticate", `Basic realm="ArgoCD Addons Platform"`)
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
-			return
-		}
-
-		next.ServeHTTP(w, r)
+		writeError(w, http.StatusUnauthorized, "unauthorized")
 	})
 }
 

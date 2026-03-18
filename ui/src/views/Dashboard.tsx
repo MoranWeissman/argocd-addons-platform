@@ -75,11 +75,11 @@ export function Dashboard() {
       {/* Hero Section */}
       <div className="rounded-2xl bg-gradient-to-r from-cyan-600 to-blue-700 px-8 py-10 text-white shadow-lg dark:from-cyan-800 dark:to-blue-900">
         <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
-          GitOps Platform Dashboard
+          ArgoCD Addons Platform
         </h1>
         <p className="mt-2 max-w-2xl text-lg text-cyan-100">
-          No More ClickOps — Pure GitOps. Manage Kubernetes cluster addons
-          through Git-driven workflows with full auditability.
+          Centralized visibility into addon deployments, health status, and
+          configurations across all your Kubernetes clusters.
         </p>
       </div>
 
