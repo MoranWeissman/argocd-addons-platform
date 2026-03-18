@@ -4,7 +4,7 @@
 replicaCount: 1
 
 image:
-  repository: ghcr.io/moran/argocd-addons-platform
+  repository: ghcr.io/moranweissman/argocd-addons-platform
   tag: ""  # Defaults to appVersion from Chart.yaml
   pullPolicy: IfNotPresent
 
@@ -107,7 +107,7 @@ datadog:
 # ---------------------------------------------------------------------------
 service:
   type: ClusterIP
-  port: 8080
+  port: 80
 
 # ---------------------------------------------------------------------------
 # Ingress

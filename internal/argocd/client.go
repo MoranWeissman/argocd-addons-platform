@@ -40,9 +40,10 @@ func NewClient(serverURL, token string, insecure bool) *Client {
 }
 
 // NewInClusterClient creates an ArgoCD client for in-cluster use.
-// It discovers the ArgoCD server via Kubernetes service DNS and reads the
-// ServiceAccount token from the standard mount path.
-func NewInClusterClient(namespace string) (*Client, error) {
+// It reads the ServiceAccount token from the standard mount path.
+// If serverURL is provided, it's used directly. If empty, it falls back
+// to the default argocd-server.<namespace>.svc.cluster.local.
+func NewInClusterClient(serverURL, namespace string) (*Client, error) {
 	const saTokenPath = "/var/run/secrets/kubernetes.io/serviceaccount/token"
 
 	tokenBytes, err := os.ReadFile(saTokenPath)
@@ -50,10 +51,13 @@ func NewInClusterClient(namespace string) (*Client, error) {
 		return nil, fmt.Errorf("reading service account token: %w", err)
 	}
 
-	serverURL := fmt.Sprintf("https://argocd-server.%s.svc.cluster.local", namespace)
+	if serverURL == "" {
+		if namespace == "" {
+			namespace = "argocd"
+		}
+		serverURL = fmt.Sprintf("https://argocd-server.%s.svc.cluster.local", namespace)
+	}
 
-	// In-cluster communication typically uses cluster-internal CAs that the
-	// default system pool may not trust, so we skip verification.
 	slog.Info("argocd in-cluster client initialized", "server", serverURL, "namespace", namespace)
 	return NewClient(serverURL, strings.TrimSpace(string(tokenBytes)), true), nil
 }

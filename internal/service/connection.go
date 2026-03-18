@@ -77,10 +77,20 @@ func (s *ConnectionService) GetActiveGitProvider() (gitprovider.GitProvider, err
 }
 
 // GetActiveArgocdClient returns an ArgoCD client for the currently active connection.
+// If server_url is empty, it uses in-cluster mode with the pod's ServiceAccount token.
 func (s *ConnectionService) GetActiveArgocdClient() (*argocd.Client, error) {
 	conn, err := s.getActiveConn()
 	if err != nil {
 		return nil, err
+	}
+	return s.buildArgocdClient(conn)
+}
+
+func (s *ConnectionService) buildArgocdClient(conn *models.Connection) (*argocd.Client, error) {
+	// If token is empty and we're running in K8s, use ServiceAccount token
+	if conn.Argocd.Token == "" {
+		slog.Info("argocd: no token configured, attempting in-cluster ServiceAccount auth")
+		return argocd.NewInClusterClient(conn.Argocd.ServerURL, conn.Argocd.Namespace)
 	}
 	return argocd.NewClient(conn.Argocd.ServerURL, conn.Argocd.Token, conn.Argocd.Insecure), nil
 }
@@ -111,8 +121,12 @@ func (s *ConnectionService) TestConnection(ctx context.Context) (gitErr, argocdE
 		gitErr = gp.TestConnection(ctx)
 	}
 
-	ac := argocd.NewClient(conn.Argocd.ServerURL, conn.Argocd.Token, conn.Argocd.Insecure)
-	argocdErr = ac.TestConnection(ctx)
+	ac, err := s.buildArgocdClient(conn)
+	if err != nil {
+		argocdErr = err
+	} else {
+		argocdErr = ac.TestConnection(ctx)
+	}
 
 	return gitErr, argocdErr
 }

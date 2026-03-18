@@ -4,9 +4,9 @@
 replicaCount: 1
 
 image:
-  repository: ghcr.io/moran/argocd-addons-platform
-  tag: "1.5.0"
-  pullPolicy: IfNotPresent
+  repository: ghcr.io/moranweissman/argocd-addons-platform
+  tag: "1.5.5"
+  pullPolicy: Always
 
 config:
   connections:
@@ -14,11 +14,12 @@ config:
       default: true
       git:
         provider: github
-        owner: your-org
-        repo: your-addons-repo
+        owner: merck-ahtl
+        repo: argocd-cluster-addons
         token: ${GITHUB_TOKEN}
       argocd:
-        server_url: ${ARGOCD_NONPROD_SERVER_URL}
+        # In-cluster: use HTTP (port 80) via k8s service DNS + ArgoCD API token
+        server_url: "http://argocd-devops-argocd-addons-dev-eks-server.argocd.svc.cluster.local"
         token: ${ARGOCD_TOKEN}
         namespace: argocd
         insecure: true
@@ -37,11 +38,22 @@ datadog:
   site: datadoghq.com
 
 service:
-  type: LoadBalancer
-  port: 8080
+  type: ClusterIP
+  port: 80
 
 ingress:
-  enabled: false
+  enabled: true
+  className: alb
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80},{"HTTPS":443}]'
+    alb.ingress.kubernetes.io/ssl-redirect: "443"
+  hosts:
+    - host: argocd-addons-platform.mahi-techlabs.com
+      paths:
+        - path: /
+          pathType: Prefix
 
 resources:
   requests:

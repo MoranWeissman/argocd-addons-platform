@@ -64,6 +64,12 @@ else
 fi
 IMAGE_TAG="${VERSION}"
 
+# --- Update Helm chart with current version ---
+CHART_YAML="${CHART_DIR}/Chart.yaml"
+if [[ -f "${CHART_YAML}" ]]; then
+  sed -i.bak "s/^appVersion:.*/appVersion: \"${VERSION}\"/" "${CHART_YAML}" && rm -f "${CHART_YAML}.bak"
+fi
+
 echo "=== ArgoCD Addons Platform Installer ==="
 echo "  Version:   ${VERSION}"
 echo "  Image:     ${FULL_IMAGE}:${IMAGE_TAG}"
@@ -74,36 +80,45 @@ echo "  AI:        ${AI_PROVIDER:-disabled} ${AI_CLOUD_MODEL:+(${AI_CLOUD_MODEL}
 echo "  Datadog:   ${DATADOG_API_KEY:+enabled}${DATADOG_API_KEY:-disabled}"
 echo ""
 
-# --- Step 1: Build Docker image ---
-echo ">>> Building Docker image ${FULL_IMAGE}:${IMAGE_TAG} ..."
-
-# If minikube is running, build inside minikube's docker
-if command -v minikube >/dev/null 2>&1 && minikube status --format='{{.Host}}' 2>/dev/null | grep -q Running; then
-  echo "    (Using minikube docker daemon)"
-  eval "$(minikube docker-env)"
-fi
-
-docker build -t "${FULL_IMAGE}:${IMAGE_TAG}" -t "${FULL_IMAGE}:latest" "${PROJECT_ROOT}"
-echo "    Build complete."
-
-# --- Step 2: Push to registry (if configured) ---
+# --- Step 1: Login to registry (if configured) ---
 if [[ -n "${REGISTRY}" ]]; then
-  echo ""
-  echo ">>> Pushing ${FULL_IMAGE}:${IMAGE_TAG} to registry..."
-
-  # Auto-login to registry
-  if [[ "${REGISTRY}" == ghcr.io/* ]]; then
-    echo "    Logging into GHCR..."
-    echo "${GITHUB_TOKEN}" | docker login ghcr.io -u "$(echo "${REGISTRY}" | cut -d/ -f2)" --password-stdin
+  if [[ "${REGISTRY}" == ghcr.io* ]]; then
+    GHCR_USER="${GHCR_USER:-$(echo "${REGISTRY}" | cut -d/ -f2)}"
+    GHCR_PASS="${GHCR_TOKEN:-${GITHUB_TOKEN}}"
+    echo ">>> Logging into GHCR as ${GHCR_USER}..."
+    echo "${GHCR_PASS}" | docker login ghcr.io -u "${GHCR_USER}" --password-stdin
   elif [[ "${REGISTRY}" == *.dkr.ecr.*.amazonaws.com ]]; then
     AWS_REGION="$(echo "${REGISTRY}" | sed 's/.*\.dkr\.ecr\.\(.*\)\.amazonaws\.com/\1/')"
-    echo "    Logging into ECR (${AWS_REGION})..."
+    echo ">>> Logging into ECR (${AWS_REGION})..."
     aws ecr get-login-password --region "${AWS_REGION}" | docker login --username AWS --password-stdin "${REGISTRY}"
   fi
+fi
 
-  docker push "${FULL_IMAGE}:${IMAGE_TAG}"
-  docker push "${FULL_IMAGE}:latest"
-  echo "    Push complete."
+# --- Step 2: Build Docker image ---
+echo ""
+echo ">>> Building Docker image ${FULL_IMAGE}:${IMAGE_TAG} ..."
+
+if [[ -n "${REGISTRY}" ]]; then
+  # Remote registry: build multi-arch and push in one step
+  # Ensure buildx builder exists
+  if ! docker buildx inspect multiarch >/dev/null 2>&1; then
+    echo "    Creating buildx builder 'multiarch'..."
+    docker buildx create --name multiarch --use
+  fi
+  docker buildx build --builder multiarch \
+    --platform linux/amd64,linux/arm64 \
+    -t "${FULL_IMAGE}:${IMAGE_TAG}" \
+    -t "${FULL_IMAGE}:latest" \
+    --push "${PROJECT_ROOT}"
+  echo "    Build + push complete."
+else
+  # Local: build for current platform only
+  if command -v minikube >/dev/null 2>&1 && minikube status --format='{{.Host}}' 2>/dev/null | grep -q Running; then
+    echo "    (Using minikube docker daemon)"
+    eval "$(minikube docker-env)"
+  fi
+  docker build -t "${FULL_IMAGE}:${IMAGE_TAG}" -t "${FULL_IMAGE}:latest" "${PROJECT_ROOT}"
+  echo "    Build complete."
 fi
 
 # --- Step 3: Helm upgrade --install ---
