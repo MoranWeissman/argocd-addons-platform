@@ -38,11 +38,14 @@ export function Login() {
         <div className="w-full max-w-sm">
           {/* Logo */}
           <div className="mb-8 text-center">
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-              argocd
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+              AAP
             </h1>
-            <p className="mt-1 text-sm tracking-widest text-gray-500 dark:text-gray-400">
-              ADDONS PLATFORM
+            <p className="mt-1 text-sm font-medium text-gray-700 dark:text-gray-300">
+              ArgoCD Addons Platform
+            </p>
+            <p className="mt-0.5 text-xs text-gray-400 dark:text-gray-500">
+              Control plane for Kubernetes add-ons
             </p>
           </div>
 
@@ -99,7 +102,7 @@ export function Login() {
 
           {/* Footer */}
           <p className="mt-12 text-center text-[10px] text-gray-400 dark:text-gray-600">
-            argocd addons platform
+            AAP
           </p>
         </div>
       </div>

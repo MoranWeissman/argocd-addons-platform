@@ -49,4 +49,39 @@ subjects:
   - kind: ServiceAccount
     name: {{ include "aap.serviceAccountName" . }}
     namespace: {{ .Release.Namespace }}
+---
+# Role: read/write own secret and read users ConfigMap in the release namespace
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "aap.fullname" . }}-auth
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "aap.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames: [{{ include "aap.fullname" . | quote }}]
+    verbs: ["get", "update"]
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    resourceNames: [{{ printf "%s-users" (include "aap.fullname" .) | quote }}]
+    verbs: ["get"]
+---
+# Bind auth role to the service account
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "aap.fullname" . }}-auth
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "aap.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "aap.fullname" . }}-auth
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "aap.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
 {{- end }}

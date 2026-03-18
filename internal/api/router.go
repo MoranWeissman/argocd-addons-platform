@@ -8,12 +8,12 @@ import (
 	"log"
 	"log/slog"
 	"net/http"
-	"os"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/moran/argocd-addons-platform/internal/ai"
+	"github.com/moran/argocd-addons-platform/internal/auth"
 	"github.com/moran/argocd-addons-platform/internal/datadog"
 	"github.com/moran/argocd-addons-platform/internal/service"
 	"golang.org/x/crypto/bcrypt"
@@ -30,6 +30,7 @@ type Server struct {
 	aiClient         *ai.Client
 	ddClient         *datadog.Client
 	agentMemory      *ai.MemoryStore
+	authStore        *auth.Store
 }
 
 // NewServer creates a new API server.
@@ -47,6 +48,9 @@ func NewServer(
 	memoryPath := "/tmp/aap-agent-memory.json"
 	agentMemory := ai.NewMemoryStore(memoryPath)
 
+	// Initialize auth store (auto-detects K8s vs local mode)
+	authStore := auth.NewStore()
+
 	return &Server{
 		connSvc:          connSvc,
 		clusterSvc:       clusterSvc,
@@ -57,6 +61,7 @@ func NewServer(
 		aiClient:         aiClient,
 		ddClient:         ddClient,
 		agentMemory:      agentMemory,
+		authStore:        authStore,
 	}
 }
 
@@ -120,9 +125,9 @@ func NewRouter(srv *Server, staticFS fs.FS) http.Handler {
 	mux.HandleFunc("GET /api/v1/cluster/nodes", srv.handleGetNodeInfo)
 
 	// Auth
-	mux.HandleFunc("POST /api/v1/auth/login", handleLogin)
-	mux.HandleFunc("POST /api/v1/auth/update-password", handleUpdatePassword)
-	mux.HandleFunc("POST /api/v1/auth/hash", handleHashPassword)
+	mux.HandleFunc("POST /api/v1/auth/login", srv.handleLogin)
+	mux.HandleFunc("POST /api/v1/auth/update-password", srv.handleUpdatePassword)
+	mux.HandleFunc("POST /api/v1/auth/hash", srv.handleHashPassword)
 
 	// Static files (SPA)
 	if staticFS != nil {
@@ -143,7 +148,7 @@ func NewRouter(srv *Server, staticFS fs.FS) http.Handler {
 
 	// Wrap with middleware
 	var handler http.Handler = mux
-	handler = basicAuthMiddleware(handler)
+	handler = srv.basicAuthMiddleware(handler)
 	handler = corsMiddleware(handler)
 	handler = loggingMiddleware(handler)
 
@@ -172,10 +177,7 @@ func isValidSession(token string) bool {
 }
 
 // handleLogin validates credentials and returns a session token.
-func handleLogin(w http.ResponseWriter, r *http.Request) {
-	user := os.Getenv("AAP_AUTH_USER")
-	pass := os.Getenv("AAP_AUTH_PASSWORD")
-
+func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Username string `json:"username"`
 		Password string `json:"password"`
@@ -186,7 +188,7 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// If no auth configured, allow any login
-	if user == "" && pass == "" {
+	if !s.authStore.HasUsers() {
 		token := generateToken()
 		sessionsMu.Lock()
 		activeSessions[token] = time.Now().Add(sessionLifetime)
@@ -195,21 +197,7 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Username != user {
-		writeError(w, http.StatusUnauthorized, "invalid credentials")
-		return
-	}
-
-	// Check password (bcrypt or plaintext)
-	var passwordMatch bool
-	if strings.HasPrefix(pass, "$2") {
-		err := bcrypt.CompareHashAndPassword([]byte(pass), []byte(req.Password))
-		passwordMatch = err == nil
-	} else {
-		passwordMatch = req.Password == pass
-	}
-
-	if !passwordMatch {
+	if !s.authStore.ValidateCredentials(req.Username, req.Password) {
 		writeError(w, http.StatusUnauthorized, "invalid credentials")
 		return
 	}
@@ -226,12 +214,9 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 // basicAuthMiddleware enforces token-based auth on all API routes.
 // Accepts: Authorization: Bearer <token>
 // Skips: health checks, login endpoint, and static files.
-func basicAuthMiddleware(next http.Handler) http.Handler {
-	user := os.Getenv("AAP_AUTH_USER")
-	pass := os.Getenv("AAP_AUTH_PASSWORD")
-
-	// If no credentials configured, skip auth entirely
-	if user == "" && pass == "" {
+func (s *Server) basicAuthMiddleware(next http.Handler) http.Handler {
+	// If no users configured, skip auth entirely
+	if !s.authStore.HasUsers() {
 		return next
 	}
 
@@ -245,9 +230,9 @@ func basicAuthMiddleware(next http.Handler) http.Handler {
 		}
 
 		// Check Bearer token
-		auth := r.Header.Get("Authorization")
-		if strings.HasPrefix(auth, "Bearer ") {
-			token := strings.TrimPrefix(auth, "Bearer ")
+		authHeader := r.Header.Get("Authorization")
+		if strings.HasPrefix(authHeader, "Bearer ") {
+			token := strings.TrimPrefix(authHeader, "Bearer ")
 			if isValidSession(token) {
 				next.ServeHTTP(w, r)
 				return
@@ -259,14 +244,14 @@ func basicAuthMiddleware(next http.Handler) http.Handler {
 }
 
 // handleUpdatePassword allows changing the password. Verifies current password first.
-func handleUpdatePassword(w http.ResponseWriter, r *http.Request) {
-	currentPass := os.Getenv("AAP_AUTH_PASSWORD")
-	if currentPass == "" {
+func (s *Server) handleUpdatePassword(w http.ResponseWriter, r *http.Request) {
+	if !s.authStore.HasUsers() {
 		writeError(w, http.StatusBadRequest, "no password configured")
 		return
 	}
 
 	var req struct {
+		Username        string `json:"username"`
 		CurrentPassword string `json:"current_password"`
 		NewPassword     string `json:"new_password"`
 	}
@@ -279,34 +264,32 @@ func handleUpdatePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Verify current password
-	var currentMatch bool
-	if strings.HasPrefix(currentPass, "$2") {
-		currentMatch = bcrypt.CompareHashAndPassword([]byte(currentPass), []byte(req.CurrentPassword)) == nil
-	} else {
-		currentMatch = req.CurrentPassword == currentPass
-	}
-	if !currentMatch {
-		writeError(w, http.StatusUnauthorized, "current password is incorrect")
-		return
+	// Default to "admin" if no username provided (backward compat)
+	username := req.Username
+	if username == "" {
+		username = "admin"
 	}
 
-	// Generate bcrypt hash and update env
-	hash, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to hash password")
+	if err := s.authStore.UpdatePassword(username, req.CurrentPassword, req.NewPassword); err != nil {
+		if strings.Contains(err.Error(), "incorrect") {
+			writeError(w, http.StatusUnauthorized, err.Error())
+			return
+		}
+		if strings.Contains(err.Error(), "at least") {
+			writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	os.Setenv("AAP_AUTH_PASSWORD", string(hash))
-	slog.Info("password updated")
 
 	writeJSON(w, http.StatusOK, map[string]string{"status": "password updated"})
 }
 
 // handleHashPassword generates a bcrypt hash from a plaintext password.
-// Only available when auth is disabled (no AAP_AUTH_USER set) for initial setup.
-func handleHashPassword(w http.ResponseWriter, r *http.Request) {
-	if os.Getenv("AAP_AUTH_USER") != "" {
+// Only available when auth is disabled (no users configured) for initial setup.
+func (s *Server) handleHashPassword(w http.ResponseWriter, r *http.Request) {
+	if s.authStore.HasUsers() {
 		writeError(w, http.StatusForbidden, "hash endpoint is only available when auth is disabled")
 		return
 	}
