@@ -3,7 +3,7 @@
 Centralized visibility and AI-powered insights for Kubernetes addon deployments managed by ArgoCD.
 
 ![CI](https://img.shields.io/badge/build-passing-brightgreen)
-![License](https://img.shields.io/badge/license-Apache%202.0-blue)
+![License](https://img.shields.io/badge/license-AGPL--3.0-blue)
 ![Go](https://img.shields.io/badge/Go-1.25-00ADD8)
 ![React](https://img.shields.io/badge/React-19-61DAFB)
 
@@ -158,4 +158,6 @@ To report a security vulnerability, please contact the maintainers directly rath
 
 ## License
 
-This project is licensed under the Apache License 2.0. See [LICENSE](LICENSE) for the full text.
+This project is licensed under the [GNU Affero General Public License v3.0 (AGPL-3.0)](LICENSE).
+
+You are free to use, modify, and distribute this software. If you modify it and offer it as a service, you must make your modifications available under the same license.
