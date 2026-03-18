@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard,
   Server,
@@ -36,6 +36,7 @@ const navItems = [
 ]
 
 export function Layout() {
+  const navigate = useNavigate()
   const [collapsed, setCollapsed] = useState(false)
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -72,7 +73,10 @@ export function Layout() {
         }`}
       >
         {/* Logo / title */}
-        <div className="flex h-14 items-center gap-2 border-b border-slate-700 px-4">
+        <div
+          className="flex h-14 cursor-pointer items-center gap-2 border-b border-slate-700 px-4 transition-colors hover:bg-slate-800"
+          onClick={() => navigate('/')}
+        >
           <Package className="h-6 w-6 shrink-0 text-cyan-400" />
           {!collapsed && (
             <div className="flex flex-col leading-tight">
