@@ -70,7 +70,7 @@ func GetToolDefinitions() []ToolDefinition {
 			Type: "function",
 			Function: ToolFunction{
 				Name:        "list_addons",
-				Description: "List all available addons in the catalog with their versions",
+				Description: "List all addons defined in the catalog (NOT necessarily deployed). This shows what addons COULD be deployed, not what IS deployed. To see what is actually deployed/running, use get_argocd_app_health instead.",
 				Parameters:  json.RawMessage(`{"type":"object","properties":{}}`),
 			},
 		},
@@ -102,7 +102,7 @@ func GetToolDefinitions() []ToolDefinition {
 			Type: "function",
 			Function: ToolFunction{
 				Name:        "get_argocd_app_health",
-				Description: "Get the health and sync status of ArgoCD applications, optionally filtered by cluster",
+				Description: "Get what addons are ACTUALLY DEPLOYED and running in ArgoCD with their health and sync status. Use this when asked 'what is deployed' or 'what addons are running'. Optionally filter by cluster name.",
 				Parameters:  json.RawMessage(`{"type":"object","properties":{"cluster_name":{"type":"string","description":"Optional cluster name to filter by"}}}`),
 			},
 		},

@@ -88,6 +88,11 @@ HOW IT WORKS:
 7. When in doubt, call a tool. It is ALWAYS better to call a tool than to ask the user.
 
 === TOOL SELECTION GUIDE ===
+CRITICAL DISTINCTION:
+- "What addons are DEPLOYED/RUNNING?" → get_argocd_app_health (shows ACTUAL running apps in ArgoCD)
+- "What addons EXIST/are available?" → list_addons (shows the catalog — what COULD be deployed)
+These are DIFFERENT. "deployed" = get_argocd_app_health. "available"/"catalog" = list_addons.
+
 - "Where is addon X deployed/installed?" → find_addon_deployments (only shows ENABLED clusters)
 - "What addons are on cluster X?" → get_cluster_addons
 - "What version of addon X on cluster Y?" → get_addon_on_cluster
