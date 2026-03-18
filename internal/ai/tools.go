@@ -49,7 +49,7 @@ func NewToolExecutor(gp gitprovider.GitProvider, ac *argocd.Client, memory *Memo
 
 // GetToolDefinitions returns all available tool definitions for Ollama.
 func GetToolDefinitions() []ToolDefinition {
-	return []ToolDefinition{
+	tools := []ToolDefinition{
 		{
 			Type: "function",
 			Function: ToolFunction{
@@ -243,6 +243,8 @@ func GetToolDefinitions() []ToolDefinition {
 			},
 		},
 	}
+	tools = append(tools, GetWriteToolDefinitions()...)
+	return tools
 }
 
 // ExecuteTool runs a tool and returns the result as a string.
@@ -331,6 +333,21 @@ func (e *ToolExecutor) ExecuteTool(ctx context.Context, name string, args json.R
 			return e.memory.Search(params["query"]), nil
 		}
 		return "Memory system not available.", nil
+	case "enable_addon":
+		return e.enableAddon(ctx, params["cluster_name"], params["addon_name"])
+	case "disable_addon":
+		return e.disableAddon(ctx, params["cluster_name"], params["addon_name"])
+	case "update_addon_version":
+		return e.updateAddonVersion(ctx, params["addon_name"], params["version"])
+	case "sync_argocd_app":
+		an := params["app_name"]
+		if an == "" { an = params["name"] }
+		return e.syncArgocdApp(ctx, an)
+	case "refresh_argocd_app":
+		an := params["app_name"]
+		if an == "" { an = params["name"] }
+		hard := strings.EqualFold(params["hard"], "true")
+		return e.refreshArgocdApp(ctx, an, hard)
 	default:
 		return "", fmt.Errorf("unknown tool: %s", name)
 	}
