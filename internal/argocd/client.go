@@ -150,6 +150,58 @@ func (c *Client) GetVersion(ctx context.Context) (map[string]string, error) {
 	return result, nil
 }
 
+// GetResourceTree returns the full resource tree for an ArgoCD application as raw JSON.
+func (c *Client) GetResourceTree(ctx context.Context, appName string) (map[string]interface{}, error) {
+	body, err := c.doGet(ctx, "/api/v1/applications/"+appName+"/resource-tree")
+	if err != nil {
+		return nil, fmt.Errorf("getting resource tree for %q: %w", appName, err)
+	}
+
+	var raw map[string]interface{}
+	if err := json.Unmarshal(body, &raw); err != nil {
+		return nil, fmt.Errorf("decoding resource tree response: %w", err)
+	}
+	return raw, nil
+}
+
+// GetManagedResource returns the live manifest of a specific managed resource.
+// It filters out Secret kind to prevent leaking sensitive data.
+func (c *Client) GetManagedResource(ctx context.Context, appName, namespace, resourceName, group, kind string) (map[string]interface{}, error) {
+	if strings.EqualFold(kind, "Secret") {
+		return nil, fmt.Errorf("refusing to return Secret resources for security reasons")
+	}
+
+	path := fmt.Sprintf("/api/v1/applications/%s/managed-resources?namespace=%s&resourceName=%s&group=%s&kind=%s",
+		appName, namespace, resourceName, group, kind)
+
+	body, err := c.doGet(ctx, path)
+	if err != nil {
+		return nil, fmt.Errorf("getting managed resource for %q: %w", appName, err)
+	}
+
+	var raw map[string]interface{}
+	if err := json.Unmarshal(body, &raw); err != nil {
+		return nil, fmt.Errorf("decoding managed resource response: %w", err)
+	}
+	return raw, nil
+}
+
+// GetApplicationEvents returns recent Kubernetes events for an ArgoCD application.
+func (c *Client) GetApplicationEvents(ctx context.Context, appName string) ([]map[string]interface{}, error) {
+	body, err := c.doGet(ctx, "/api/v1/applications/"+appName+"/events")
+	if err != nil {
+		return nil, fmt.Errorf("getting events for %q: %w", appName, err)
+	}
+
+	var raw struct {
+		Items []map[string]interface{} `json:"items"`
+	}
+	if err := json.Unmarshal(body, &raw); err != nil {
+		return nil, fmt.Errorf("decoding events response: %w", err)
+	}
+	return raw.Items, nil
+}
+
 // ListApplicationsSummary returns all applications with summary data (no history/resources).
 // This is the same as ListApplications and is suitable for list views and health overviews.
 func (c *Client) ListApplicationsSummary(ctx context.Context) ([]models.ArgocdApplication, error) {

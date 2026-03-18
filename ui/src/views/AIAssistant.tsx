@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Sparkles, Send, User, RotateCcw, RefreshCw, Wrench, Database, Search, Shield } from 'lucide-react'
+import { Sparkles, Send, User, RotateCcw, RefreshCw, Wrench, Database, Search, Shield, Download } from 'lucide-react'
 import { api } from '@/services/api'
 
 interface ChatMessage {
@@ -435,6 +435,37 @@ export function AIAssistant() {
     clearPersistedState()
   }, [sessionId])
 
+  const handleExport = useCallback(() => {
+    const now = new Date()
+    const dateStr = now.toISOString().slice(0, 10)
+    const header = [
+      'ArgoCD Addons Platform - AI Chat Export',
+      `Date: ${dateStr}`,
+      `Messages: ${messages.length}`,
+      '=====================================',
+      '',
+    ].join('\n')
+
+    const body = messages
+      .map((msg) => {
+        const ts = msg.timestamp.toISOString()
+        const role = msg.role === 'user' ? 'User' : 'Assistant'
+        return `[${ts}] ${role}:\n${msg.content}\n`
+      })
+      .join('\n')
+
+    const text = header + body
+    const blob = new Blob([text], { type: 'text/plain' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `aap-chat-${dateStr}.txt`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }, [messages])
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
@@ -486,6 +517,15 @@ export function AIAssistant() {
             <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] text-gray-500 dark:bg-gray-800 dark:text-gray-400">
               {messages.length} messages
             </span>
+          )}
+          {messages.length > 0 && (
+            <button
+              onClick={handleExport}
+              className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
+            >
+              <Download className="h-3.5 w-3.5" />
+              Export
+            </button>
           )}
           <button
             onClick={handleNewConversation}

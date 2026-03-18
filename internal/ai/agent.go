@@ -144,7 +144,7 @@ func (a *Agent) Chat(ctx context.Context, userMessage string) (string, error) {
 	a.messages = append(a.messages, ChatMessage{Role: "user", Content: userMessage})
 
 	chatStart := time.Now()
-	for i := 0; i < 5; i++ {
+	for i := 0; i < 8; i++ {
 		resp, err := a.callLLM(ctx)
 		if err != nil {
 			return "", err
