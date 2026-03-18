@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"log"
-	"strings"
 
 	"github.com/moran/argocd-addons-platform/internal/argocd"
 	"github.com/moran/argocd-addons-platform/internal/config"
@@ -77,24 +76,21 @@ func (s *DashboardService) GetStats(ctx context.Context, gp gitprovider.GitProvi
 
 	// Application stats from ArgoCD — only count addon apps (not bootstrap/infrastructure)
 	// Addon apps follow the pattern: {addon-name}-{cluster-name}
-	addonNames := make(map[string]bool)
+	// Build a set of valid addon app names from catalog × clusters
+	validAddonApps := make(map[string]bool)
 	for _, addon := range repoCfg.Addons {
-		addonNames[addon.AppName] = true
+		for _, cluster := range repoCfg.Clusters {
+			if cluster.Labels[addon.AppName] == "enabled" {
+				validAddonApps[addon.AppName+"-"+cluster.Name] = true
+			}
+		}
 	}
 
 	appStats := models.DashboardApplicationStats{}
 	apps, err := ac.ListApplications(ctx)
 	if err == nil {
 		for _, app := range apps {
-			// Check if this app belongs to a known addon (prefix match)
-			isAddon := false
-			for name := range addonNames {
-				if strings.HasPrefix(app.Name, name+"-") {
-					isAddon = true
-					break
-				}
-			}
-			if !isAddon {
+			if !validAddonApps[app.Name] {
 				continue
 			}
 
