@@ -16,6 +16,7 @@ import { Observability } from '@/views/Observability'
 import { Dashboards } from '@/views/Dashboards'
 import { UpgradeChecker } from '@/views/UpgradeChecker'
 import { AIAssistant } from '@/views/AIAssistant'
+import { UserInfo } from '@/views/UserInfo'
 
 function AppRoutes() {
   const { isAuthenticated, loading } = useAuth()
@@ -49,6 +50,7 @@ function AppRoutes() {
           <Route path="dashboards" element={<Dashboards />} />
           <Route path="docs" element={<Docs />} />
           <Route path="settings" element={<Connections />} />
+          <Route path="user" element={<UserInfo />} />
         </Route>
       </Routes>
     </ConnectionProvider>

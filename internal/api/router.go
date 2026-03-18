@@ -121,6 +121,7 @@ func NewRouter(srv *Server, staticFS fs.FS) http.Handler {
 
 	// Auth
 	mux.HandleFunc("POST /api/v1/auth/login", handleLogin)
+	mux.HandleFunc("POST /api/v1/auth/update-password", handleUpdatePassword)
 	mux.HandleFunc("POST /api/v1/auth/hash", handleHashPassword)
 
 	// Static files (SPA)
@@ -255,6 +256,51 @@ func basicAuthMiddleware(next http.Handler) http.Handler {
 
 		writeError(w, http.StatusUnauthorized, "unauthorized")
 	})
+}
+
+// handleUpdatePassword allows changing the password. Verifies current password first.
+func handleUpdatePassword(w http.ResponseWriter, r *http.Request) {
+	currentPass := os.Getenv("AAP_AUTH_PASSWORD")
+	if currentPass == "" {
+		writeError(w, http.StatusBadRequest, "no password configured")
+		return
+	}
+
+	var req struct {
+		CurrentPassword string `json:"current_password"`
+		NewPassword     string `json:"new_password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request")
+		return
+	}
+	if req.NewPassword == "" || len(req.NewPassword) < 8 {
+		writeError(w, http.StatusBadRequest, "new password must be at least 8 characters")
+		return
+	}
+
+	// Verify current password
+	var currentMatch bool
+	if strings.HasPrefix(currentPass, "$2") {
+		currentMatch = bcrypt.CompareHashAndPassword([]byte(currentPass), []byte(req.CurrentPassword)) == nil
+	} else {
+		currentMatch = req.CurrentPassword == currentPass
+	}
+	if !currentMatch {
+		writeError(w, http.StatusUnauthorized, "current password is incorrect")
+		return
+	}
+
+	// Generate bcrypt hash and update env
+	hash, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to hash password")
+		return
+	}
+	os.Setenv("AAP_AUTH_PASSWORD", string(hash))
+	slog.Info("password updated")
+
+	writeJSON(w, http.StatusOK, map[string]string{"status": "password updated"})
 }
 
 // handleHashPassword generates a bcrypt hash from a plaintext password.
