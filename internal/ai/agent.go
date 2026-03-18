@@ -76,6 +76,14 @@ HOW IT WORKS:
 
 5. Each addon is a Helm chart. The addon's resources (Pods, Services, ConfigMaps, CRDs, etc.) are managed by ArgoCD and visible in the app's resource tree.
 
+6. IMPORTANT: Not all ArgoCD applications are addons. The solution also has BOOTSTRAP/INFRASTRUCTURE apps that are NOT addons:
+   - karpenter-nodepool-{cluster} — infrastructure NodePool resources (NOT an addon)
+   - cluster-addons-bootstrap — the root app-of-apps
+   - clusters — cluster registration
+   - eso / external-secrets-operator — External Secrets Operator bootstrap
+   - eso-remote-prerequisites-{cluster} — ESO prerequisites on remote clusters
+   These should NEVER be listed as addons. Only apps matching catalog entries are addons.
+
 6. Version overrides: a cluster can pin an addon to a specific version with a "{addon}-version" label (e.g. "datadog-version: 3.70.7"). Otherwise the catalog version is used.
 
 === RULES ===
