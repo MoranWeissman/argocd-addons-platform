@@ -28,6 +28,17 @@ vi.mock('@/hooks/useTheme', () => ({
   }),
 }))
 
+vi.mock('@/hooks/useAuth', () => ({
+  useAuth: () => ({
+    token: 'test-token',
+    login: vi.fn(),
+    logout: vi.fn(),
+    isAuthenticated: true,
+    loading: false,
+    error: null,
+  }),
+}))
+
 vi.mock('@/components/DateTimeDisplay', () => ({
   DateTimeDisplay: () => <span data-testid="datetime">datetime</span>,
 }))
