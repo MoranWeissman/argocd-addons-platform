@@ -88,7 +88,7 @@ func (s *Server) handleSetAIProvider(w http.ResponseWriter, r *http.Request) {
 
 	// Validate provider
 	switch ai.Provider(req.Provider) {
-	case ai.ProviderOllama, ai.ProviderClaude, ai.ProviderOpenAI, ai.ProviderGemini:
+	case ai.ProviderOllama, ai.ProviderClaude, ai.ProviderOpenAI, ai.ProviderGemini, ai.ProviderNone:
 		// valid
 	default:
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("unsupported provider: %s", req.Provider))

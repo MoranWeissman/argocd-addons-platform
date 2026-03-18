@@ -797,13 +797,22 @@ function AIConfigSection() {
           </div>
         </div>
         {isEnabled && (
-          <button
-            onClick={handleTest}
-            disabled={testing}
-            className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
-          >
-            {testing ? 'Testing...' : 'Test Connection'}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleTest}
+              disabled={testing}
+              className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+            >
+              {testing ? 'Testing...' : 'Test Connection'}
+            </button>
+            <button
+              onClick={() => handleSwitchProvider('none')}
+              disabled={switching === 'none'}
+              className="rounded-lg border border-red-300 px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-900/20"
+            >
+              {switching === 'none' ? 'Disabling...' : 'Disable AI'}
+            </button>
+          </div>
         )}
       </div>
 
