@@ -87,10 +87,12 @@ func (s *AddonService) GetCatalog(ctx context.Context, gp gitprovider.GitProvide
 				continue
 			}
 
+			// Only care about enabled addons — disabled is the same as not configured
 			enabled := labelVal == "enabled"
-			if enabled {
-				enabledCount++
+			if !enabled {
+				continue
 			}
+			enabledCount++
 
 			// Version for this cluster
 			version := addon.Version
@@ -101,14 +103,12 @@ func (s *AddonService) GetCatalog(ctx context.Context, gp gitprovider.GitProvide
 
 			dep := models.AddonDeploymentInfo{
 				ClusterName:       cluster.Name,
-				Enabled:           enabled,
+				Enabled:           true,
 				ConfiguredVersion: version,
 				Namespace:         addon.Namespace,
 			}
 
-			if !enabled {
-				dep.Status = "disabled"
-			} else {
+			{
 				// Check ArgoCD status
 				appName := addon.AppName + "-" + cluster.Name
 				if app, ok := appMap[appName]; ok {
@@ -143,7 +143,7 @@ func (s *AddonService) GetCatalog(ctx context.Context, gp gitprovider.GitProvide
 		item.MissingApplications = missingCount
 		item.Applications = deployments
 
-		if len(deployments) == 0 {
+		if enabledCount == 0 {
 			addonsOnlyInGit++
 		}
 

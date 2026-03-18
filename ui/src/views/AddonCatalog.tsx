@@ -106,7 +106,7 @@ function AddonCard({ addon }: { addon: AddonCatalogItem }) {
               </p>
             ) : (
               <p className="mt-1 text-sm font-semibold text-amber-600 dark:text-amber-400">
-                Not Assigned
+                Not Deployed
               </p>
             )}
           </div>
@@ -304,7 +304,7 @@ function AddonListTable({ addons }: { addons: AddonCatalogItem[] }) {
               <td className="px-6 py-3 text-gray-700 dark:text-gray-300">
                 {addon.enabled_clusters === 0 ? (
                   <span className="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-                    Not Assigned
+                    Not Deployed
                   </span>
                 ) : (
                   `${addon.enabled_clusters} / ${addon.total_clusters}`
