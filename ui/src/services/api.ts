@@ -162,6 +162,9 @@ export const api = {
   cancelMigration: (id: string) => postJSON<void>(`/migration/${id}/cancel`),
   azureListProjects: (org: string, pat: string) => fetchJSON<string[]>(`/migration/azure/projects?org=${encodeURIComponent(org)}&pat=${encodeURIComponent(pat)}`),
   azureListRepos: (org: string, project: string, pat: string) => fetchJSON<string[]>(`/migration/azure/repos?org=${encodeURIComponent(org)}&project=${encodeURIComponent(project)}&pat=${encodeURIComponent(pat)}`),
+  oldRepoAddons: () => fetchJSON<string[]>('/migration/old-repo/addons'),
+  oldRepoClusters: () => fetchJSON<string[]>('/migration/old-repo/clusters'),
+  oldRepoClusterAddons: (cluster: string) => fetchJSON<string[]>(`/migration/old-repo/cluster-addons?cluster=${encodeURIComponent(cluster)}`),
 }
 
 // Migration types
