@@ -154,7 +154,7 @@ export const api = {
   saveMigrationSettings: (settings: MigrationSettings) => postJSON<void>('/migration/settings', settings),
   testMigrationConnection: () => postJSON<{ git: boolean; argocd: boolean }>('/migration/settings/test'),
   listMigrations: () => fetchJSON<Migration[]>('/migration/list'),
-  startMigration: (data: { addon_name: string; cluster_name: string }) => postJSON<Migration>('/migration/start', data),
+  startMigration: (data: { addon_name: string; cluster_name: string; mode?: string }) => postJSON<Migration>('/migration/start', data),
   getMigration: (id: string) => fetchJSON<Migration>(`/migration/${id}`),
   continueMigration: (id: string) => postJSON<void>(`/migration/${id}/continue`),
   pauseMigration: (id: string) => postJSON<void>(`/migration/${id}/pause`),
@@ -168,6 +168,14 @@ export const api = {
 }
 
 // Migration types
+export interface LogEntry {
+  timestamp: string
+  step: number
+  repo: string
+  action: string
+  detail: string
+}
+
 export interface MigrationStep {
   number: number
   title: string
@@ -185,9 +193,11 @@ export interface Migration {
   id: string
   addon_name: string
   cluster_name: string
-  status: 'pending' | 'running' | 'waiting' | 'paused' | 'completed' | 'failed' | 'cancelled'
+  mode: string
+  status: 'pending' | 'running' | 'waiting' | 'paused' | 'gated' | 'completed' | 'failed' | 'cancelled'
   current_step: number
   steps: MigrationStep[]
+  logs: LogEntry[]
   created_at: string
   updated_at: string
   completed_at?: string

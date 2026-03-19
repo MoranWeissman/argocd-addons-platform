@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, GitPullRequest } from 'lucide-react'
+import { Plus, GitPullRequest, Play } from 'lucide-react'
 import { api } from '@/services/api'
 import type { Migration } from '@/services/api'
 import { MigrationSettings } from '@/components/MigrationSettings'
@@ -43,6 +43,17 @@ export default function MigrationPage() {
     navigate(`/migration/${migration.id}`)
   }
 
+  const hasActive = migrations.some((m) =>
+    ['running', 'waiting', 'paused', 'gated'].includes(m.status)
+  )
+  const activeMigration = migrations.find((m) =>
+    ['running', 'waiting', 'paused', 'gated'].includes(m.status)
+  )
+
+  const handleResume = (migrationId: string) => {
+    navigate(`/migration/${migrationId}`)
+  }
+
   const formatDate = (dateStr: string) => {
     try {
       return new Date(dateStr).toLocaleString()
@@ -81,11 +92,31 @@ export default function MigrationPage() {
           <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
             Migrations
           </h3>
-          <Button onClick={() => setDialogOpen(true)} disabled={!configured}>
+          <Button onClick={() => setDialogOpen(true)} disabled={!configured || hasActive}>
             <Plus className="h-4 w-4" />
-            New Migration
+            {hasActive ? 'Migration in Progress' : 'New Migration'}
           </Button>
         </div>
+
+        {/* Active migration banner */}
+        {activeMigration && (
+          <div className="mb-4 rounded-lg border-2 border-cyan-500 bg-cyan-50 p-4 dark:bg-cyan-900/20">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <span className="font-semibold text-gray-900 dark:text-gray-100">
+                  {activeMigration.addon_name}
+                </span>
+                <span className="text-gray-500 dark:text-gray-400">
+                  on {activeMigration.cluster_name}
+                </span>
+                <StatusBadge status={activeMigration.status} />
+              </div>
+              <Button size="sm" onClick={() => navigate(`/migration/${activeMigration.id}`)}>
+                View Progress
+              </Button>
+            </div>
+          </div>
+        )}
 
         {loading ? (
           <LoadingState message="Loading migrations..." />
@@ -106,7 +137,8 @@ export default function MigrationPage() {
                   <th className="pb-3 pr-4 font-medium text-gray-500 dark:text-gray-400">Cluster</th>
                   <th className="pb-3 pr-4 font-medium text-gray-500 dark:text-gray-400">Status</th>
                   <th className="pb-3 pr-4 font-medium text-gray-500 dark:text-gray-400">Current Step</th>
-                  <th className="pb-3 font-medium text-gray-500 dark:text-gray-400">Started At</th>
+                  <th className="pb-3 pr-4 font-medium text-gray-500 dark:text-gray-400">Started At</th>
+                  <th className="pb-3 font-medium text-gray-500 dark:text-gray-400"></th>
                 </tr>
               </thead>
               <tbody>
@@ -128,8 +160,23 @@ export default function MigrationPage() {
                     <td className="py-3 pr-4 text-gray-600 dark:text-gray-300">
                       {stepLabel(m)}
                     </td>
-                    <td className="py-3 text-gray-500 dark:text-gray-400">
+                    <td className="py-3 pr-4 text-gray-500 dark:text-gray-400">
                       {formatDate(m.created_at)}
+                    </td>
+                    <td className="py-3">
+                      {['paused', 'cancelled'].includes(m.status) && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleResume(m.id)
+                          }}
+                        >
+                          <Play className="h-3 w-3" />
+                          Resume
+                        </Button>
+                      )}
                     </td>
                   </tr>
                 ))}
