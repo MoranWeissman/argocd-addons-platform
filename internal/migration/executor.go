@@ -69,7 +69,7 @@ func (e *Executor) StartMigration(ctx context.Context, addonName, clusterName st
 		return nil, fmt.Errorf("saving new migration: %w", err)
 	}
 
-	runCtx, cancel := context.WithCancel(ctx)
+	runCtx, cancel := context.WithCancel(ctx) //nolint:gosec // cancel stored in e.running, called on pause/cancel/goroutine exit
 	e.mu.Lock()
 	e.running[m.ID] = cancel
 	e.mu.Unlock()
@@ -182,7 +182,7 @@ func (e *Executor) ContinueAfterPR(ctx context.Context, migrationID string) erro
 		return err
 	}
 
-	runCtx, cancel := context.WithCancel(ctx)
+	runCtx, cancel := context.WithCancel(ctx) //nolint:gosec // cancel stored in e.running, called on pause/cancel/goroutine exit
 	e.mu.Lock()
 	e.running[m.ID] = cancel
 	e.mu.Unlock()
@@ -238,12 +238,13 @@ func (e *Executor) RetryStep(ctx context.Context, migrationID string) error {
 		return err
 	}
 
-	runCtx, cancel := context.WithCancel(ctx)
+	runCtx, cancel := context.WithCancel(ctx) //nolint:gosec // cancel stored in e.running, called on pause/cancel/goroutine exit
 	e.mu.Lock()
 	e.running[m.ID] = cancel
 	e.mu.Unlock()
 
 	go func() {
+		defer cancel()
 		defer func() {
 			e.mu.Lock()
 			delete(e.running, m.ID)
