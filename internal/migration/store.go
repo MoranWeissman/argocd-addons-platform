@@ -1,6 +1,7 @@
 package migration
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -10,18 +11,23 @@ import (
 
 const settingsFile = "settings.json"
 
-// Store provides JSON file-based persistence for migrations and settings.
-// Each migration is stored as {dataDir}/{id}.json. Settings are stored at
-// {dataDir}/settings.json.
+// Store provides JSON file-based persistence for migrations and K8s Secret
+// storage for sensitive settings. Migration state files are stored at
+// {dataDir}/{id}.json. Settings (credentials) are stored in a K8s Secret
+// when running in-cluster, or in a local file for development.
 type Store struct {
-	dataDir string
+	dataDir     string
+	secretStore *SecretStore
 }
 
 // NewStore creates a new Store backed by the given directory. The directory
 // is created if it does not already exist.
 func NewStore(dataDir string) *Store {
 	_ = os.MkdirAll(dataDir, 0o750)
-	return &Store{dataDir: dataDir}
+	return &Store{
+		dataDir:     dataDir,
+		secretStore: NewSecretStore(), // nil if not in K8s
+	}
 }
 
 // SaveMigration persists a migration to disk as a JSON file.
@@ -78,8 +84,12 @@ func (s *Store) ListMigrations() ([]*Migration, error) {
 	return migrations, nil
 }
 
-// SaveSettings persists the migration settings to disk.
+// SaveSettings persists credentials. Uses K8s Secret in-cluster, file locally.
 func (s *Store) SaveSettings(settings *MigrationSettings) error {
+	if s.secretStore != nil {
+		return s.secretStore.SaveSettings(context.Background(), settings)
+	}
+	// File fallback for local dev
 	data, err := json.MarshalIndent(settings, "", "  ")
 	if err != nil {
 		return fmt.Errorf("marshaling settings: %w", err)
@@ -91,9 +101,12 @@ func (s *Store) SaveSettings(settings *MigrationSettings) error {
 	return nil
 }
 
-// GetSettings reads the migration settings from disk. If no settings file
-// exists, a zero-value MigrationSettings is returned (Configured = false).
+// GetSettings reads credentials. Uses K8s Secret in-cluster, file locally.
 func (s *Store) GetSettings() (*MigrationSettings, error) {
+	if s.secretStore != nil {
+		return s.secretStore.GetSettings(context.Background())
+	}
+	// File fallback for local dev
 	path := filepath.Join(s.dataDir, settingsFile)
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -107,4 +120,13 @@ func (s *Store) GetSettings() (*MigrationSettings, error) {
 		return nil, fmt.Errorf("decoding settings: %w", err)
 	}
 	return &settings, nil
+}
+
+// DeleteSettings removes credentials. Uses K8s Secret in-cluster, file locally.
+func (s *Store) DeleteSettings() error {
+	if s.secretStore != nil {
+		return s.secretStore.DeleteSettings(context.Background())
+	}
+	path := filepath.Join(s.dataDir, settingsFile)
+	return os.Remove(path)
 }

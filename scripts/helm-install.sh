@@ -149,6 +149,9 @@ SECRET_ARGS=(
   --set "secrets.GITHUB_TOKEN=${GITHUB_TOKEN}"
 )
 
+# Encryption key for migration credentials
+[[ -n "${AAP_ENCRYPTION_KEY:-}" ]] && SECRET_ARGS+=(--set "secrets.AAP_ENCRYPTION_KEY=${AAP_ENCRYPTION_KEY}")
+
 # ArgoCD tokens
 [[ -n "${ARGOCD_TOKEN:-}" ]] && SECRET_ARGS+=(--set "secrets.ARGOCD_TOKEN=${ARGOCD_TOKEN}")
 [[ -n "${ARGOCD_NONPROD_SERVER_URL:-}" ]] && SECRET_ARGS+=(--set "secrets.ARGOCD_NONPROD_SERVER_URL=${ARGOCD_NONPROD_SERVER_URL}")

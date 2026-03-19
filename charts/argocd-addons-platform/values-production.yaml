@@ -5,7 +5,7 @@ replicaCount: 1
 
 image:
   repository: ghcr.io/moranweissman/argocd-addons-platform
-  tag: "1.13.2"
+  tag: "1.16.0"
   pullPolicy: Always
 
 config:
@@ -32,12 +32,12 @@ auth: {}
   # username and password passed via --set from .env.secrets
 
 ai:
-  enabled: true
+  enabled: false
   provider: gemini
   cloudModel: gemini-2.5-flash
 
 datadog:
-  enabled: true
+  enabled: false
   site: datadoghq.com
 
 service:
@@ -45,7 +45,7 @@ service:
   port: 80
 
 ingress:
-  enabled: true
+  enabled: false
   className: alb
   annotations:
     alb.ingress.kubernetes.io/scheme: internet-facing
@@ -57,6 +57,21 @@ ingress:
       paths:
         - path: /
           pathType: Prefix
+
+persistence:
+  enabled: false
+  storageClassName: gp2
+  size: 1Gi
+
+# POC: hostAliases for private DNS resolution (remove after Route 53 VPC association)
+# Using ALB public IPs so pods can reach OLD ArgoCD via internet
+hostAliases:
+  - ip: "52.16.252.23"
+    hostnames:
+      - "devops-argocd-argocd-addons-dev.mahi-techlabs.com"
+  - ip: "52.48.109.207"
+    hostnames:
+      - "devops-argocd-addons-none-prod.mahi-techlabs.com"
 
 resources:
   requests:
