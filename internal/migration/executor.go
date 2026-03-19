@@ -75,6 +75,7 @@ func (e *Executor) StartMigration(ctx context.Context, addonName, clusterName st
 	e.mu.Unlock()
 
 	go func() {
+		defer cancel()
 		defer func() {
 			e.mu.Lock()
 			delete(e.running, m.ID)
@@ -187,6 +188,7 @@ func (e *Executor) ContinueAfterPR(ctx context.Context, migrationID string) erro
 	e.mu.Unlock()
 
 	go func() {
+		defer cancel()
 		defer func() {
 			e.mu.Lock()
 			delete(e.running, m.ID)

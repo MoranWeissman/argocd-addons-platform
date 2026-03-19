@@ -20,7 +20,7 @@ type Store struct {
 // NewStore creates a new Store backed by the given directory. The directory
 // is created if it does not already exist.
 func NewStore(dataDir string) *Store {
-	_ = os.MkdirAll(dataDir, 0o755)
+	_ = os.MkdirAll(dataDir, 0o750)
 	return &Store{dataDir: dataDir}
 }
 
@@ -31,7 +31,7 @@ func (s *Store) SaveMigration(m *Migration) error {
 		return fmt.Errorf("marshaling migration %s: %w", m.ID, err)
 	}
 	path := filepath.Join(s.dataDir, m.ID+".json")
-	if err := os.WriteFile(path, data, 0o644); err != nil {
+	if err := os.WriteFile(path, data, 0o600); err != nil {
 		return fmt.Errorf("writing migration %s: %w", m.ID, err)
 	}
 	return nil
@@ -85,7 +85,7 @@ func (s *Store) SaveSettings(settings *MigrationSettings) error {
 		return fmt.Errorf("marshaling settings: %w", err)
 	}
 	path := filepath.Join(s.dataDir, settingsFile)
-	if err := os.WriteFile(path, data, 0o644); err != nil {
+	if err := os.WriteFile(path, data, 0o600); err != nil {
 		return fmt.Errorf("writing settings: %w", err)
 	}
 	return nil
