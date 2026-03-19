@@ -217,24 +217,36 @@ func (e *Executor) RunSteps(ctx context.Context, migrationID string) {
 	}
 }
 
-// ContinueAfterPR resumes execution after the user confirms a PR was merged.
+// ContinueAfterPR resumes execution. Handles waiting (PR merged), gated (approved),
+// paused, cancelled, and failed states.
 func (e *Executor) ContinueAfterPR(ctx context.Context, migrationID string) error {
 	m, err := e.store.GetMigration(migrationID)
 	if err != nil {
 		return err
 	}
-	if m.Status != StatusWaiting && m.Status != StatusGated {
-		return fmt.Errorf("migration %s is not in waiting or gated state (current: %s)", migrationID, m.Status)
-	}
 
-	// For waiting migrations (PR created), mark the current step as completed.
-	// For gated migrations, the step is already completed — just resume.
-	if m.Status == StatusWaiting {
+	switch m.Status {
+	case StatusWaiting:
+		// PR was merged — mark step completed, advance
 		step := &m.Steps[m.CurrentStep-1]
 		step.Status = StepCompleted
 		step.CompletedAt = now()
 		step.PRStatus = "merged"
 		m.CurrentStep++
+	case StatusGated:
+		// User approved — just resume (step already completed)
+	case StatusPaused, StatusCancelled:
+		// Resume from current step
+		slog.Info("migration: resuming from paused/cancelled", "id", migrationID, "step", m.CurrentStep)
+	case StatusFailed:
+		// Reset current failed step and retry
+		step := &m.Steps[m.CurrentStep-1]
+		step.Status = StepPending
+		step.Error = ""
+		m.Error = ""
+		slog.Info("migration: resuming from failed", "id", migrationID, "step", m.CurrentStep)
+	default:
+		return fmt.Errorf("migration %s cannot be resumed (status: %s)", migrationID, m.Status)
 	}
 	m.Status = StatusRunning
 	m.UpdatedAt = now()

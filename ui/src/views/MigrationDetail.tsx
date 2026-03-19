@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Pause, XCircle, Terminal } from 'lucide-react'
+import { ArrowLeft, Pause, Terminal } from 'lucide-react'
 import { api } from '@/services/api'
 import type { Migration } from '@/services/api'
 import { MigrationStepper } from '@/components/MigrationStepper'
@@ -71,16 +71,10 @@ export default function MigrationDetail() {
     if (!id) return
     try { await api.pauseMigration(id); void fetchMigration() } catch { /* next poll */ }
   }
-  const handleCancel = async () => {
-    if (!id) return
-    try { await api.cancelMigration(id); void fetchMigration() } catch { /* next poll */ }
-  }
-
   if (loading) return <LoadingState message="Loading migration details..." />
   if (error) return <ErrorState message={error} onRetry={fetchMigration} />
   if (!migration) return null
 
-  const isTerminal = ['completed', 'failed', 'cancelled'].includes(migration.status)
   const isRunning = migration.status === 'running'
 
   // Filter logs for selected step (or show all)
@@ -120,11 +114,6 @@ export default function MigrationDetail() {
               <Pause className="h-4 w-4" /> Pause
             </Button>
           )}
-          {!isTerminal && (
-            <Button variant="outline" size="sm" onClick={handleCancel} className="border-red-300 text-red-600 hover:bg-red-50 dark:border-red-700 dark:text-red-400">
-              <XCircle className="h-4 w-4" /> Cancel
-            </Button>
-          )}
         </div>
       </div>
 
@@ -135,9 +124,9 @@ export default function MigrationDetail() {
         </div>
       )}
 
-      {/* Pipeline layout: stages on left, logs on right */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
-        {/* Left: Pipeline stages */}
+      {/* Pipeline layout: narrow stages on left, wide logs on right */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-7">
+        {/* Left: Pipeline stages (narrow) */}
         <div className="lg:col-span-3">
           <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
             <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
@@ -155,8 +144,8 @@ export default function MigrationDetail() {
           </div>
         </div>
 
-        {/* Right: Activity Log */}
-        <div className="lg:col-span-2">
+        {/* Right: Activity Log (wide) */}
+        <div className="lg:col-span-4">
           <div className="sticky top-4 rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
             <div className="flex items-center gap-2 border-b border-gray-200 p-4 dark:border-gray-700">
               <Terminal className="h-4 w-4 text-gray-500" />
