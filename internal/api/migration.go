@@ -4,10 +4,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sort"
+	"strings"
 
 	"github.com/moran/argocd-addons-platform/internal/argocd"
 	"github.com/moran/argocd-addons-platform/internal/gitprovider"
 	"github.com/moran/argocd-addons-platform/internal/migration"
+	"gopkg.in/yaml.v3"
 )
 
 // --- Migration Settings ---
@@ -343,6 +346,214 @@ func (s *Server) handleAzureListRepos(w http.ResponseWriter, r *http.Request) {
 		names = append(names, r.Name)
 	}
 	writeJSON(w, http.StatusOK, names)
+}
+
+// --- OLD Repo Discovery (addons + clusters) ---
+
+// handleOldRepoAddons fetches the addon list from the OLD repo.
+// Tries V2 path (configuration/addons-catalog.yaml) then V1 (values/addons-list.yaml).
+func (s *Server) handleOldRepoAddons(w http.ResponseWriter, r *http.Request) {
+	if s.migrationExecutor == nil {
+		writeError(w, http.StatusServiceUnavailable, "migration service not configured")
+		return
+	}
+	settings, err := s.migrationExecutor.GetStore().GetSettings()
+	if err != nil || !settings.Configured {
+		writeError(w, http.StatusBadRequest, "migration settings not configured")
+		return
+	}
+	oldGP, err := buildOldGitProvider(settings)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	var addons []string
+
+	// Try V2 structure first
+	data, err := oldGP.GetFileContent(r.Context(), "configuration/addons-catalog.yaml", "main")
+	if err == nil {
+		addons = parseAddonNames(data)
+	}
+
+	// Fall back to V1 structure
+	if len(addons) == 0 {
+		data, err = oldGP.GetFileContent(r.Context(), "values/addons-list.yaml", "main")
+		if err == nil {
+			addons = parseAddonNamesV1(data)
+		}
+	}
+
+	if len(addons) == 0 {
+		writeError(w, http.StatusNotFound, "no addons found in old repo")
+		return
+	}
+	writeJSON(w, http.StatusOK, addons)
+}
+
+// handleOldRepoClusters fetches the cluster list from the OLD repo.
+// Tries V2 path (configuration/cluster-addons.yaml) then V1 (values/clusters.yaml).
+func (s *Server) handleOldRepoClusters(w http.ResponseWriter, r *http.Request) {
+	if s.migrationExecutor == nil {
+		writeError(w, http.StatusServiceUnavailable, "migration service not configured")
+		return
+	}
+	settings, err := s.migrationExecutor.GetStore().GetSettings()
+	if err != nil || !settings.Configured {
+		writeError(w, http.StatusBadRequest, "migration settings not configured")
+		return
+	}
+	oldGP, err := buildOldGitProvider(settings)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	var clusters []string
+
+	// Try V2 structure first
+	data, err := oldGP.GetFileContent(r.Context(), "configuration/cluster-addons.yaml", "main")
+	if err == nil {
+		clusters = parseClusterNames(data)
+	}
+
+	// Fall back to V1 structure
+	if len(clusters) == 0 {
+		data, err = oldGP.GetFileContent(r.Context(), "values/clusters.yaml", "main")
+		if err == nil {
+			clusters = parseClusterNames(data)
+		}
+	}
+
+	if len(clusters) == 0 {
+		writeError(w, http.StatusNotFound, "no clusters found in old repo")
+		return
+	}
+	writeJSON(w, http.StatusOK, clusters)
+}
+
+// handleOldRepoClusterAddons fetches enabled addons for a specific cluster.
+func (s *Server) handleOldRepoClusterAddons(w http.ResponseWriter, r *http.Request) {
+	if s.migrationExecutor == nil {
+		writeError(w, http.StatusServiceUnavailable, "migration service not configured")
+		return
+	}
+	clusterName := r.URL.Query().Get("cluster")
+	if clusterName == "" {
+		writeError(w, http.StatusBadRequest, "cluster query parameter is required")
+		return
+	}
+	settings, err := s.migrationExecutor.GetStore().GetSettings()
+	if err != nil || !settings.Configured {
+		writeError(w, http.StatusBadRequest, "migration settings not configured")
+		return
+	}
+	oldGP, err := buildOldGitProvider(settings)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	var enabledAddons []string
+
+	// Try V2 then V1
+	data, err := oldGP.GetFileContent(r.Context(), "configuration/cluster-addons.yaml", "main")
+	if err != nil {
+		data, err = oldGP.GetFileContent(r.Context(), "values/clusters.yaml", "main")
+	}
+	if err == nil {
+		enabledAddons = parseEnabledAddonsForCluster(data, clusterName)
+	}
+
+	if enabledAddons == nil {
+		enabledAddons = []string{}
+	}
+	writeJSON(w, http.StatusOK, enabledAddons)
+}
+
+// parseAddonNames extracts appName values from V2 addons-catalog.yaml
+func parseAddonNames(data []byte) []string {
+	var names []string
+	var parsed struct {
+		ApplicationSets []struct {
+			AppName string `yaml:"appName"`
+		} `yaml:"applicationsets"`
+	}
+	if err := yaml.Unmarshal(data, &parsed); err != nil {
+		return nil
+	}
+	for _, a := range parsed.ApplicationSets {
+		if a.AppName != "" {
+			names = append(names, a.AppName)
+		}
+	}
+	return names
+}
+
+// parseAddonNamesV1 extracts addon names from V1 addons-list.yaml
+func parseAddonNamesV1(data []byte) []string {
+	var parsed struct {
+		ApplicationSets []struct {
+			AppName string `yaml:"appName"`
+		} `yaml:"applicationsets"`
+	}
+	if err := yaml.Unmarshal(data, &parsed); err != nil {
+		return nil
+	}
+	seen := make(map[string]bool)
+	var names []string
+	for _, a := range parsed.ApplicationSets {
+		if a.AppName != "" && !seen[a.AppName] {
+			seen[a.AppName] = true
+			names = append(names, a.AppName)
+		}
+	}
+	return names
+}
+
+// parseClusterNames extracts cluster names from cluster-addons.yaml or clusters.yaml
+func parseClusterNames(data []byte) []string {
+	var parsed struct {
+		Clusters []struct {
+			Name string `yaml:"name"`
+		} `yaml:"clusters"`
+	}
+	if err := yaml.Unmarshal(data, &parsed); err != nil {
+		return nil
+	}
+	var names []string
+	for _, c := range parsed.Clusters {
+		if c.Name != "" {
+			names = append(names, c.Name)
+		}
+	}
+	return names
+}
+
+// parseEnabledAddonsForCluster extracts enabled addon labels for a specific cluster
+func parseEnabledAddonsForCluster(data []byte, clusterName string) []string {
+	var parsed struct {
+		Clusters []struct {
+			Name   string            `yaml:"name"`
+			Labels map[string]string `yaml:"labels"`
+		} `yaml:"clusters"`
+	}
+	if err := yaml.Unmarshal(data, &parsed); err != nil {
+		return nil
+	}
+	for _, c := range parsed.Clusters {
+		if c.Name == clusterName {
+			var addons []string
+			for k, v := range c.Labels {
+				if v == "enabled" && !strings.HasSuffix(k, "-version") {
+					addons = append(addons, k)
+				}
+			}
+			sort.Strings(addons)
+			return addons
+		}
+	}
+	return nil
 }
 
 // --- Helpers ---

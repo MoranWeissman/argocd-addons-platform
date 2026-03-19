@@ -1,9 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Loader2 } from 'lucide-react'
 import { api } from '@/services/api'
 import type { Migration } from '@/services/api'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { SearchableSelect } from '@/components/SearchableSelect'
 import {
   Dialog,
   DialogContent,
@@ -13,6 +13,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 
+type MigrationScope = 'single' | 'multiple' | 'cluster'
+
 interface NewMigrationDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -20,23 +22,96 @@ interface NewMigrationDialogProps {
 }
 
 export function NewMigrationDialog({ open, onOpenChange, onStarted }: NewMigrationDialogProps) {
-  const [addonName, setAddonName] = useState('')
+  const [scope, setScope] = useState<MigrationScope>('single')
   const [clusterName, setClusterName] = useState('')
+  const [selectedAddons, setSelectedAddons] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Data from OLD repo
+  const [addons, setAddons] = useState<string[]>([])
+  const [clusters, setClusters] = useState<string[]>([])
+  const [clusterAddons, setClusterAddons] = useState<string[]>([])
+  const [loadingAddons, setLoadingAddons] = useState(false)
+  const [loadingClusters, setLoadingClusters] = useState(false)
+  const [loadingClusterAddons, setLoadingClusterAddons] = useState(false)
+
+  // Fetch addons and clusters when dialog opens
+  const fetchData = useCallback(async () => {
+    if (!open) return
+    setLoadingAddons(true)
+    setLoadingClusters(true)
+    try {
+      const [addonList, clusterList] = await Promise.all([
+        api.oldRepoAddons(),
+        api.oldRepoClusters(),
+      ])
+      setAddons(addonList)
+      setClusters(clusterList)
+    } catch {
+      setError('Failed to fetch data from old repo. Check migration settings.')
+    } finally {
+      setLoadingAddons(false)
+      setLoadingClusters(false)
+    }
+  }, [open])
+
+  useEffect(() => {
+    void fetchData()
+  }, [fetchData])
+
+  // Fetch enabled addons when cluster is selected (for "cluster" scope)
+  const handleClusterChange = async (cluster: string) => {
+    setClusterName(cluster)
+    setSelectedAddons([])
+    setClusterAddons([])
+    if (!cluster) return
+
+    if (scope === 'cluster') {
+      setLoadingClusterAddons(true)
+      try {
+        const enabled = await api.oldRepoClusterAddons(cluster)
+        setClusterAddons(enabled)
+        setSelectedAddons(enabled) // auto-select all for cluster migration
+      } catch {
+        // ignore — user can still proceed
+      } finally {
+        setLoadingClusterAddons(false)
+      }
+    }
+  }
+
+  // When scope changes to cluster and a cluster is already selected, fetch its addons
+  useEffect(() => {
+    if (scope === 'cluster' && clusterName) {
+      void handleClusterChange(clusterName)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scope])
+
+  const handleAddonToggle = (addon: string) => {
+    setSelectedAddons((prev) =>
+      prev.includes(addon) ? prev.filter((a) => a !== addon) : [...prev, addon]
+    )
+  }
+
   const handleStart = async () => {
-    if (!addonName.trim() || !clusterName.trim()) return
+    if (!clusterName || selectedAddons.length === 0) return
     setLoading(true)
     setError(null)
+
     try {
+      // Start migration for each selected addon
+      // For now, start one at a time — first addon
       const migration = await api.startMigration({
-        addon_name: addonName.trim(),
-        cluster_name: clusterName.trim(),
+        addon_name: selectedAddons[0],
+        cluster_name: clusterName,
       })
-      setAddonName('')
-      setClusterName('')
       onStarted(migration)
+      // Reset state
+      setScope('single')
+      setClusterName('')
+      setSelectedAddons([])
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Failed to start migration')
     } finally {
@@ -44,13 +119,15 @@ export function NewMigrationDialog({ open, onOpenChange, onStarted }: NewMigrati
     }
   }
 
+  const canStart = clusterName && selectedAddons.length > 0 && !loading
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>New Migration</DialogTitle>
           <DialogDescription>
-            Start a new addon migration from the old platform to the new one.
+            Migrate addons from the old ArgoCD to the new one.
           </DialogDescription>
         </DialogHeader>
 
@@ -61,38 +138,141 @@ export function NewMigrationDialog({ open, onOpenChange, onStarted }: NewMigrati
             </div>
           )}
 
+          {/* Scope selection */}
+          <div>
+            <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+              What do you want to migrate?
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              {([
+                { value: 'single', label: 'Single Addon' },
+                { value: 'multiple', label: 'Multiple Addons' },
+                { value: 'cluster', label: 'Entire Cluster' },
+              ] as const).map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => { setScope(opt.value); setSelectedAddons([]) }}
+                  className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                    scope === opt.value
+                      ? 'border-cyan-500 bg-cyan-50 text-cyan-700 dark:border-cyan-400 dark:bg-cyan-900/30 dark:text-cyan-300'
+                      : 'border-gray-200 text-gray-600 hover:border-gray-300 dark:border-gray-700 dark:text-gray-400 dark:hover:border-gray-600'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Cluster selection */}
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Addon Name
+              Cluster
             </label>
-            <Input
-              value={addonName}
-              onChange={(e) => setAddonName(e.target.value)}
-              placeholder="e.g. cert-manager"
+            <SearchableSelect
+              options={clusters}
+              value={clusterName}
+              onChange={handleClusterChange}
+              placeholder="Search clusters..."
+              loading={loadingClusters}
               disabled={loading}
             />
           </div>
 
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Cluster Name
-            </label>
-            <Input
-              value={clusterName}
-              onChange={(e) => setClusterName(e.target.value)}
-              placeholder="e.g. prod-eu-west-1"
-              disabled={loading}
-            />
-          </div>
+          {/* Addon selection — single */}
+          {scope === 'single' && (
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Addon
+              </label>
+              <SearchableSelect
+                options={addons}
+                value={selectedAddons[0] ?? ''}
+                onChange={(v) => setSelectedAddons(v ? [v] : [])}
+                placeholder="Search addons..."
+                loading={loadingAddons}
+                disabled={loading}
+              />
+            </div>
+          )}
+
+          {/* Addon selection — multiple (checkboxes) */}
+          {scope === 'multiple' && (
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Select Addons ({selectedAddons.length} selected)
+              </label>
+              <div className="max-h-48 overflow-auto rounded-lg border border-gray-200 p-2 dark:border-gray-700">
+                {loadingAddons ? (
+                  <div className="flex items-center gap-2 p-2 text-sm text-gray-500">
+                    <Loader2 className="h-4 w-4 animate-spin" /> Loading...
+                  </div>
+                ) : addons.length === 0 ? (
+                  <p className="p-2 text-sm text-gray-500">No addons found</p>
+                ) : (
+                  addons.map((addon) => (
+                    <label
+                      key={addon}
+                      className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedAddons.includes(addon)}
+                        onChange={() => handleAddonToggle(addon)}
+                        className="h-4 w-4 rounded border-gray-300"
+                        disabled={loading}
+                      />
+                      <span className="text-gray-700 dark:text-gray-300">{addon}</span>
+                    </label>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Addon selection — entire cluster (show what will be migrated) */}
+          {scope === 'cluster' && clusterName && (
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Enabled Addons on {clusterName} ({clusterAddons.length} total)
+              </label>
+              {loadingClusterAddons ? (
+                <div className="flex items-center gap-2 p-2 text-sm text-gray-500">
+                  <Loader2 className="h-4 w-4 animate-spin" /> Loading cluster addons...
+                </div>
+              ) : clusterAddons.length === 0 ? (
+                <p className="rounded-lg border border-gray-200 p-3 text-sm text-gray-500 dark:border-gray-700">
+                  No enabled addons found on this cluster
+                </p>
+              ) : (
+                <div className="max-h-48 overflow-auto rounded-lg border border-gray-200 p-2 dark:border-gray-700">
+                  {clusterAddons.map((addon) => (
+                    <div
+                      key={addon}
+                      className="flex items-center gap-2 rounded px-2 py-1.5 text-sm"
+                    >
+                      <div className="h-2 w-2 rounded-full bg-green-500" />
+                      <span className="text-gray-700 dark:text-gray-300">{addon}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
             Cancel
           </Button>
-          <Button onClick={handleStart} disabled={!addonName.trim() || !clusterName.trim() || loading}>
+          <Button onClick={handleStart} disabled={!canStart}>
             {loading && <Loader2 className="h-4 w-4 animate-spin" />}
-            Start Migration
+            {scope === 'cluster'
+              ? `Migrate ${clusterAddons.length} Addons`
+              : scope === 'multiple'
+                ? `Migrate ${selectedAddons.length} Addon${selectedAddons.length !== 1 ? 's' : ''}`
+                : 'Start Migration'}
           </Button>
         </DialogFooter>
       </DialogContent>
