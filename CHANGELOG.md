@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.17.0](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.16.0...v1.17.0) (2026-03-19)
+
+
+### Features
+
+* AES-256-GCM encrypted storage for migration credentials ([#40](https://github.com/MoranWeissman/argocd-addons-platform/issues/40)) ([efa60e7](https://github.com/MoranWeissman/argocd-addons-platform/commit/efa60e774763c9adfcdb85f58bfcc126119cc31a))
+
 ## [1.16.0](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.15.0...v1.16.0) (2026-03-19)
 
 
