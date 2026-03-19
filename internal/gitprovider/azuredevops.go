@@ -1,18 +1,20 @@
 package gitprovider
 
 import (
-	"context"
+	"bytes"
+	"encoding/base64"
 	"fmt"
+	"io"
 	"net/http"
 )
 
 // AzureDevOpsProvider implements GitProvider for Azure DevOps repositories.
-// This is a stub for future implementation.
 type AzureDevOpsProvider struct {
 	client       *http.Client
 	organisation string
 	project      string
 	repository   string
+	pat          string
 	baseURL      string
 }
 
@@ -24,46 +26,55 @@ func NewAzureDevOpsProvider(organisation, project, repository, token string) *Az
 		organisation: organisation,
 		project:      project,
 		repository:   repository,
+		pat:          token,
 		baseURL:      fmt.Sprintf("https://dev.azure.com/%s/%s/_apis/git/repositories/%s", organisation, project, repository),
 	}
 }
 
-// GetFileContent is not yet implemented for Azure DevOps.
-func (a *AzureDevOpsProvider) GetFileContent(_ context.Context, _, _ string) ([]byte, error) {
-	return nil, fmt.Errorf("azure devops: GetFileContent not implemented")
+// authHeader returns the Basic auth header value for Azure DevOps PAT authentication.
+func (a *AzureDevOpsProvider) authHeader() string {
+	return "Basic " + base64.StdEncoding.EncodeToString([]byte(":"+a.pat))
 }
 
-// ListDirectory is not yet implemented for Azure DevOps.
-func (a *AzureDevOpsProvider) ListDirectory(_ context.Context, _, _ string) ([]string, error) {
-	return nil, fmt.Errorf("azure devops: ListDirectory not implemented")
+// doGet performs an authenticated GET request and returns the response body.
+func (a *AzureDevOpsProvider) doGet(url string) (*http.Response, []byte, error) {
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, nil, fmt.Errorf("create request: %w", err)
+	}
+	req.Header.Set("Authorization", a.authHeader())
+
+	resp, err := a.client.Do(req)
+	if err != nil {
+		return nil, nil, fmt.Errorf("execute request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return resp, nil, fmt.Errorf("read response: %w", err)
+	}
+	return resp, body, nil
 }
 
-// ListPullRequests is not yet implemented for Azure DevOps.
-func (a *AzureDevOpsProvider) ListPullRequests(_ context.Context, _ string) ([]PullRequest, error) {
-	return nil, fmt.Errorf("azure devops: ListPullRequests not implemented")
-}
+// doPost performs an authenticated POST request with a JSON body.
+func (a *AzureDevOpsProvider) doPost(url string, jsonBody []byte) (*http.Response, []byte, error) {
+	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(jsonBody))
+	if err != nil {
+		return nil, nil, fmt.Errorf("create request: %w", err)
+	}
+	req.Header.Set("Authorization", a.authHeader())
+	req.Header.Set("Content-Type", "application/json")
 
-// TestConnection is not yet implemented for Azure DevOps.
-func (a *AzureDevOpsProvider) TestConnection(_ context.Context) error {
-	return fmt.Errorf("azure devops: TestConnection not implemented")
-}
+	resp, err := a.client.Do(req)
+	if err != nil {
+		return nil, nil, fmt.Errorf("execute request: %w", err)
+	}
+	defer resp.Body.Close()
 
-// CreateBranch is not yet implemented for Azure DevOps.
-func (a *AzureDevOpsProvider) CreateBranch(_ context.Context, _, _ string) error {
-	return fmt.Errorf("azure devops: write operations not implemented")
-}
-
-// CreateOrUpdateFile is not yet implemented for Azure DevOps.
-func (a *AzureDevOpsProvider) CreateOrUpdateFile(_ context.Context, _ string, _ []byte, _, _ string) error {
-	return fmt.Errorf("azure devops: write operations not implemented")
-}
-
-// DeleteFile is not yet implemented for Azure DevOps.
-func (a *AzureDevOpsProvider) DeleteFile(_ context.Context, _, _, _ string) error {
-	return fmt.Errorf("azure devops: write operations not implemented")
-}
-
-// CreatePullRequest is not yet implemented for Azure DevOps.
-func (a *AzureDevOpsProvider) CreatePullRequest(_ context.Context, _, _, _, _ string) (*PullRequest, error) {
-	return nil, fmt.Errorf("azure devops: write operations not implemented")
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return resp, nil, fmt.Errorf("read response: %w", err)
+	}
+	return resp, body, nil
 }

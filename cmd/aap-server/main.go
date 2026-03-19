@@ -14,6 +14,7 @@ import (
 	"github.com/moran/argocd-addons-platform/internal/api"
 	"github.com/moran/argocd-addons-platform/internal/config"
 	"github.com/moran/argocd-addons-platform/internal/datadog"
+	"github.com/moran/argocd-addons-platform/internal/migration"
 	"github.com/moran/argocd-addons-platform/internal/platform"
 	"github.com/moran/argocd-addons-platform/internal/service"
 )
@@ -187,8 +188,12 @@ func main() {
 	observabilitySvc := service.NewObservabilityService()
 	upgradeSvc := service.NewUpgradeService(aiClient)
 
+	// Migration service — old providers are resolved at runtime from saved settings
+	migrationStore := migration.NewStore("./data/migrations")
+	migrationExecutor := migration.NewExecutor(migrationStore, nil, nil, nil, nil, aiClient)
+
 	// Build server
-	srv := api.NewServer(connSvc, clusterSvc, addonSvc, dashboardSvc, observabilitySvc, upgradeSvc, aiClient, ddClient)
+	srv := api.NewServer(connSvc, clusterSvc, addonSvc, dashboardSvc, observabilitySvc, upgradeSvc, aiClient, ddClient, migrationExecutor)
 
 	// Static files
 	var staticFS fs.FS

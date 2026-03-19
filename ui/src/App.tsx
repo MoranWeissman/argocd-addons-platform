@@ -17,6 +17,8 @@ import { Dashboards } from '@/views/Dashboards'
 import { UpgradeChecker } from '@/views/UpgradeChecker'
 import { AIAssistant } from '@/views/AIAssistant'
 import { UserInfo } from '@/views/UserInfo'
+import MigrationPage from '@/views/MigrationPage'
+import MigrationDetail from '@/views/MigrationDetail'
 
 function AppRoutes() {
   const { isAuthenticated, loading } = useAuth()
@@ -51,6 +53,8 @@ function AppRoutes() {
           <Route path="docs" element={<Docs />} />
           <Route path="settings" element={<Connections />} />
           <Route path="user" element={<UserInfo />} />
+          <Route path="migration" element={<MigrationPage />} />
+          <Route path="migration/:id" element={<MigrationDetail />} />
         </Route>
       </Routes>
     </ConnectionProvider>

@@ -148,4 +148,63 @@ export const api = {
   // Agent Chat
   agentChat: (sessionId: string, message: string) => postJSON<{ session_id: string; response: string }>('/agent/chat', { session_id: sessionId, message }),
   agentReset: (sessionId: string) => postJSON<{ status: string }>('/agent/reset', { session_id: sessionId }),
+
+  // Migration
+  getMigrationSettings: () => fetchJSON<MigrationSettings>('/migration/settings'),
+  saveMigrationSettings: (settings: MigrationSettings) => postJSON<void>('/migration/settings', settings),
+  testMigrationConnection: () => postJSON<{ git: boolean; argocd: boolean }>('/migration/settings/test'),
+  listMigrations: () => fetchJSON<Migration[]>('/migration/list'),
+  startMigration: (data: { addon_name: string; cluster_name: string }) => postJSON<Migration>('/migration/start', data),
+  getMigration: (id: string) => fetchJSON<Migration>(`/migration/${id}`),
+  continueMigration: (id: string) => postJSON<void>(`/migration/${id}/continue`),
+  pauseMigration: (id: string) => postJSON<void>(`/migration/${id}/pause`),
+  retryMigration: (id: string) => postJSON<void>(`/migration/${id}/retry`),
+  cancelMigration: (id: string) => postJSON<void>(`/migration/${id}/cancel`),
+}
+
+// Migration types
+export interface MigrationStep {
+  number: number
+  title: string
+  description: string
+  status: 'pending' | 'running' | 'waiting' | 'completed' | 'failed' | 'skipped'
+  message: string
+  pr_url?: string
+  pr_status?: string
+  started_at?: string
+  completed_at?: string
+  error?: string
+}
+
+export interface Migration {
+  id: string
+  addon_name: string
+  cluster_name: string
+  status: 'pending' | 'running' | 'waiting' | 'paused' | 'completed' | 'failed' | 'cancelled'
+  current_step: number
+  steps: MigrationStep[]
+  created_at: string
+  updated_at: string
+  completed_at?: string
+  error?: string
+}
+
+export interface MigrationSettings {
+  old_git: {
+    provider: string
+    owner?: string
+    repo?: string
+    token?: string
+    organization?: string
+    project?: string
+    repository?: string
+    pat?: string
+  }
+  old_argocd: {
+    server_url: string
+    token: string
+    namespace: string
+    insecure?: boolean
+  }
+  configured: boolean
 }

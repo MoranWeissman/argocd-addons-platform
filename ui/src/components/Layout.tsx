@@ -18,6 +18,7 @@ import {
   Moon,
   LogOut,
   User,
+  GitPullRequest,
 } from 'lucide-react'
 import { useConnections } from '@/hooks/useConnections'
 import { useTheme } from '@/hooks/useTheme'
@@ -31,6 +32,7 @@ const navItems = [
   { to: '/version-matrix', label: 'Version Matrix', icon: TableProperties },
   { to: '/observability', label: 'Observability', icon: Activity },
   { to: '/upgrade', label: 'Upgrade Checker', icon: ArrowUpCircle },
+  { to: '/migration', label: 'Migration', icon: GitPullRequest },
   { to: '/assistant', label: 'AI Assistant', icon: MessageSquare },
   { to: '/dashboards', label: 'Dashboards', icon: BarChart3 },
   { to: '/docs', label: 'Docs', icon: BookOpen },

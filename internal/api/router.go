@@ -16,6 +16,7 @@ import (
 	"github.com/moran/argocd-addons-platform/internal/ai"
 	"github.com/moran/argocd-addons-platform/internal/auth"
 	"github.com/moran/argocd-addons-platform/internal/datadog"
+	"github.com/moran/argocd-addons-platform/internal/migration"
 	"github.com/moran/argocd-addons-platform/internal/service"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -28,10 +29,11 @@ type Server struct {
 	dashboardSvc     *service.DashboardService
 	observabilitySvc *service.ObservabilityService
 	upgradeSvc       *service.UpgradeService
-	aiClient         *ai.Client
-	ddClient         *datadog.Client
-	agentMemory      *ai.MemoryStore
-	authStore        *auth.Store
+	aiClient          *ai.Client
+	ddClient          *datadog.Client
+	agentMemory       *ai.MemoryStore
+	authStore         *auth.Store
+	migrationExecutor *migration.Executor
 }
 
 // NewServer creates a new API server.
@@ -44,6 +46,7 @@ func NewServer(
 	upgradeSvc *service.UpgradeService,
 	aiClient *ai.Client,
 	ddClient *datadog.Client,
+	migrationExecutor *migration.Executor,
 ) *Server {
 	// Initialize agent memory — store in /tmp for containers (writable), or local dir for dev
 	memoryPath := "/tmp/aap-agent-memory.json"
@@ -57,16 +60,17 @@ func NewServer(
 	}
 
 	return &Server{
-		connSvc:          connSvc,
-		clusterSvc:       clusterSvc,
-		addonSvc:         addonSvc,
-		dashboardSvc:     dashboardSvc,
-		observabilitySvc: observabilitySvc,
-		upgradeSvc:       upgradeSvc,
-		aiClient:         aiClient,
-		ddClient:         ddClient,
-		agentMemory:      agentMemory,
-		authStore:        authStore,
+		connSvc:           connSvc,
+		clusterSvc:        clusterSvc,
+		addonSvc:          addonSvc,
+		dashboardSvc:      dashboardSvc,
+		observabilitySvc:  observabilitySvc,
+		upgradeSvc:        upgradeSvc,
+		aiClient:          aiClient,
+		ddClient:          ddClient,
+		agentMemory:       agentMemory,
+		authStore:         authStore,
+		migrationExecutor: migrationExecutor,
 	}
 }
 
@@ -125,6 +129,18 @@ func NewRouter(srv *Server, staticFS fs.FS) http.Handler {
 	// AI Agent
 	mux.HandleFunc("POST /api/v1/agent/chat", srv.handleAgentChat)
 	mux.HandleFunc("POST /api/v1/agent/reset", srv.handleAgentReset)
+
+	// Migration
+	mux.HandleFunc("GET /api/v1/migration/settings", srv.handleGetMigrationSettings)
+	mux.HandleFunc("POST /api/v1/migration/settings", srv.handleSaveMigrationSettings)
+	mux.HandleFunc("POST /api/v1/migration/settings/test", srv.handleTestMigrationConnection)
+	mux.HandleFunc("GET /api/v1/migration/list", srv.handleListMigrations)
+	mux.HandleFunc("POST /api/v1/migration/start", srv.handleStartMigration)
+	mux.HandleFunc("GET /api/v1/migration/{id}", srv.handleGetMigration)
+	mux.HandleFunc("POST /api/v1/migration/{id}/continue", srv.handleContinueMigration)
+	mux.HandleFunc("POST /api/v1/migration/{id}/pause", srv.handlePauseMigration)
+	mux.HandleFunc("POST /api/v1/migration/{id}/retry", srv.handleRetryMigration)
+	mux.HandleFunc("POST /api/v1/migration/{id}/cancel", srv.handleCancelMigration)
 
 	// Cluster info
 	mux.HandleFunc("GET /api/v1/cluster/nodes", srv.handleGetNodeInfo)
