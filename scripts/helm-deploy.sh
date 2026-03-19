@@ -16,7 +16,13 @@ PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 CHART_DIR="${PROJECT_ROOT}/charts/argocd-addons-platform"
 NAMESPACE="argocd-addons-platform"
 RELEASE="aap"
-VERSION="$(cat "${PROJECT_ROOT}/VERSION" 2>/dev/null || echo "0.0.0")"
+# Read version: prefer .release-please-manifest.json, fall back to VERSION file
+if [[ -f "${PROJECT_ROOT}/.release-please-manifest.json" ]]; then
+  VERSION="$(grep -o '"\.": *"[^"]*"' "${PROJECT_ROOT}/.release-please-manifest.json" | grep -o '[0-9][0-9.]*')"
+fi
+if [[ -z "${VERSION:-}" ]]; then
+  VERSION="$(cat "${PROJECT_ROOT}/VERSION" 2>/dev/null || echo "0.0.0")"
+fi
 
 # --- Source secrets ---
 SECRETS_FILE="${1:-}"
