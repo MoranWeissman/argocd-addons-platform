@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.20.0](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.19.2...v1.20.0) (2026-03-19)
+
+
+### Features
+
+* descriptive step names, PR merge button, YOLO auto-merge, universal resume ([#61](https://github.com/MoranWeissman/argocd-addons-platform/issues/61)) ([6868ab7](https://github.com/MoranWeissman/argocd-addons-platform/commit/6868ab74f580975ff9546c20efb0b2ee3239fb8b))
+
 ## [1.19.2](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.19.1...v1.19.2) (2026-03-19)
 
 
