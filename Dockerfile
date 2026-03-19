@@ -20,7 +20,7 @@ FROM alpine:3.21
 RUN apk add --no-cache ca-certificates
 COPY --from=go-build /app/aap-server /usr/local/bin/
 COPY --from=ui-build /app/ui/dist /app/static
-COPY VERSION /app/VERSION
+COPY version.txt /app/version.txt
 ENV AAP_STATIC_DIR=/app/static
 ENV AAP_PORT=8080
 EXPOSE 8080

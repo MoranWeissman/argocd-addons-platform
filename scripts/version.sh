@@ -6,7 +6,7 @@
 
 set -euo pipefail
 
-VERSION_FILE="VERSION"
+VERSION_FILE="version.txt"
 
 # Colors for output
 RED='\033[0;31m'
