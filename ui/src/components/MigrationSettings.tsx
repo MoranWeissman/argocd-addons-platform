@@ -12,6 +12,7 @@ import type { MigrationSettings as MigrationSettingsType } from '@/services/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import { SearchableSelect } from '@/components/SearchableSelect'
 
 interface MigrationSettingsProps {
   onConfigured: () => void
@@ -380,32 +381,24 @@ export function MigrationSettings({ onConfigured }: MigrationSettingsProps) {
             {azProjects.length > 0 && (
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Project</label>
-                <select
+                <SearchableSelect
+                  options={azProjects}
                   value={azProject}
-                  onChange={(e) => handleProjectChange(e.target.value)}
-                  className="h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30"
-                >
-                  <option value="">Select a project...</option>
-                  {azProjects.map((p) => (
-                    <option key={p} value={p}>{p}</option>
-                  ))}
-                </select>
+                  onChange={handleProjectChange}
+                  placeholder="Search projects..."
+                />
               </div>
             )}
 
             {azRepos.length > 0 && (
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Repository</label>
-                <select
+                <SearchableSelect
+                  options={azRepos}
                   value={azRepo}
-                  onChange={(e) => setAzRepo(e.target.value)}
-                  className="h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30"
-                >
-                  <option value="">Select a repository...</option>
-                  {azRepos.map((r) => (
-                    <option key={r} value={r}>{r}</option>
-                  ))}
-                </select>
+                  onChange={setAzRepo}
+                  placeholder="Search repositories..."
+                />
               </div>
             )}
 
