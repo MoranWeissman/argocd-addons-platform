@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.17.1](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.17.0...v1.17.1) (2026-03-19)
+
+
+### Bug Fixes
+
+* migration executor using request context and nil providers ([#42](https://github.com/MoranWeissman/argocd-addons-platform/issues/42)) ([f0e03d8](https://github.com/MoranWeissman/argocd-addons-platform/commit/f0e03d8a972985889b644eadc422422bd939b420))
+
 ## [1.17.0](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.16.0...v1.17.0) (2026-03-19)
 
 
