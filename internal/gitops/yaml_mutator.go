@@ -6,6 +6,7 @@ package gitops
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 )
 
@@ -56,7 +57,7 @@ func setAddonLabel(data []byte, clusterName, addonName, value string) ([]byte, e
 		if strings.HasPrefix(trimmed, "- name:") && leadingSpaces(line) <= clusterIndent {
 			break
 		}
-		if trimmed == "labels:" {
+		if strings.HasPrefix(trimmed, "labels:") {
 			labelsIdx = i
 			labelsIndent = leadingSpaces(line)
 			break
@@ -64,6 +65,15 @@ func setAddonLabel(data []byte, clusterName, addonName, value string) ([]byte, e
 	}
 	if labelsIdx == -1 {
 		return nil, fmt.Errorf("labels block not found for cluster %q", clusterName)
+	}
+
+	// Handle labels: [] (empty array) — replace with a block and insert the label.
+	if strings.Contains(lines[labelsIdx], "[]") {
+		indent := leadingSpaces(lines[labelsIdx])
+		lines[labelsIdx] = strings.Repeat(" ", indent) + "labels:"
+		newLabel := strings.Repeat(" ", indent+2) + addonName + ": " + value
+		lines = insertLine(lines, labelsIdx+1, newLabel)
+		return []byte(strings.Join(lines, "\n")), nil
 	}
 
 	// The label entries are indented more than the "labels:" line.
@@ -80,6 +90,30 @@ func setAddonLabel(data []byte, clusterName, addonName, value string) ([]byte, e
 			entryIndent = sp
 		}
 		break
+	}
+
+	// Check for commented-out label and uncomment it if found.
+	commentPattern := regexp.MustCompile(`^\s*#\s*` + regexp.QuoteMeta(addonName) + `:\s+\S+`)
+	labelEnd := labelsIdx + 1
+	for i := labelsIdx + 1; i < len(lines); i++ {
+		line := lines[i]
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			break
+		}
+		sp := leadingSpaces(line)
+		if !strings.HasPrefix(trimmed, "#") && sp < entryIndent {
+			break
+		}
+		labelEnd = i + 1
+	}
+	for i := labelsIdx + 1; i < labelEnd; i++ {
+		if commentPattern.MatchString(lines[i]) {
+			// Uncomment and set the desired value.
+			indent := entryIndent
+			lines[i] = strings.Repeat(" ", indent) + addonName + ": " + value
+			return []byte(strings.Join(lines, "\n")), nil
+		}
 	}
 
 	// Scan label entries to see if addonName already exists.
