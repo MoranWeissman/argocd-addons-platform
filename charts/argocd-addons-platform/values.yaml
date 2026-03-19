@@ -165,6 +165,17 @@ ingress:
   #      - aap.example.com
 
 # ---------------------------------------------------------------------------
+# Data Persistence (for migration state)
+# ---------------------------------------------------------------------------
+persistence:
+  enabled: false
+  storageClassName: ""  # Leave empty for cluster default
+  size: 1Gi
+
+# Host aliases (for private DNS resolution)
+hostAliases: []
+
+# ---------------------------------------------------------------------------
 # Resources
 # ---------------------------------------------------------------------------
 resources:
