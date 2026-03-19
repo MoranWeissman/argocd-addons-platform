@@ -72,6 +72,9 @@ rules:
     verbs: ["create"]  # needed to create new secrets (resourceNames can't restrict create)
   - apiGroups: [""]
     resources: ["configmaps"]
+    verbs: ["get", "list", "create", "update", "delete"]  # migration state stored in ConfigMaps
+  - apiGroups: [""]
+    resources: ["configmaps"]
     resourceNames: [{{ printf "%s-users" (include "aap.fullname" .) | quote }}]
     verbs: ["get"]
 ---

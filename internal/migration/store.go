@@ -18,6 +18,7 @@ const settingsFile = "settings.json"
 type Store struct {
 	dataDir     string
 	secretStore *SecretStore
+	cmStore     *ConfigMapStore
 }
 
 // NewStore creates a new Store backed by the given directory. The directory
@@ -26,12 +27,16 @@ func NewStore(dataDir string) *Store {
 	_ = os.MkdirAll(dataDir, 0o750)
 	return &Store{
 		dataDir:     dataDir,
-		secretStore: NewSecretStore(), // nil if not in K8s
+		secretStore: NewSecretStore(),    // nil if not in K8s
+		cmStore:     NewConfigMapStore(), // nil if not in K8s
 	}
 }
 
-// SaveMigration persists a migration to disk as a JSON file.
+// SaveMigration persists migration state. Uses K8s ConfigMap in-cluster, file locally.
 func (s *Store) SaveMigration(m *Migration) error {
+	if s.cmStore != nil {
+		return s.cmStore.SaveMigration(context.Background(), m)
+	}
 	data, err := json.MarshalIndent(m, "", "  ")
 	if err != nil {
 		return fmt.Errorf("marshaling migration %s: %w", m.ID, err)
@@ -43,8 +48,11 @@ func (s *Store) SaveMigration(m *Migration) error {
 	return nil
 }
 
-// GetMigration reads a single migration by ID from disk.
+// GetMigration reads migration state. Uses K8s ConfigMap in-cluster, file locally.
 func (s *Store) GetMigration(id string) (*Migration, error) {
+	if s.cmStore != nil {
+		return s.cmStore.GetMigration(context.Background(), id)
+	}
 	path := filepath.Join(s.dataDir, id+".json")
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -57,9 +65,11 @@ func (s *Store) GetMigration(id string) (*Migration, error) {
 	return &m, nil
 }
 
-// ListMigrations returns all migrations stored on disk, excluding the
-// settings file.
+// ListMigrations returns all migrations. Uses K8s ConfigMap in-cluster, file locally.
 func (s *Store) ListMigrations() ([]*Migration, error) {
+	if s.cmStore != nil {
+		return s.cmStore.ListMigrations(context.Background())
+	}
 	entries, err := os.ReadDir(s.dataDir)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -77,7 +87,7 @@ func (s *Store) ListMigrations() ([]*Migration, error) {
 		id := strings.TrimSuffix(name, ".json")
 		m, err := s.GetMigration(id)
 		if err != nil {
-			continue // skip corrupt files
+			continue
 		}
 		migrations = append(migrations, m)
 	}
