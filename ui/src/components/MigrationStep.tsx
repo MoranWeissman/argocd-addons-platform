@@ -1,12 +1,9 @@
-import { useState } from 'react'
 import {
   CheckCircle2,
   Loader2,
   Clock,
   XCircle,
   ExternalLink,
-  ChevronDown,
-  ChevronRight,
   SkipForward,
 } from 'lucide-react'
 import type { MigrationStep as MigrationStepType } from '@/services/api'
@@ -22,150 +19,104 @@ interface MigrationStepProps {
 }
 
 function StepIcon({ status, number }: { status: MigrationStepType['status']; number: number }) {
-  const base = 'flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold'
+  const base = 'flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold'
 
   switch (status) {
     case 'completed':
-      return (
-        <div className={cn(base, 'bg-green-500 text-white')}>
-          <CheckCircle2 className="h-5 w-5" />
-        </div>
-      )
+      return <div className={cn(base, 'bg-green-500 text-white')}><CheckCircle2 className="h-3.5 w-3.5" /></div>
     case 'running':
-      return (
-        <div className={cn(base, 'bg-blue-500 text-white')}>
-          <Loader2 className="h-5 w-5 animate-spin" />
-        </div>
-      )
+      return <div className={cn(base, 'bg-blue-500 text-white')}><Loader2 className="h-3.5 w-3.5 animate-spin" /></div>
     case 'waiting':
-      return (
-        <div className={cn(base, 'bg-amber-500 text-white')}>
-          <Clock className="h-5 w-5" />
-        </div>
-      )
+      return <div className={cn(base, 'bg-amber-500 text-white')}><Clock className="h-3.5 w-3.5" /></div>
     case 'failed':
-      return (
-        <div className={cn(base, 'bg-red-500 text-white')}>
-          <XCircle className="h-5 w-5" />
-        </div>
-      )
+      return <div className={cn(base, 'bg-red-500 text-white')}><XCircle className="h-3.5 w-3.5" /></div>
     case 'skipped':
-      return (
-        <div className={cn(base, 'bg-gray-400 text-white')}>
-          <SkipForward className="h-4 w-4" />
-        </div>
-      )
+      return <div className={cn(base, 'bg-gray-400 text-white')}><SkipForward className="h-3 w-3" /></div>
     default:
-      return (
-        <div className={cn(base, 'bg-gray-300 text-gray-600 dark:bg-gray-600 dark:text-gray-300')}>
-          {number}
-        </div>
-      )
+      return <div className={cn(base, 'bg-gray-300 text-gray-600 dark:bg-gray-600 dark:text-gray-300')}>{number}</div>
   }
 }
 
 export function MigrationStepCard({ step, isActive, isLast, onContinue, onRetry }: MigrationStepProps) {
-  const [expanded, setExpanded] = useState(isActive)
-
   const isCompleted = step.status === 'completed'
   const isFailed = step.status === 'failed'
   const isWaiting = step.status === 'waiting'
-  const hasDetails = step.message || step.pr_url || step.error
 
   return (
-    <div className="flex gap-4">
+    <div className="flex gap-3">
       {/* Left: icon + connecting line */}
       <div className="flex flex-col items-center">
         <StepIcon status={step.status} number={step.number} />
         {!isLast && (
-          <div
-            className={cn(
-              'mt-1 w-0.5 flex-1',
-              isCompleted ? 'bg-green-400' : 'border-l-2 border-dashed border-gray-300 dark:border-gray-600'
-            )}
-          />
+          <div className={cn(
+            'mt-0.5 w-0.5 flex-1 min-h-[12px]',
+            isCompleted ? 'bg-green-400' : 'border-l border-dashed border-gray-300 dark:border-gray-600'
+          )} />
         )}
       </div>
 
-      {/* Right: content */}
-      <div
-        className={cn(
-          'mb-6 flex-1 rounded-lg border p-4',
-          isActive && !isFailed && 'border-blue-300 bg-blue-50/50 dark:border-blue-700 dark:bg-blue-900/20',
-          isFailed && 'border-red-300 bg-red-50/50 dark:border-red-700 dark:bg-red-900/20',
-          !isActive && !isFailed && 'border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800',
-          isCompleted && 'opacity-60'
-        )}
-      >
-        <div className="flex items-start justify-between">
-          <div>
-            <h4 className="font-semibold text-gray-900 dark:text-gray-100">
-              {step.title}
-            </h4>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              {step.description}
-            </p>
-          </div>
-          {isCompleted && hasDetails && (
-            <button
-              onClick={() => setExpanded((e) => !e)}
-              className="ml-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-            >
-              {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-            </button>
+      {/* Right: compact content */}
+      <div className={cn(
+        'mb-2 flex-1 rounded-md px-3 py-2',
+        isActive && !isFailed && 'bg-blue-50/80 dark:bg-blue-900/20',
+        isFailed && 'bg-red-50/80 dark:bg-red-900/20',
+        isCompleted && 'opacity-50',
+      )}>
+        <div className="flex items-center justify-between">
+          <span className={cn(
+            'text-sm',
+            isActive ? 'font-semibold text-gray-900 dark:text-gray-100' : 'text-gray-700 dark:text-gray-300',
+            isCompleted && 'text-gray-500 dark:text-gray-500'
+          )}>
+            {step.title}
+          </span>
+
+          {/* Duration */}
+          {step.started_at && step.completed_at && (
+            <span className="text-[10px] text-gray-400">
+              {Math.round((new Date(step.completed_at).getTime() - new Date(step.started_at).getTime()) / 1000)}s
+            </span>
+          )}
+          {step.started_at && !step.completed_at && step.status === 'running' && (
+            <span className="text-[10px] text-blue-400">running...</span>
           )}
         </div>
 
-        {(isActive || isFailed || expanded) && (
-          <div className="mt-3 space-y-2">
-            {/* AI message */}
+        {/* Expanded details for active/failed/waiting steps */}
+        {(isActive || isFailed || isWaiting) && (
+          <div className="mt-1.5 space-y-1.5">
             {step.message && (
-              <div className="rounded-md bg-gray-100 p-3 text-sm text-gray-700 dark:bg-gray-700 dark:text-gray-300">
-                {step.message}
-              </div>
+              <p className="text-xs text-gray-600 dark:text-gray-400">{step.message}</p>
             )}
 
-            {/* PR link */}
             {step.pr_url && (
-              <a
-                href={step.pr_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
-              >
-                <ExternalLink className="h-3.5 w-3.5" />
-                View Pull Request
-                {step.pr_status && <span className="text-gray-500">({step.pr_status})</span>}
+              <a href={step.pr_url} target="_blank" rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400">
+                <ExternalLink className="h-3 w-3" />
+                Pull Request {step.pr_status && `(${step.pr_status})`}
               </a>
             )}
 
-            {/* Waiting banner */}
             {isWaiting && (
-              <div className="flex items-center gap-2 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-                <Clock className="h-4 w-4" />
-                Waiting for PR merge...
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-amber-600 dark:text-amber-400">Waiting for PR merge</span>
+                {onContinue && (
+                  <Button size="sm" variant="outline" onClick={onContinue} className="h-6 px-2 text-xs">
+                    Continue
+                  </Button>
+                )}
               </div>
             )}
 
-            {/* Continue button */}
-            {isWaiting && onContinue && (
-              <Button size="sm" onClick={onContinue}>
-                Continue
-              </Button>
-            )}
-
-            {/* Error message */}
             {step.error && (
-              <div className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-900/30 dark:text-red-400">
-                {step.error}
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-red-600 dark:text-red-400">{step.error}</span>
+                {onRetry && (
+                  <Button size="sm" variant="destructive" onClick={onRetry} className="h-6 px-2 text-xs">
+                    Retry
+                  </Button>
+                )}
               </div>
-            )}
-
-            {/* Retry button */}
-            {isFailed && onRetry && (
-              <Button size="sm" variant="destructive" onClick={onRetry}>
-                Retry
-              </Button>
             )}
           </div>
         )}
