@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.19.0](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.18.1...v1.19.0) (2026-03-19)
+
+
+### Features
+
+* pipeline-style layout with side-by-side stages and logs ([#55](https://github.com/MoranWeissman/argocd-addons-platform/issues/55)) ([2958d45](https://github.com/MoranWeissman/argocd-addons-platform/commit/2958d4516b4beae4ccafaff5962f7676f8c16521))
+
 ## [1.18.1](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.18.0...v1.18.1) (2026-03-19)
 
 
