@@ -137,25 +137,42 @@ export function MigrationSettings({ onConfigured }: MigrationSettingsProps) {
     configured: true,
   })
 
-  const handleTestConnection = async () => {
-    setTestingGit(true)
-    setTestingArgo(true)
-    setGitOk(null)
-    setArgoOk(null)
-    setError(null)
+  // Separate error messages for git and argocd
+  const [gitError, setGitError] = useState<string | null>(null)
+  const [argoError, setArgoError] = useState<string | null>(null)
 
+  const handleTestGit = async () => {
+    setTestingGit(true)
+    setGitOk(null)
+    setGitError(null)
+    setError(null)
     try {
-      // Save first so the backend can test
       await api.saveMigrationSettings(buildSettings())
-      const result = await api.testMigrationConnection()
+      const result = await api.testMigrationConnection() as { git: boolean; git_error: string; argocd: boolean; argocd_error: string }
       setGitOk(result.git)
-      setArgoOk(result.argocd)
+      if (!result.git && result.git_error) setGitError(result.git_error)
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Connection test failed')
       setGitOk(false)
-      setArgoOk(false)
+      setGitError(e instanceof Error ? e.message : 'Git connection test failed')
     } finally {
       setTestingGit(false)
+    }
+  }
+
+  const handleTestArgo = async () => {
+    setTestingArgo(true)
+    setArgoOk(null)
+    setArgoError(null)
+    setError(null)
+    try {
+      await api.saveMigrationSettings(buildSettings())
+      const result = await api.testMigrationConnection() as { git: boolean; git_error: string; argocd: boolean; argocd_error: string }
+      setArgoOk(result.argocd)
+      if (!result.argocd && result.argocd_error) setArgoError(result.argocd_error)
+    } catch (e: unknown) {
+      setArgoOk(false)
+      setArgoError(e instanceof Error ? e.message : 'ArgoCD connection test failed')
+    } finally {
       setTestingArgo(false)
     }
   }
@@ -253,9 +270,31 @@ export function MigrationSettings({ onConfigured }: MigrationSettingsProps) {
                 <p className="text-sm text-gray-900 dark:text-gray-100">{argoNamespace}</p>
               </div>
             </div>
-            <div className="mt-4">
+            <div className="mt-4 flex items-center gap-3">
               <Button variant="outline" onClick={() => { setEditing(true); setGitOk(null); setArgoOk(null) }}>
                 Reconfigure
+              </Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={async () => {
+                  if (!confirm('Delete all migration credentials? This cannot be undone.')) return
+                  try {
+                    await api.saveMigrationSettings({
+                      old_git: { provider: '' },
+                      old_argocd: { server_url: '', token: '', namespace: '' },
+                      configured: false,
+                    })
+                    setConfigured(false)
+                    setGhToken(''); setAzPat(''); setArgoToken('')
+                    setGhOwner(''); setGhRepo(''); setAzOrg(''); setAzProject(''); setAzRepo('')
+                    setArgoUrl(''); setArgoNamespace('argocd')
+                  } catch {
+                    setError('Failed to clear settings')
+                  }
+                }}
+              >
+                Clear All Credentials
               </Button>
             </div>
           </div>
@@ -383,7 +422,7 @@ export function MigrationSettings({ onConfigured }: MigrationSettingsProps) {
           <Button
             variant="outline"
             size="sm"
-            onClick={handleTestConnection}
+            onClick={handleTestGit}
             disabled={testingGit}
           >
             {testingGit ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
@@ -391,6 +430,7 @@ export function MigrationSettings({ onConfigured }: MigrationSettingsProps) {
           </Button>
           {gitOk === true && <CheckCircle className="h-4 w-4 text-green-500" />}
           {gitOk === false && <XCircle className="h-4 w-4 text-red-500" />}
+          {gitError && <span className="text-xs text-red-500">{gitError}</span>}
         </div>
       </div>
 
@@ -431,7 +471,7 @@ export function MigrationSettings({ onConfigured }: MigrationSettingsProps) {
           <Button
             variant="outline"
             size="sm"
-            onClick={handleTestConnection}
+            onClick={handleTestArgo}
             disabled={testingArgo}
           >
             {testingArgo ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
@@ -439,6 +479,7 @@ export function MigrationSettings({ onConfigured }: MigrationSettingsProps) {
           </Button>
           {argoOk === true && <CheckCircle className="h-4 w-4 text-green-500" />}
           {argoOk === false && <XCircle className="h-4 w-4 text-red-500" />}
+          {argoError && <span className="text-xs text-red-500">{argoError}</span>}
         </div>
       </div>
 
