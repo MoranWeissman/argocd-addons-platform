@@ -24,7 +24,7 @@ func newTestServer() *Server {
 
 	aiClient := ai.NewClient(ai.Config{})
 	ddClient := datadog.NewClient(datadog.Config{})
-	return NewServer(connSvc, clusterSvc, addonSvc, dashboardSvc, observabilitySvc, upgradeSvc, aiClient, ddClient)
+	return NewServer(connSvc, clusterSvc, addonSvc, dashboardSvc, observabilitySvc, upgradeSvc, aiClient, ddClient, nil)
 }
 
 func TestHealthEndpoint(t *testing.T) {
