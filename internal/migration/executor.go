@@ -54,6 +54,15 @@ func (e *Executor) SetOldProviders(gp gitprovider.GitProvider, ac *argocd.Client
 	e.oldArgoCD = ac
 }
 
+// SetNewProviders sets the new (target) git provider and ArgoCD client.
+// These are resolved at runtime from the active connection.
+func (e *Executor) SetNewProviders(gp gitprovider.GitProvider, ac *argocd.Client) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.newGP = gp
+	e.newArgoCD = ac
+}
+
 // GetStore returns the underlying migration store.
 func (e *Executor) GetStore() *Store {
 	return e.store

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -171,7 +172,21 @@ func (s *Server) handleStartMigration(w http.ResponseWriter, r *http.Request) {
 	)
 	s.migrationExecutor.SetOldProviders(oldGP, oldAC)
 
-	m, err := s.migrationExecutor.StartMigration(r.Context(), req.AddonName, req.ClusterName)
+	// Resolve NEW providers from the active connection
+	newGP, err := s.connSvc.GetActiveGitProvider()
+	if err != nil {
+		writeError(w, http.StatusServiceUnavailable, "no active git connection configured: "+err.Error())
+		return
+	}
+	newAC, err := s.connSvc.GetActiveArgocdClient()
+	if err != nil {
+		writeError(w, http.StatusServiceUnavailable, "no active ArgoCD connection configured: "+err.Error())
+		return
+	}
+	s.migrationExecutor.SetNewProviders(newGP, newAC)
+
+	// Use background context — the migration runs independently of the HTTP request lifecycle
+	m, err := s.migrationExecutor.StartMigration(context.Background(), req.AddonName, req.ClusterName)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -191,7 +206,7 @@ func (s *Server) handleContinueMigration(w http.ResponseWriter, r *http.Request)
 		writeError(w, http.StatusBadRequest, "migration id is required")
 		return
 	}
-	if err := s.migrationExecutor.ContinueAfterPR(r.Context(), id); err != nil {
+	if err := s.migrationExecutor.ContinueAfterPR(context.Background(), id); err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
@@ -227,7 +242,7 @@ func (s *Server) handleRetryMigration(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "migration id is required")
 		return
 	}
-	if err := s.migrationExecutor.RetryStep(r.Context(), id); err != nil {
+	if err := s.migrationExecutor.RetryStep(context.Background(), id); err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
