@@ -52,6 +52,10 @@ func (f *fakeGitProvider) MergePullRequest(_ context.Context, _ int) error {
 	return nil
 }
 
+func (f *fakeGitProvider) DeleteBranch(_ context.Context, _ string) error {
+	return nil
+}
+
 func TestGetVersionMatrix(t *testing.T) {
 	clusterAddonsYAML := []byte(`
 clusters:

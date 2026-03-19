@@ -31,4 +31,5 @@ type GitProvider interface {
 	DeleteFile(ctx context.Context, path, branch, commitMessage string) error
 	CreatePullRequest(ctx context.Context, title, body, head, base string) (*PullRequest, error)
 	MergePullRequest(ctx context.Context, prNumber int) error
+	DeleteBranch(ctx context.Context, branchName string) error
 }

@@ -142,6 +142,7 @@ func NewRouter(srv *Server, staticFS fs.FS) http.Handler {
 	mux.HandleFunc("POST /api/v1/migration/{id}/retry", srv.handleRetryMigration)
 	mux.HandleFunc("POST /api/v1/migration/{id}/cancel", srv.handleCancelMigration)
 	mux.HandleFunc("POST /api/v1/migration/{id}/merge-pr", srv.handleMergePR)
+	mux.HandleFunc("DELETE /api/v1/migration/{id}", srv.handleDeleteMigration)
 	mux.HandleFunc("GET /api/v1/migration/azure/projects", srv.handleAzureListProjects)
 	mux.HandleFunc("GET /api/v1/migration/azure/repos", srv.handleAzureListRepos)
 	mux.HandleFunc("GET /api/v1/migration/old-repo/addons", srv.handleOldRepoAddons)

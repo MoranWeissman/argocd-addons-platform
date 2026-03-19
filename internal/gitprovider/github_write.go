@@ -175,3 +175,13 @@ func (g *GitHubProvider) MergePullRequest(ctx context.Context, prNumber int) err
 	slog.Info("github pull request merged", "number", prNumber)
 	return nil
 }
+
+// DeleteBranch removes a branch by name.
+func (g *GitHubProvider) DeleteBranch(ctx context.Context, branchName string) error {
+	_, err := g.client.Git.DeleteRef(ctx, g.owner, g.repo, "refs/heads/"+branchName)
+	if err != nil {
+		return fmt.Errorf("delete branch %q: %w", branchName, err)
+	}
+	slog.Info("github branch deleted", "branch", branchName)
+	return nil
+}

@@ -5,7 +5,7 @@ replicaCount: 1
 
 image:
   repository: ghcr.io/moranweissman/argocd-addons-platform
-  tag: "1.19.2"
+  tag: "1.20.0"
   pullPolicy: Always
 
 config:

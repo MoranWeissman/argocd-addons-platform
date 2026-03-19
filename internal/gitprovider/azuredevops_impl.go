@@ -376,3 +376,9 @@ func (a *AzureDevOpsProvider) MergePullRequest(ctx context.Context, prNumber int
 	slog.Info("azure devops pull request merged", "number", prNumber)
 	return nil
 }
+
+// DeleteBranch removes a branch in Azure DevOps.
+func (a *AzureDevOpsProvider) DeleteBranch(ctx context.Context, branchName string) error {
+	// Azure DevOps deletes branches via refs endpoint with all-zero newObjectId
+	return fmt.Errorf("azure devops: DeleteBranch not yet implemented")
+}
