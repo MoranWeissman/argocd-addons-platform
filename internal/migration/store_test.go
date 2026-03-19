@@ -7,7 +7,7 @@ import (
 )
 
 func TestNewMigration(t *testing.T) {
-	m := NewMigration("cert-manager", "prod-eu")
+	m := NewMigration("cert-manager", "prod-eu", "gates")
 
 	if m.AddonName != "cert-manager" {
 		t.Fatalf("expected addon_name cert-manager, got %s", m.AddonName)
@@ -38,7 +38,7 @@ func TestSaveAndGetMigration(t *testing.T) {
 	dir := t.TempDir()
 	store := NewStore(dir)
 
-	m := NewMigration("external-dns", "staging-us")
+	m := NewMigration("external-dns", "staging-us", "gates")
 	m.Status = StatusRunning
 	m.Steps[0].Status = StepCompleted
 
@@ -77,9 +77,9 @@ func TestListMigrations(t *testing.T) {
 	dir := t.TempDir()
 	store := NewStore(dir)
 
-	m1 := NewMigration("addon-a", "cluster-1")
-	m2 := NewMigration("addon-b", "cluster-2")
-	m3 := NewMigration("addon-c", "cluster-3")
+	m1 := NewMigration("addon-a", "cluster-1", "gates")
+	m2 := NewMigration("addon-b", "cluster-2", "yolo")
+	m3 := NewMigration("addon-c", "cluster-3", "gates")
 
 	for _, m := range []*Migration{m1, m2, m3} {
 		if err := store.SaveMigration(m); err != nil {
@@ -100,7 +100,7 @@ func TestListMigrationsExcludesSettings(t *testing.T) {
 	dir := t.TempDir()
 	store := NewStore(dir)
 
-	m := NewMigration("addon-x", "cluster-y")
+	m := NewMigration("addon-x", "cluster-y", "gates")
 	if err := store.SaveMigration(m); err != nil {
 		t.Fatalf("SaveMigration: %v", err)
 	}

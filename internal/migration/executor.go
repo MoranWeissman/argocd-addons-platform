@@ -68,11 +68,35 @@ func (e *Executor) GetStore() *Store {
 	return e.store
 }
 
+// addLog appends a structured log entry to the migration and persists it.
+func (e *Executor) addLog(m *Migration, step int, repo, action, detail string) {
+	entry := LogEntry{
+		Timestamp: time.Now().UTC().Format(time.RFC3339),
+		Step:      step,
+		Repo:      repo,
+		Action:    action,
+		Detail:    detail,
+	}
+	m.Logs = append(m.Logs, entry)
+	_ = e.store.SaveMigration(m)
+	slog.Info("migration log", "id", m.ID, "step", step, "repo", repo, "action", action, "detail", detail)
+}
+
+// newRepoLabel returns a descriptive label for the new (target) repository.
+func (e *Executor) newRepoLabel() string {
+	return "NEW repo"
+}
+
+// oldRepoLabel returns a descriptive label for the old (source) repository.
+func (e *Executor) oldRepoLabel() string {
+	return "OLD repo"
+}
+
 // StartMigration creates a new migration and begins executing steps in the
 // background. The migration object is returned immediately so the caller can
 // track progress via the store.
-func (e *Executor) StartMigration(ctx context.Context, addonName, clusterName string) (*Migration, error) {
-	m := NewMigration(addonName, clusterName)
+func (e *Executor) StartMigration(ctx context.Context, addonName, clusterName, mode string) (*Migration, error) {
+	m := NewMigration(addonName, clusterName, mode)
 	m.Status = StatusRunning
 	if err := e.store.SaveMigration(m); err != nil {
 		return nil, fmt.Errorf("saving new migration: %w", err)
@@ -167,6 +191,15 @@ func (e *Executor) RunSteps(ctx context.Context, migrationID string) {
 		m.CurrentStep++
 		m.UpdatedAt = now()
 		_ = e.store.SaveMigration(m)
+
+		// If gates mode, pause and wait for user approval before next step.
+		if m.Mode == "gates" && m.CurrentStep <= len(StepDefinitions) {
+			m.Status = StatusGated
+			m.UpdatedAt = now()
+			_ = e.store.SaveMigration(m)
+			slog.Info("migration: gated — waiting for user approval", "id", migrationID, "step", m.CurrentStep)
+			return
+		}
 	}
 }
 
@@ -176,15 +209,19 @@ func (e *Executor) ContinueAfterPR(ctx context.Context, migrationID string) erro
 	if err != nil {
 		return err
 	}
-	if m.Status != StatusWaiting {
-		return fmt.Errorf("migration %s is not in waiting state (current: %s)", migrationID, m.Status)
+	if m.Status != StatusWaiting && m.Status != StatusGated {
+		return fmt.Errorf("migration %s is not in waiting or gated state (current: %s)", migrationID, m.Status)
 	}
 
-	step := &m.Steps[m.CurrentStep-1]
-	step.Status = StepCompleted
-	step.CompletedAt = now()
-	step.PRStatus = "merged"
-	m.CurrentStep++
+	// For waiting migrations (PR created), mark the current step as completed.
+	// For gated migrations, the step is already completed — just resume.
+	if m.Status == StatusWaiting {
+		step := &m.Steps[m.CurrentStep-1]
+		step.Status = StepCompleted
+		step.CompletedAt = now()
+		step.PRStatus = "merged"
+		m.CurrentStep++
+	}
 	m.Status = StatusRunning
 	m.UpdatedAt = now()
 	if err := e.store.SaveMigration(m); err != nil {

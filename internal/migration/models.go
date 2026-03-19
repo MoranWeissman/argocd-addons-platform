@@ -15,6 +15,7 @@ const (
 	StatusPaused    MigrationStatus = "paused"
 	StatusCompleted MigrationStatus = "completed"
 	StatusFailed    MigrationStatus = "failed"
+	StatusGated     MigrationStatus = "gated" // paused at gate, waiting for user approval in gates mode
 	StatusCancelled MigrationStatus = "cancelled"
 )
 
@@ -29,6 +30,15 @@ const (
 	StepFailed    StepStatus = "failed"
 	StepSkipped   StepStatus = "skipped"
 )
+
+// LogEntry represents a single log entry emitted during migration execution.
+type LogEntry struct {
+	Timestamp string `json:"timestamp"`
+	Step      int    `json:"step"`
+	Repo      string `json:"repo"`   // e.g., "NEW (github.com/org/repo)" or "OLD (dev.azure.com/org/project/repo)"
+	Action    string `json:"action"` // "reading", "creating", "comparing", etc.
+	Detail    string `json:"detail"`
+}
 
 // MigrationStep represents a single step in the migration process.
 type MigrationStep struct {
@@ -52,7 +62,9 @@ type Migration struct {
 	ClusterName string          `json:"cluster_name"`
 	Status      MigrationStatus `json:"status"`
 	CurrentStep int             `json:"current_step"`
+	Mode        string          `json:"mode"` // "yolo" or "gates"
 	Steps       []MigrationStep `json:"steps"`
+	Logs        []LogEntry      `json:"logs"`
 	CreatedAt   string          `json:"created_at"`
 	UpdatedAt   string          `json:"updated_at"`
 	CompletedAt string          `json:"completed_at,omitempty"`
@@ -110,9 +122,13 @@ var StepDefinitions = []struct {
 
 // NewMigration creates a new Migration with all 10 steps pre-populated in
 // pending state.
-func NewMigration(addonName, clusterName string) *Migration {
+func NewMigration(addonName, clusterName, mode string) *Migration {
 	id := fmt.Sprintf("mig-%d", time.Now().UnixNano())
 	now := time.Now().UTC().Format(time.RFC3339)
+
+	if mode == "" {
+		mode = "gates"
+	}
 
 	steps := make([]MigrationStep, len(StepDefinitions))
 	for i, def := range StepDefinitions {
@@ -130,7 +146,9 @@ func NewMigration(addonName, clusterName string) *Migration {
 		ClusterName: clusterName,
 		Status:      StatusPending,
 		CurrentStep: 1,
+		Mode:        mode,
 		Steps:       steps,
+		Logs:        []LogEntry{},
 		CreatedAt:   now,
 		UpdatedAt:   now,
 	}

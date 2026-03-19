@@ -84,6 +84,22 @@ func (s *Store) ListMigrations() ([]*Migration, error) {
 	return migrations, nil
 }
 
+// HasActiveMigration checks whether any migration is currently in an active
+// state (running, waiting, paused, or gated). Returns the ID of the first
+// active migration found.
+func (s *Store) HasActiveMigration() (bool, string, error) {
+	migrations, err := s.ListMigrations()
+	if err != nil {
+		return false, "", err
+	}
+	for _, m := range migrations {
+		if m.Status == StatusRunning || m.Status == StatusWaiting || m.Status == StatusPaused || m.Status == StatusGated {
+			return true, m.ID, nil
+		}
+	}
+	return false, "", nil
+}
+
 // SaveSettings persists credentials. Uses K8s Secret in-cluster, file locally.
 func (s *Store) SaveSettings(settings *MigrationSettings) error {
 	if s.secretStore != nil {
