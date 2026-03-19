@@ -15,14 +15,13 @@ export function MigrationStepper({ steps, currentStep, migrationStatus, onContin
   const isGated = migrationStatus === 'gated'
 
   return (
-    <div className="space-y-0">
+    <div>
       {steps.map((step, index) => {
         const isActive = step.number === currentStep
         const isLast = index === steps.length - 1
-        // Show gate between this step and the next when:
-        // - migration is gated
-        // - this step is completed
-        // - next step is pending (the gate is before the next step)
+
+        // Show gate AFTER the last completed step (before the next pending one)
+        // Gate appears when: migration is gated, this step is completed, and it's the step just before currentStep
         const showGateAfter = isGated && step.status === 'completed' && step.number === currentStep - 1
 
         return (
@@ -35,24 +34,20 @@ export function MigrationStepper({ steps, currentStep, migrationStatus, onContin
               onRetry={onRetry}
             />
 
-            {/* Gate approval button between steps */}
+            {/* Gate approval — appears AFTER the completed step */}
             {showGateAfter && (
-              <div className="flex gap-4">
-                {/* Align with the connecting line */}
+              <div className="flex gap-3 mb-2">
                 <div className="flex flex-col items-center">
                   <div className="w-0.5 flex-1 border-l-2 border-dashed border-amber-400" />
                 </div>
-                <div className="my-2 flex flex-1 items-center gap-3 rounded-lg border-2 border-amber-400 bg-amber-50 px-4 py-3 dark:border-amber-600 dark:bg-amber-900/20">
+                <div className="flex flex-1 items-center gap-3 rounded-md border border-amber-400 bg-amber-50 px-3 py-2 dark:border-amber-600 dark:bg-amber-900/20">
                   <div className="flex-1">
-                    <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">
-                      Gate — Awaiting Approval
-                    </p>
-                    <p className="text-xs text-amber-600 dark:text-amber-500">
-                      Step {step.number} completed. Review the results above before continuing.
+                    <p className="text-xs font-semibold text-amber-700 dark:text-amber-400">
+                      Awaiting approval to continue
                     </p>
                   </div>
-                  <Button size="sm" onClick={onContinue} className="bg-amber-600 hover:bg-amber-700">
-                    <CheckCircle className="h-4 w-4" />
+                  <Button size="sm" onClick={onContinue} className="h-7 bg-amber-600 hover:bg-amber-700 text-xs">
+                    <CheckCircle className="h-3 w-3" />
                     Approve
                   </Button>
                 </div>

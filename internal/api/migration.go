@@ -165,40 +165,11 @@ func (s *Server) handleStartMigration(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Resolve old providers from saved settings before starting
-	settings, err := s.migrationExecutor.GetStore().GetSettings()
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to read migration settings: "+err.Error())
+	// Resolve all providers before starting
+	if err := s.resolveExecutorProviders(); err != nil {
+		writeError(w, http.StatusServiceUnavailable, err.Error())
 		return
 	}
-	if !settings.Configured {
-		writeError(w, http.StatusBadRequest, "migration settings must be configured before starting a migration")
-		return
-	}
-	oldGP, err := buildOldGitProvider(settings)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "failed to build old git provider: "+err.Error())
-		return
-	}
-	oldAC := argocd.NewClient(
-		settings.OldArgocd.ServerURL,
-		settings.OldArgocd.Token,
-		settings.OldArgocd.Insecure,
-	)
-	s.migrationExecutor.SetOldProviders(oldGP, oldAC)
-
-	// Resolve NEW providers from the active connection
-	newGP, err := s.connSvc.GetActiveGitProvider()
-	if err != nil {
-		writeError(w, http.StatusServiceUnavailable, "no active git connection configured: "+err.Error())
-		return
-	}
-	newAC, err := s.connSvc.GetActiveArgocdClient()
-	if err != nil {
-		writeError(w, http.StatusServiceUnavailable, "no active ArgoCD connection configured: "+err.Error())
-		return
-	}
-	s.migrationExecutor.SetNewProviders(newGP, newAC)
 
 	// Use background context — the migration runs independently of the HTTP request lifecycle
 	m, err := s.migrationExecutor.StartMigration(context.Background(), req.AddonName, req.ClusterName, req.Mode)
@@ -221,6 +192,13 @@ func (s *Server) handleContinueMigration(w http.ResponseWriter, r *http.Request)
 		writeError(w, http.StatusBadRequest, "migration id is required")
 		return
 	}
+
+	// Re-resolve providers (they may be nil after pod restart)
+	if err := s.resolveExecutorProviders(); err != nil {
+		writeError(w, http.StatusServiceUnavailable, err.Error())
+		return
+	}
+
 	if err := s.migrationExecutor.ContinueAfterPR(context.Background(), id); err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
@@ -255,6 +233,10 @@ func (s *Server) handleRetryMigration(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if id == "" {
 		writeError(w, http.StatusBadRequest, "migration id is required")
+		return
+	}
+	if err := s.resolveExecutorProviders(); err != nil {
+		writeError(w, http.StatusServiceUnavailable, err.Error())
 		return
 	}
 	if err := s.migrationExecutor.RetryStep(context.Background(), id); err != nil {
@@ -587,6 +569,36 @@ func parseEnabledAddonsForCluster(data []byte, clusterName string) []string {
 }
 
 // --- Helpers ---
+
+// resolveExecutorProviders sets up both OLD and NEW providers on the executor.
+// Called before starting, continuing, or retrying a migration.
+func (s *Server) resolveExecutorProviders() error {
+	settings, err := s.migrationExecutor.GetStore().GetSettings()
+	if err != nil {
+		return fmt.Errorf("reading migration settings: %w", err)
+	}
+	if !settings.Configured {
+		return fmt.Errorf("migration settings not configured")
+	}
+
+	oldGP, err := buildOldGitProvider(settings)
+	if err != nil {
+		return fmt.Errorf("building old git provider: %w", err)
+	}
+	oldAC := argocd.NewClient(settings.OldArgocd.ServerURL, settings.OldArgocd.Token, settings.OldArgocd.Insecure)
+	s.migrationExecutor.SetOldProviders(oldGP, oldAC)
+
+	newGP, err := s.connSvc.GetActiveGitProvider()
+	if err != nil {
+		return fmt.Errorf("no active git connection: %w", err)
+	}
+	newAC, err := s.connSvc.GetActiveArgocdClient()
+	if err != nil {
+		return fmt.Errorf("no active ArgoCD connection: %w", err)
+	}
+	s.migrationExecutor.SetNewProviders(newGP, newAC)
+	return nil
+}
 
 // buildOldGitProvider creates a GitProvider from the saved migration settings.
 func buildOldGitProvider(settings *migration.MigrationSettings) (gitprovider.GitProvider, error) {

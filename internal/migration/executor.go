@@ -114,6 +114,17 @@ func (e *Executor) StartMigration(ctx context.Context, addonName, clusterName, m
 			delete(e.running, m.ID)
 			e.mu.Unlock()
 		}()
+		defer func() {
+			if r := recover(); r != nil {
+				slog.Error("migration: panic in step execution", "id", m.ID, "panic", r)
+				if mg, err := e.store.GetMigration(m.ID); err == nil {
+					mg.Status = StatusFailed
+					mg.Error = fmt.Sprintf("internal error: %v", r)
+					mg.UpdatedAt = now()
+					_ = e.store.SaveMigration(mg)
+				}
+			}
+		}()
 		e.RunSteps(runCtx, m.ID)
 	}()
 
@@ -154,7 +165,10 @@ func (e *Executor) RunSteps(ctx context.Context, migrationID string) {
 
 		slog.Info("migration: executing step", "id", migrationID, "step", m.CurrentStep, "title", step.Title)
 
-		stepErr := e.executeStep(ctx, m, m.CurrentStep)
+		// Execute step with timeout (2 minutes per step)
+		stepCtx, stepCancel := context.WithTimeout(ctx, 2*time.Minute)
+		stepErr := e.executeStep(stepCtx, m, m.CurrentStep)
+		stepCancel()
 
 		// Re-read in case the step handler updated the migration.
 		m, err = e.store.GetMigration(migrationID)
@@ -240,6 +254,17 @@ func (e *Executor) ContinueAfterPR(ctx context.Context, migrationID string) erro
 			delete(e.running, m.ID)
 			e.mu.Unlock()
 		}()
+		defer func() {
+			if r := recover(); r != nil {
+				slog.Error("migration: panic in step execution", "id", m.ID, "panic", r)
+				if mg, err := e.store.GetMigration(m.ID); err == nil {
+					mg.Status = StatusFailed
+					mg.Error = fmt.Sprintf("internal error: %v", r)
+					mg.UpdatedAt = now()
+					_ = e.store.SaveMigration(mg)
+				}
+			}
+		}()
 		e.RunSteps(runCtx, m.ID)
 	}()
 
@@ -295,6 +320,17 @@ func (e *Executor) RetryStep(ctx context.Context, migrationID string) error {
 			e.mu.Lock()
 			delete(e.running, m.ID)
 			e.mu.Unlock()
+		}()
+		defer func() {
+			if r := recover(); r != nil {
+				slog.Error("migration: panic in step execution", "id", m.ID, "panic", r)
+				if mg, err := e.store.GetMigration(m.ID); err == nil {
+					mg.Status = StatusFailed
+					mg.Error = fmt.Sprintf("internal error: %v", r)
+					mg.UpdatedAt = now()
+					_ = e.store.SaveMigration(mg)
+				}
+			}
 		}()
 		e.RunSteps(runCtx, m.ID)
 	}()
