@@ -141,6 +141,8 @@ func NewRouter(srv *Server, staticFS fs.FS) http.Handler {
 	mux.HandleFunc("POST /api/v1/migration/{id}/pause", srv.handlePauseMigration)
 	mux.HandleFunc("POST /api/v1/migration/{id}/retry", srv.handleRetryMigration)
 	mux.HandleFunc("POST /api/v1/migration/{id}/cancel", srv.handleCancelMigration)
+	mux.HandleFunc("GET /api/v1/migration/azure/projects", srv.handleAzureListProjects)
+	mux.HandleFunc("GET /api/v1/migration/azure/repos", srv.handleAzureListRepos)
 
 	// Cluster info
 	mux.HandleFunc("GET /api/v1/cluster/nodes", srv.handleGetNodeInfo)

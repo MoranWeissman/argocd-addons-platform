@@ -239,6 +239,101 @@ func (s *Server) handleCancelMigration(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, m)
 }
 
+// --- Azure DevOps Discovery ---
+
+func (s *Server) handleAzureListProjects(w http.ResponseWriter, r *http.Request) {
+	org := r.URL.Query().Get("org")
+	pat := r.URL.Query().Get("pat")
+	if org == "" || pat == "" {
+		writeError(w, http.StatusBadRequest, "org and pat query parameters are required")
+		return
+	}
+
+	url := fmt.Sprintf("https://dev.azure.com/%s/_apis/projects?api-version=7.1", org)
+	req, err := http.NewRequestWithContext(r.Context(), "GET", url, nil) // #nosec G704 -- org is user-provided config for their own Azure DevOps
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	req.SetBasicAuth("", pat)
+
+	resp, err := http.DefaultClient.Do(req) // #nosec G704 -- URL targets user-configured Azure DevOps instance
+	if err != nil {
+		writeError(w, http.StatusBadGateway, "failed to connect to Azure DevOps: "+err.Error())
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		writeError(w, resp.StatusCode, fmt.Sprintf("Azure DevOps returned %d", resp.StatusCode))
+		return
+	}
+
+	var result struct {
+		Value []struct {
+			Name string `json:"name"`
+			ID   string `json:"id"`
+		} `json:"value"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to parse Azure DevOps response")
+		return
+	}
+
+	names := make([]string, 0, len(result.Value))
+	for _, p := range result.Value {
+		names = append(names, p.Name)
+	}
+	writeJSON(w, http.StatusOK, names)
+}
+
+func (s *Server) handleAzureListRepos(w http.ResponseWriter, r *http.Request) {
+	org := r.URL.Query().Get("org")
+	project := r.URL.Query().Get("project")
+	pat := r.URL.Query().Get("pat")
+	if org == "" || project == "" || pat == "" {
+		writeError(w, http.StatusBadRequest, "org, project, and pat query parameters are required")
+		return
+	}
+
+	url := fmt.Sprintf("https://dev.azure.com/%s/%s/_apis/git/repositories?api-version=7.1", org, project)
+	req, err := http.NewRequestWithContext(r.Context(), "GET", url, nil) // #nosec G704 -- org/project are user-provided config
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	req.SetBasicAuth("", pat)
+
+	resp, err := http.DefaultClient.Do(req) // #nosec G704 -- URL targets user-configured Azure DevOps instance
+	if err != nil {
+		writeError(w, http.StatusBadGateway, "failed to connect to Azure DevOps: "+err.Error())
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		writeError(w, resp.StatusCode, fmt.Sprintf("Azure DevOps returned %d", resp.StatusCode))
+		return
+	}
+
+	var result struct {
+		Value []struct {
+			Name string `json:"name"`
+			ID   string `json:"id"`
+		} `json:"value"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to parse Azure DevOps response")
+		return
+	}
+
+	names := make([]string, 0, len(result.Value))
+	for _, r := range result.Value {
+		names = append(names, r.Name)
+	}
+	writeJSON(w, http.StatusOK, names)
+}
+
 // --- Helpers ---
 
 // buildOldGitProvider creates a GitProvider from the saved migration settings.
