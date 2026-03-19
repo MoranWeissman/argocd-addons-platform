@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.14.0](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.13.2...v1.14.0) (2026-03-19)
+
+
+### Features
+
+* add searchable autocomplete dropdowns for Azure DevOps project and repo selection ([#34](https://github.com/MoranWeissman/argocd-addons-platform/issues/34)) ([722b267](https://github.com/MoranWeissman/argocd-addons-platform/commit/722b267e8121e299f29791fe4708bd63f29468a3))
+
+
+### Bug Fixes
+
+* migration settings — data volume, separate connection errors, clear credentials ([#32](https://github.com/MoranWeissman/argocd-addons-platform/issues/32)) ([9b9de5a](https://github.com/MoranWeissman/argocd-addons-platform/commit/9b9de5ae4a89815c5df7087624fb4b3aa8b0bbb8))
+
 ## [1.13.2](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.13.1...v1.13.2) (2026-03-19)
 
 
