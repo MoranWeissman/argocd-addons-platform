@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.16.0](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.15.0...v1.16.0) (2026-03-19)
+
+
+### Features
+
+* migration dialog with scope selection and addon/cluster discovery from OLD repo ([#38](https://github.com/MoranWeissman/argocd-addons-platform/issues/38)) ([416812b](https://github.com/MoranWeissman/argocd-addons-platform/commit/416812bf895c4ceecc372f9317f9cd0290ef85c1))
+
 ## [1.15.0](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.14.0...v1.15.0) (2026-03-19)
 
 
