@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.19.1](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.19.0...v1.19.1) (2026-03-19)
+
+
+### Bug Fixes
+
+* migration resume, compact pipeline UI, step timeouts, panic recovery ([#57](https://github.com/MoranWeissman/argocd-addons-platform/issues/57)) ([2a20522](https://github.com/MoranWeissman/argocd-addons-platform/commit/2a20522637f446c3128ff827b04b3ba0c10c3653))
+
 ## [1.19.0](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.18.1...v1.19.0) (2026-03-19)
 
 
