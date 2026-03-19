@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.13.2](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.13.1...v1.13.2) (2026-03-19)
+
+
+### Bug Fixes
+
+* let release-please update Helm chart version via extra-files ([#29](https://github.com/MoranWeissman/argocd-addons-platform/issues/29)) ([07118cc](https://github.com/MoranWeissman/argocd-addons-platform/commit/07118ccd71d3dbe75eba8cbdf20bf49672017190))
+
 ## [1.13.1](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.13.0...v1.13.1) (2026-03-19)
 
 
