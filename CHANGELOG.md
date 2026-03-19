@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.18.0](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.17.2...v1.18.0) (2026-03-19)
+
+
+### Features
+
+* migration wizard v2 — live logs, YOLO/gates mode, session management ([#51](https://github.com/MoranWeissman/argocd-addons-platform/issues/51)) ([c318a62](https://github.com/MoranWeissman/argocd-addons-platform/commit/c318a6230740da37b83c525b9c867529aa99fe10))
+
 ## [1.17.2](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.17.1...v1.17.2) (2026-03-19)
 
 
