@@ -100,6 +100,8 @@ spec:
             - name: config
               mountPath: /etc/aap
               readOnly: true
+            - name: data
+              mountPath: /app/data
           {{- with .Values.livenessProbe }}
           livenessProbe:
             {{- toYaml . | nindent 12 }}
@@ -116,6 +118,8 @@ spec:
         - name: config
           configMap:
             name: {{ include "aap.fullname" . }}-config
+        - name: data
+          emptyDir: {}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

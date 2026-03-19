@@ -58,12 +58,21 @@ func (s *Server) handleTestMigrationConnection(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	result := map[string]bool{"git": false, "argocd": false}
+	result := map[string]interface{}{
+		"git":          false,
+		"git_error":    "",
+		"argocd":       false,
+		"argocd_error": "",
+	}
 
 	// Test old git connection
 	oldGP, err := buildOldGitProvider(settings)
-	if err == nil {
-		if testErr := oldGP.TestConnection(r.Context()); testErr == nil {
+	if err != nil {
+		result["git_error"] = err.Error()
+	} else {
+		if testErr := oldGP.TestConnection(r.Context()); testErr != nil {
+			result["git_error"] = testErr.Error()
+		} else {
 			result["git"] = true
 		}
 	}
@@ -74,7 +83,9 @@ func (s *Server) handleTestMigrationConnection(w http.ResponseWriter, r *http.Re
 		settings.OldArgocd.Token,
 		settings.OldArgocd.Insecure,
 	)
-	if testErr := oldAC.TestConnection(r.Context()); testErr == nil {
+	if testErr := oldAC.TestConnection(r.Context()); testErr != nil {
+		result["argocd_error"] = testErr.Error()
+	} else {
 		result["argocd"] = true
 	}
 

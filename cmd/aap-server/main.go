@@ -189,7 +189,11 @@ func main() {
 	upgradeSvc := service.NewUpgradeService(aiClient)
 
 	// Migration service — old providers are resolved at runtime from saved settings
-	migrationStore := migration.NewStore("./data/migrations")
+	migrationDataDir := getEnvDefault("AAP_MIGRATION_DATA_DIR", "/app/data/migrations")
+	if mode != platform.ModeKubernetes {
+		migrationDataDir = "./data/migrations" // local dev
+	}
+	migrationStore := migration.NewStore(migrationDataDir)
 	migrationExecutor := migration.NewExecutor(migrationStore, nil, nil, nil, nil, aiClient)
 
 	// Build server
