@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.19.2](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.19.1...v1.19.2) (2026-03-19)
+
+
+### Bug Fixes
+
+* resume from any state, wider logs panel, remove cancel button ([#59](https://github.com/MoranWeissman/argocd-addons-platform/issues/59)) ([b219e86](https://github.com/MoranWeissman/argocd-addons-platform/commit/b219e86dc143e88ded170b75d27f22569c2a50e7))
+
 ## [1.19.1](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.19.0...v1.19.1) (2026-03-19)
 
 
