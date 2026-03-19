@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.13.1](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.13.0...v1.13.1) (2026-03-19)
+
+
+### Bug Fixes
+
+* use fetch origin main for Helm chart update step ([#27](https://github.com/MoranWeissman/argocd-addons-platform/issues/27)) ([4b7e8ae](https://github.com/MoranWeissman/argocd-addons-platform/commit/4b7e8aecbeb760c93657c17e5dd7ca66aa1ac284))
+
 ## [1.13.0](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.12.0...v1.13.0) (2026-03-19)
 
 
