@@ -163,3 +163,15 @@ func (g *GitHubProvider) CreatePullRequest(ctx context.Context, title, body, hea
 	slog.Info("github pull request created", "number", result.ID, "url", result.URL)
 	return result, nil
 }
+
+// MergePullRequest merges an open pull request by number.
+func (g *GitHubProvider) MergePullRequest(ctx context.Context, prNumber int) error {
+	_, _, err := g.client.PullRequests.Merge(ctx, g.owner, g.repo, prNumber, "", &github.PullRequestOptions{
+		MergeMethod: "squash",
+	})
+	if err != nil {
+		return fmt.Errorf("merge pull request #%d: %w", prNumber, err)
+	}
+	slog.Info("github pull request merged", "number", prNumber)
+	return nil
+}

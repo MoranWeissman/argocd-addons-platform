@@ -265,6 +265,69 @@ func (s *Server) handleCancelMigration(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, m)
 }
 
+// handleMergePR attempts to merge a PR from a migration step.
+func (s *Server) handleMergePR(w http.ResponseWriter, r *http.Request) {
+	if s.migrationExecutor == nil {
+		writeError(w, http.StatusServiceUnavailable, "migration service not configured")
+		return
+	}
+	id := r.PathValue("id")
+
+	var req struct {
+		Step int `json:"step"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	m, err := s.migrationExecutor.GetStore().GetMigration(id)
+	if err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+
+	if req.Step < 1 || req.Step > len(m.Steps) {
+		writeError(w, http.StatusBadRequest, "invalid step number")
+		return
+	}
+
+	step := &m.Steps[req.Step-1]
+	if step.PRNumber == 0 {
+		writeError(w, http.StatusBadRequest, "this step has no PR")
+		return
+	}
+
+	if err := s.resolveExecutorProviders(); err != nil {
+		writeError(w, http.StatusServiceUnavailable, err.Error())
+		return
+	}
+
+	// Determine which provider to use
+	var gp gitprovider.GitProvider
+	if step.PRRepo == "old" {
+		settings, _ := s.migrationExecutor.GetStore().GetSettings()
+		gp, _ = buildOldGitProvider(settings)
+	} else {
+		gp, _ = s.connSvc.GetActiveGitProvider()
+	}
+
+	if gp == nil {
+		writeError(w, http.StatusServiceUnavailable, "git provider not available")
+		return
+	}
+
+	if mergeErr := gp.MergePullRequest(r.Context(), step.PRNumber); mergeErr != nil {
+		writeError(w, http.StatusBadRequest, fmt.Sprintf("Failed to merge PR #%d: %s", step.PRNumber, mergeErr.Error()))
+		return
+	}
+
+	step.PRStatus = "merged"
+	_ = s.migrationExecutor.GetStore().SaveMigration(m)
+
+	writeJSON(w, http.StatusOK, map[string]string{"status": "merged"})
+}
+
 // --- Azure DevOps Discovery ---
 
 func (s *Server) handleAzureListProjects(w http.ResponseWriter, r *http.Request) {

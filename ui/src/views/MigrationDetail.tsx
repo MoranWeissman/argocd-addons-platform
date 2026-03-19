@@ -67,6 +67,15 @@ export default function MigrationDetail() {
     if (!id) return
     try { await api.retryMigration(id); void fetchMigration() } catch { /* next poll */ }
   }
+  const handleMergePR = async (step: number) => {
+    if (!id) return
+    try {
+      await api.mergeMigrationPR(id, step)
+      void fetchMigration()
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : 'Failed to merge PR')
+    }
+  }
   const handlePause = async () => {
     if (!id) return
     try { await api.pauseMigration(id); void fetchMigration() } catch { /* next poll */ }
@@ -137,8 +146,10 @@ export default function MigrationDetail() {
                 steps={migration.steps}
                 currentStep={migration.current_step}
                 migrationStatus={migration.status}
+                migrationId={migration.id}
                 onContinue={handleContinue}
                 onRetry={handleRetry}
+                onMergePR={handleMergePR}
               />
             )}
           </div>

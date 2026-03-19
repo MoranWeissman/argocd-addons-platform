@@ -364,3 +364,15 @@ func (a *AzureDevOpsProvider) CreatePullRequest(_ context.Context, title, body, 
 	slog.Info("azure devops pull request created", "id", pr.ID, "url", pr.URL)
 	return pr, nil
 }
+
+// MergePullRequest completes a pull request in Azure DevOps.
+func (a *AzureDevOpsProvider) MergePullRequest(ctx context.Context, prNumber int) error {
+	url := fmt.Sprintf("%s/pullrequests/%d?api-version=7.1", a.baseURL, prNumber)
+	body := []byte(`{"status":"completed"}`)
+	_, _, err := a.doPost(url, body)
+	if err != nil {
+		return fmt.Errorf("merge pull request #%d: %w", prNumber, err)
+	}
+	slog.Info("azure devops pull request merged", "number", prNumber)
+	return nil
+}

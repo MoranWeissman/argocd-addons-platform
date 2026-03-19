@@ -14,8 +14,10 @@ interface MigrationStepProps {
   step: MigrationStepType
   isActive: boolean
   isLast: boolean
+  migrationId?: string
   onContinue?: () => void
   onRetry?: () => void
+  onMergePR?: (step: number) => void
 }
 
 function StepIcon({ status, number }: { status: MigrationStepType['status']; number: number }) {
@@ -37,7 +39,7 @@ function StepIcon({ status, number }: { status: MigrationStepType['status']; num
   }
 }
 
-export function MigrationStepCard({ step, isActive, isLast, onContinue, onRetry }: MigrationStepProps) {
+export function MigrationStepCard({ step, isActive, isLast, onContinue, onRetry, onMergePR }: MigrationStepProps) {
   const isCompleted = step.status === 'completed'
   const isFailed = step.status === 'failed'
   const isWaiting = step.status === 'waiting'
@@ -100,9 +102,14 @@ export function MigrationStepCard({ step, isActive, isLast, onContinue, onRetry 
             {isWaiting && (
               <div className="flex items-center gap-2">
                 <span className="text-xs text-amber-600 dark:text-amber-400">Waiting for PR merge</span>
+                {onMergePR && step.pr_number && (
+                  <Button size="sm" variant="outline" onClick={() => onMergePR(step.number)} className="h-6 px-2 text-xs bg-green-50 border-green-300 text-green-700 hover:bg-green-100 dark:bg-green-900/20 dark:border-green-700 dark:text-green-400">
+                    Merge PR
+                  </Button>
+                )}
                 {onContinue && (
                   <Button size="sm" variant="outline" onClick={onContinue} className="h-6 px-2 text-xs">
-                    Continue
+                    PR Merged → Continue
                   </Button>
                 )}
               </div>

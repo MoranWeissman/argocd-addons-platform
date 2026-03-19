@@ -48,6 +48,10 @@ func (f *fakeGitProvider) CreatePullRequest(_ context.Context, _, _, _, _ string
 	return nil, nil
 }
 
+func (f *fakeGitProvider) MergePullRequest(_ context.Context, _ int) error {
+	return nil
+}
+
 func TestGetVersionMatrix(t *testing.T) {
 	clusterAddonsYAML := []byte(`
 clusters:
