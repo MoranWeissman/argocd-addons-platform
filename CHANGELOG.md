@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.17.2](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.17.1...v1.17.2) (2026-03-19)
+
+
+### Bug Fixes
+
+* add VERSION to release-please extra-files so it gets updated on every release ([#46](https://github.com/MoranWeissman/argocd-addons-platform/issues/46)) ([30f2026](https://github.com/MoranWeissman/argocd-addons-platform/commit/30f2026b4ae09f93630d7a9ea64c6b2459403d33))
+* rename VERSION to version.txt for release-please compatibility ([#49](https://github.com/MoranWeissman/argocd-addons-platform/issues/49)) ([846552b](https://github.com/MoranWeissman/argocd-addons-platform/commit/846552b4707dec803c2813338f765f48e841bd31))
+* sync VERSION file to 1.17.1 (release-please not updating it) ([#44](https://github.com/MoranWeissman/argocd-addons-platform/issues/44)) ([e9bebc2](https://github.com/MoranWeissman/argocd-addons-platform/commit/e9bebc254195d08cd596a43329a2eaad6c463df4))
+
 ## [1.17.1](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.17.0...v1.17.1) (2026-03-19)
 
 
