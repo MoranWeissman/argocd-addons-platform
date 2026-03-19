@@ -7,7 +7,6 @@
       "bump-patch-for-minor-pre-major": true,
       "changelog-path": "CHANGELOG.md",
       "extra-files": [
-        "VERSION",
         {
           "type": "yaml",
           "path": "charts/argocd-addons-platform/Chart.yaml",

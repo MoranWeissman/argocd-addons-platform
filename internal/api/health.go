@@ -11,7 +11,7 @@ var appVersion = readVersionFile()
 
 func readVersionFile() string {
 	// Try common locations
-	for _, path := range []string{"VERSION", "/app/VERSION"} {
+	for _, path := range []string{"version.txt", "/app/version.txt", "VERSION", "/app/VERSION"} {
 		data, err := os.ReadFile(path)
 		if err == nil {
 			return strings.TrimSpace(string(data))
