@@ -7,11 +7,13 @@ interface MigrationStepperProps {
   steps: MigrationStep[]
   currentStep: number
   migrationStatus: Migration['status']
+  migrationId: string
   onContinue: () => void
   onRetry: () => void
+  onMergePR: (step: number) => void
 }
 
-export function MigrationStepper({ steps, currentStep, migrationStatus, onContinue, onRetry }: MigrationStepperProps) {
+export function MigrationStepper({ steps, currentStep, migrationStatus, onContinue, onRetry, onMergePR }: MigrationStepperProps) {
   const isGated = migrationStatus === 'gated'
 
   return (
@@ -32,6 +34,7 @@ export function MigrationStepper({ steps, currentStep, migrationStatus, onContin
               isLast={isLast && !showGateAfter}
               onContinue={onContinue}
               onRetry={onRetry}
+              onMergePR={onMergePR}
             />
 
             {/* Gate approval — appears AFTER the completed step */}

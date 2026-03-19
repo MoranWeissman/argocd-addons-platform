@@ -1,6 +1,7 @@
 package migration
 
 import (
+	"crypto/rand"
 	"fmt"
 	"time"
 )
@@ -45,6 +46,8 @@ type MigrationStep struct {
 	Number      int        `json:"number"`
 	Title       string     `json:"title"`
 	Description string     `json:"description"`
+	PRNumber    int        `json:"pr_number,omitempty"`
+	PRRepo      string     `json:"pr_repo,omitempty"` // "new" or "old" — which provider to merge on
 	Status      StepStatus `json:"status"`
 	Message     string     `json:"message"`
 	PRURL       string     `json:"pr_url,omitempty"`
@@ -108,22 +111,24 @@ var StepDefinitions = []struct {
 	Title       string
 	Description string
 }{
-	{"Verify addon in NEW catalog", "Check that the addon exists in addons-catalog.yaml with inMigration: true"},
-	{"Configure values in NEW repo", "Verify global and cluster values match the OLD repo configuration"},
-	{"Enable addon on cluster", "Create PR to set addon label to 'enabled' in cluster-addons.yaml"},
-	{"Verify app created in NEW ArgoCD", "Check that ArgoCD created the application (may show OutOfSync)"},
-	{"Disable addon in OLD repo", "Create PR to disable the addon label in the OLD repository"},
-	{"Sync clusters app in OLD ArgoCD", "Trigger sync so OLD ArgoCD removes the application"},
-	{"Verify app removed from OLD ArgoCD", "Confirm the application no longer exists in OLD ArgoCD"},
-	{"Hard refresh in NEW ArgoCD", "Trigger hard refresh so NEW ArgoCD adopts orphaned resources"},
-	{"Verify healthy in NEW ArgoCD", "Confirm application is Synced + Healthy with no pod restarts"},
+	{"Verify addon in catalog", "Read-only — check addon exists in addons-catalog.yaml with inMigration: true"},
+	{"Compare values (OLD vs NEW)", "Read-only — compare global and cluster values between repos"},
+	{"Enable addon on cluster → PR", "Creates PR on NEW repo to set addon label to enabled"},
+	{"Verify app created in NEW ArgoCD", "Read-only — check ArgoCD created the application"},
+	{"Disable addon in OLD repo → PR", "Creates PR on OLD repo to disable the addon label"},
+	{"Sync clusters app in OLD ArgoCD", "Triggers sync so OLD ArgoCD processes the removal"},
+	{"Verify app removed from OLD ArgoCD", "Read-only — confirm application no longer exists in OLD ArgoCD"},
+	{"Hard refresh in NEW ArgoCD", "Triggers hard refresh so NEW ArgoCD adopts orphaned resources"},
+	{"Verify healthy in NEW ArgoCD", "Read-only — confirm Synced + Healthy with no pod restarts"},
 	{"Disable migration mode", "Create PR to set inMigration: false in addons-catalog.yaml"},
 }
 
 // NewMigration creates a new Migration with all 10 steps pre-populated in
 // pending state.
 func NewMigration(addonName, clusterName, mode string) *Migration {
-	id := fmt.Sprintf("mig-%d", time.Now().UnixNano())
+	randBytes := make([]byte, 4)
+	_, _ = rand.Read(randBytes)
+	id := fmt.Sprintf("mig-%d-%x", time.Now().Unix(), randBytes)
 	now := time.Now().UTC().Format(time.RFC3339)
 
 	if mode == "" {

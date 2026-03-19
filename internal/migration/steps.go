@@ -492,12 +492,35 @@ func (e *Executor) createPRWithLog(
 		return fmt.Errorf("creating pull request: %w", err)
 	}
 
-	e.addLog(m, stepNum, repoLabel, "waiting", fmt.Sprintf("PR created: %s", pr.URL))
-
 	step.PRURL = pr.URL
-	step.PRStatus = "open"
-	step.Status = StepWaiting
-	step.Message = fmt.Sprintf("PR created: %s — waiting for merge", pr.URL)
+	step.PRNumber = pr.ID
+	step.PRRepo = "new"
+	if gp == e.oldGP {
+		step.PRRepo = "old"
+	}
+
+	// In YOLO mode, try to auto-merge
+	if m.Mode == "yolo" {
+		e.addLog(m, stepNum, repoLabel, "merging", fmt.Sprintf("YOLO mode — auto-merging PR #%d...", pr.ID))
+		if mergeErr := gp.MergePullRequest(ctx, pr.ID); mergeErr != nil {
+			e.addLog(m, stepNum, repoLabel, "warning", fmt.Sprintf("Auto-merge failed: %s. Waiting for manual merge.", mergeErr.Error()))
+			step.PRStatus = "open"
+			step.Status = StepWaiting
+			step.Message = fmt.Sprintf("PR #%d created but auto-merge failed — please merge manually: %s", pr.ID, pr.URL)
+		} else {
+			e.addLog(m, stepNum, repoLabel, "completed", fmt.Sprintf("PR #%d auto-merged", pr.ID))
+			step.PRStatus = "merged"
+			step.Status = StepCompleted
+			step.CompletedAt = now()
+			step.Message = fmt.Sprintf("PR #%d auto-merged: %s", pr.ID, pr.URL)
+		}
+	} else {
+		e.addLog(m, stepNum, repoLabel, "waiting", fmt.Sprintf("PR #%d created: %s", pr.ID, pr.URL))
+		step.PRStatus = "open"
+		step.Status = StepWaiting
+		step.Message = fmt.Sprintf("PR #%d created — waiting for merge: %s", pr.ID, pr.URL)
+	}
+
 	_ = e.store.SaveMigration(m)
 	return nil
 }
