@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.18.1](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.18.0...v1.18.1) (2026-03-19)
+
+
+### Bug Fixes
+
+* persist migration state in K8s ConfigMaps (survives pod restarts) ([#53](https://github.com/MoranWeissman/argocd-addons-platform/issues/53)) ([07a4422](https://github.com/MoranWeissman/argocd-addons-platform/commit/07a442265bf5b712f3b376957e67492d318087ec))
+
 ## [1.18.0](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.17.2...v1.18.0) (2026-03-19)
 
 
