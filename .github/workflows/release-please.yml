@@ -71,17 +71,3 @@ jobs:
           severity: CRITICAL,HIGH
           exit-code: 0
           format: table
-
-      - name: Update Helm chart version
-        run: |
-          VERSION="${{ needs.release-please.outputs.version }}"
-          git fetch origin main
-          git checkout FETCH_HEAD
-          sed -i "s/^version:.*/version: ${VERSION}/" charts/argocd-addons-platform/Chart.yaml
-          sed -i "s/^appVersion:.*/appVersion: \"${VERSION}\"/" charts/argocd-addons-platform/Chart.yaml
-          sed -i "s/tag: \".*\"/tag: \"${VERSION}\"/" charts/argocd-addons-platform/values-production.yaml
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add charts/
-          git diff --staged --quiet || git commit -m "chore: update Helm chart to v${VERSION}"
-          git push origin HEAD:main
