@@ -140,6 +140,7 @@ func (s *Server) handleStartMigration(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		AddonName   string `json:"addon_name"`
 		ClusterName string `json:"cluster_name"`
+		Mode        string `json:"mode"` // "yolo" or "gates"
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
@@ -147,6 +148,20 @@ func (s *Server) handleStartMigration(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.AddonName == "" || req.ClusterName == "" {
 		writeError(w, http.StatusBadRequest, "addon_name and cluster_name are required")
+		return
+	}
+	if req.Mode == "" {
+		req.Mode = "gates"
+	}
+
+	// Check for an existing active migration
+	hasActive, activeID, err := s.migrationExecutor.GetStore().HasActiveMigration()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to check active migrations: "+err.Error())
+		return
+	}
+	if hasActive {
+		writeError(w, http.StatusConflict, fmt.Sprintf("an active migration already exists: %s", activeID))
 		return
 	}
 
@@ -186,7 +201,7 @@ func (s *Server) handleStartMigration(w http.ResponseWriter, r *http.Request) {
 	s.migrationExecutor.SetNewProviders(newGP, newAC)
 
 	// Use background context — the migration runs independently of the HTTP request lifecycle
-	m, err := s.migrationExecutor.StartMigration(context.Background(), req.AddonName, req.ClusterName)
+	m, err := s.migrationExecutor.StartMigration(context.Background(), req.AddonName, req.ClusterName, req.Mode)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return

@@ -227,6 +227,95 @@ func TestUpdateCatalogVersion_PreservesComments(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// labels: [] (empty array) tests
+// ---------------------------------------------------------------------------
+
+func TestEnableAddonLabel_EmptyArray(t *testing.T) {
+	input := `clusters:
+  - name: test-cluster
+    labels: []
+`
+	result, err := EnableAddonLabel([]byte(input), "test-cluster", "keda")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	s := string(result)
+	// Should produce labels block with keda: enabled
+	if !strings.Contains(s, "    labels:\n      keda: enabled") {
+		t.Errorf("expected labels block with keda: enabled, got:\n%s", s)
+	}
+	// Should NOT contain []
+	if strings.Contains(s, "[]") {
+		t.Errorf("expected [] to be removed, got:\n%s", s)
+	}
+}
+
+func TestDisableAddonLabel_EmptyArray(t *testing.T) {
+	input := `clusters:
+  - name: test-cluster
+    labels: []
+`
+	result, err := DisableAddonLabel([]byte(input), "test-cluster", "keda")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	s := string(result)
+	if !strings.Contains(s, "    labels:\n      keda: disabled") {
+		t.Errorf("expected labels block with keda: disabled, got:\n%s", s)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// commented-out label tests
+// ---------------------------------------------------------------------------
+
+func TestEnableAddonLabel_CommentedOut(t *testing.T) {
+	input := `clusters:
+  - name: test-cluster
+    labels:
+      datadog: enabled
+      # keda: disabled
+`
+	result, err := EnableAddonLabel([]byte(input), "test-cluster", "keda")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	s := string(result)
+	// Should uncomment and set to enabled
+	if !containsInCluster(s, "test-cluster", "keda: enabled") {
+		t.Errorf("expected keda: enabled (uncommented), got:\n%s", s)
+	}
+	// Should NOT contain the commented version
+	if strings.Contains(s, "# keda") {
+		t.Errorf("expected comment to be removed, got:\n%s", s)
+	}
+	// datadog still there
+	if !containsInCluster(s, "test-cluster", "datadog: enabled") {
+		t.Errorf("expected datadog: enabled to be preserved, got:\n%s", s)
+	}
+}
+
+func TestDisableAddonLabel_CommentedOutEnabled(t *testing.T) {
+	input := `clusters:
+  - name: test-cluster
+    labels:
+      datadog: enabled
+      # keda: enabled
+`
+	result, err := DisableAddonLabel([]byte(input), "test-cluster", "keda")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	s := string(result)
+	if !containsInCluster(s, "test-cluster", "keda: disabled") {
+		t.Errorf("expected keda: disabled (uncommented), got:\n%s", s)
+	}
+	if strings.Contains(s, "# keda") {
+		t.Errorf("expected comment to be removed, got:\n%s", s)
+	}
+}
+
+// ---------------------------------------------------------------------------
 // helper
 // ---------------------------------------------------------------------------
 

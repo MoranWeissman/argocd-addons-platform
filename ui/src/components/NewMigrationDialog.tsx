@@ -23,6 +23,7 @@ interface NewMigrationDialogProps {
 
 export function NewMigrationDialog({ open, onOpenChange, onStarted }: NewMigrationDialogProps) {
   const [scope, setScope] = useState<MigrationScope>('single')
+  const [mode, setMode] = useState<'gates' | 'yolo'>('gates')
   const [clusterName, setClusterName] = useState('')
   const [selectedAddons, setSelectedAddons] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
@@ -106,10 +107,12 @@ export function NewMigrationDialog({ open, onOpenChange, onStarted }: NewMigrati
       const migration = await api.startMigration({
         addon_name: selectedAddons[0],
         cluster_name: clusterName,
+        mode: mode,
       })
       onStarted(migration)
       // Reset state
       setScope('single')
+      setMode('gates')
       setClusterName('')
       setSelectedAddons([])
     } catch (e: unknown) {
@@ -162,6 +165,39 @@ export function NewMigrationDialog({ open, onOpenChange, onStarted }: NewMigrati
                   {opt.label}
                 </button>
               ))}
+            </div>
+          </div>
+
+          {/* Mode selection */}
+          <div>
+            <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Migration Mode
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setMode('gates')}
+                className={`rounded-lg border px-3 py-2 text-left transition-colors ${
+                  mode === 'gates'
+                    ? 'border-cyan-500 bg-cyan-50 text-cyan-700 dark:border-cyan-400 dark:bg-cyan-900/30 dark:text-cyan-300'
+                    : 'border-gray-200 text-gray-600 hover:border-gray-300 dark:border-gray-700 dark:text-gray-400 dark:hover:border-gray-600'
+                }`}
+              >
+                <div className="font-medium">Gates</div>
+                <div className="text-xs text-gray-500">Approve each step manually</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode('yolo')}
+                className={`rounded-lg border px-3 py-2 text-left transition-colors ${
+                  mode === 'yolo'
+                    ? 'border-cyan-500 bg-cyan-50 text-cyan-700 dark:border-cyan-400 dark:bg-cyan-900/30 dark:text-cyan-300'
+                    : 'border-gray-200 text-gray-600 hover:border-gray-300 dark:border-gray-700 dark:text-gray-400 dark:hover:border-gray-600'
+                }`}
+              >
+                <div className="font-medium">YOLO</div>
+                <div className="text-xs text-gray-500">Fully automatic</div>
+              </button>
             </div>
           </div>
 

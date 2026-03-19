@@ -43,12 +43,16 @@ func (e *Executor) executeStep(ctx context.Context, m *Migration, stepNum int) e
 func (e *Executor) stepVerifyCatalog(ctx context.Context, m *Migration) error {
 	const catalogPath = "configuration/addons-catalog.yaml"
 
+	e.addLog(m, 1, e.newRepoLabel(), "reading", "Reading addons-catalog.yaml from NEW repo...")
+
 	data, err := e.newGP.GetFileContent(ctx, catalogPath, "main")
 	if err != nil {
 		return fmt.Errorf("reading catalog from NEW repo: %w", err)
 	}
 
 	content := string(data)
+
+	e.addLog(m, 1, e.newRepoLabel(), "verifying", fmt.Sprintf("Checking if addon %q exists with inMigration: true", m.AddonName))
 
 	// Check that the addon is present.
 	if !strings.Contains(content, "appName: "+m.AddonName) {
@@ -65,6 +69,8 @@ func (e *Executor) stepVerifyCatalog(ctx context.Context, m *Migration) error {
 	assessment, _ := e.aiEvaluate(ctx, m.Steps[0].Title,
 		fmt.Sprintf("Addon catalog content for %q:\n%s", m.AddonName, truncate(content, 2000)))
 
+	e.addLog(m, 1, e.newRepoLabel(), "completed", fmt.Sprintf("Addon %q found in catalog", m.AddonName))
+
 	step := &m.Steps[0]
 	step.Message = fmt.Sprintf("Addon %q found in catalog. %s", m.AddonName, assessment)
 	_ = e.store.SaveMigration(m)
@@ -75,29 +81,85 @@ func (e *Executor) stepVerifyCatalog(ctx context.Context, m *Migration) error {
 func (e *Executor) stepConfigureValues(ctx context.Context, m *Migration) error {
 	step := &m.Steps[1]
 
-	// Read values from NEW repo.
-	newValues, newErr := e.newGP.GetFileContent(ctx, "configuration/addons-catalog.yaml", "main")
-	newValStr := "(not available)"
-	if newErr == nil {
-		newValStr = truncate(string(newValues), 1500)
+	// 1. Read addon global values from NEW repo.
+	newGlobalPath := fmt.Sprintf("configuration/addons-global-values/%s.yaml", m.AddonName)
+	e.addLog(m, 2, e.newRepoLabel(), "reading", fmt.Sprintf("Reading %s...", newGlobalPath))
+	newGlobalValues, newGlobalErr := e.newGP.GetFileContent(ctx, newGlobalPath, "main")
+	newGlobalStr := "(not available)"
+	if newGlobalErr != nil {
+		e.addLog(m, 2, e.newRepoLabel(), "warning", fmt.Sprintf("No global values file found for %s in NEW repo — may need to create one", m.AddonName))
+	} else {
+		newGlobalStr = truncate(string(newGlobalValues), 1500)
+		e.addLog(m, 2, e.newRepoLabel(), "completed", fmt.Sprintf("Read global values for %s (%d bytes)", m.AddonName, len(newGlobalValues)))
 	}
 
-	// Read values from OLD repo (if available).
-	oldValStr := "(old git provider not configured)"
+	// 2. Read addon global values from OLD repo (try V1 then V2).
+	oldGlobalStr := "(old git provider not configured)"
 	if e.oldGP != nil {
-		// Try V2 path first, then V1.
-		oldValues, err := e.oldGP.GetFileContent(ctx, "configuration/cluster-addons.yaml", "main")
+		// Try V2 path first.
+		oldGlobalPath := fmt.Sprintf("configuration/addons-global-values/%s.yaml", m.AddonName)
+		e.addLog(m, 2, e.oldRepoLabel(), "reading", fmt.Sprintf("Reading %s (V2 path)...", oldGlobalPath))
+		oldGlobalValues, err := e.oldGP.GetFileContent(ctx, oldGlobalPath, "main")
 		if err != nil {
-			oldValues, err = e.oldGP.GetFileContent(ctx, "values/clusters.yaml", "main")
-		}
-		if err == nil {
-			oldValStr = truncate(string(oldValues), 1500)
+			// Try V1 path: read defaults.yaml and extract addon section.
+			v1Path := "values/addons-config/defaults.yaml"
+			e.addLog(m, 2, e.oldRepoLabel(), "reading", fmt.Sprintf("V2 path not found, trying V1: %s...", v1Path))
+			oldGlobalValues, err = e.oldGP.GetFileContent(ctx, v1Path, "main")
+			if err != nil {
+				e.addLog(m, 2, e.oldRepoLabel(), "warning", "No global values found in OLD repo (tried V2 and V1 paths)")
+			} else {
+				oldGlobalStr = truncate(string(oldGlobalValues), 1500)
+				e.addLog(m, 2, e.oldRepoLabel(), "completed", fmt.Sprintf("Read V1 defaults.yaml (%d bytes)", len(oldGlobalValues)))
+			}
+		} else {
+			oldGlobalStr = truncate(string(oldGlobalValues), 1500)
+			e.addLog(m, 2, e.oldRepoLabel(), "completed", fmt.Sprintf("Read global values for %s (%d bytes)", m.AddonName, len(oldGlobalValues)))
 		}
 	}
 
+	// 3. Read cluster values from NEW repo.
+	newClusterPath := fmt.Sprintf("configuration/addons-clusters-values/%s.yaml", m.ClusterName)
+	e.addLog(m, 2, e.newRepoLabel(), "reading", fmt.Sprintf("Reading %s...", newClusterPath))
+	newClusterValues, newClusterErr := e.newGP.GetFileContent(ctx, newClusterPath, "main")
+	newClusterStr := "(not available)"
+	if newClusterErr != nil {
+		e.addLog(m, 2, e.newRepoLabel(), "warning", fmt.Sprintf("No cluster values file found for %s in NEW repo", m.ClusterName))
+	} else {
+		newClusterStr = truncate(string(newClusterValues), 1500)
+		e.addLog(m, 2, e.newRepoLabel(), "completed", fmt.Sprintf("Read cluster values for %s (%d bytes)", m.ClusterName, len(newClusterValues)))
+	}
+
+	// 4. Read cluster values from OLD repo.
+	oldClusterStr := "(old git provider not configured)"
+	if e.oldGP != nil {
+		// Try V2 path first.
+		oldClusterPath := fmt.Sprintf("configuration/addons-clusters-values/%s.yaml", m.ClusterName)
+		e.addLog(m, 2, e.oldRepoLabel(), "reading", fmt.Sprintf("Reading %s (V2 path)...", oldClusterPath))
+		oldClusterValues, err := e.oldGP.GetFileContent(ctx, oldClusterPath, "main")
+		if err != nil {
+			// Try V1 path.
+			v1Path := fmt.Sprintf("values/addons-config/overrides/%s/%s.yaml", m.ClusterName, m.AddonName)
+			e.addLog(m, 2, e.oldRepoLabel(), "reading", fmt.Sprintf("V2 path not found, trying V1: %s...", v1Path))
+			oldClusterValues, err = e.oldGP.GetFileContent(ctx, v1Path, "main")
+			if err != nil {
+				e.addLog(m, 2, e.oldRepoLabel(), "warning", "No cluster values found in OLD repo (tried V2 and V1 paths)")
+			} else {
+				oldClusterStr = truncate(string(oldClusterValues), 1500)
+				e.addLog(m, 2, e.oldRepoLabel(), "completed", fmt.Sprintf("Read V1 cluster override for %s/%s (%d bytes)", m.ClusterName, m.AddonName, len(oldClusterValues)))
+			}
+		} else {
+			oldClusterStr = truncate(string(oldClusterValues), 1500)
+			e.addLog(m, 2, e.oldRepoLabel(), "completed", fmt.Sprintf("Read cluster values for %s (%d bytes)", m.ClusterName, len(oldClusterValues)))
+		}
+	}
+
+	// 5. AI comparison or summary.
+	e.addLog(m, 2, e.newRepoLabel(), "comparing", "Comparing values between OLD and NEW repos...")
 	assessment, _ := e.aiEvaluate(ctx, step.Title,
-		fmt.Sprintf("Comparing values for addon %q on cluster %q.\n\nNEW repo catalog:\n%s\n\nOLD repo clusters:\n%s",
-			m.AddonName, m.ClusterName, newValStr, oldValStr))
+		fmt.Sprintf("Comparing values for addon %q on cluster %q.\n\nNEW repo global values:\n%s\n\nOLD repo global values:\n%s\n\nNEW repo cluster values:\n%s\n\nOLD repo cluster values:\n%s",
+			m.AddonName, m.ClusterName, newGlobalStr, oldGlobalStr, newClusterStr, oldClusterStr))
+
+	e.addLog(m, 2, e.newRepoLabel(), "completed", "Values comparison complete")
 
 	step.Message = fmt.Sprintf("Values comparison complete (advisory). %s", assessment)
 	_ = e.store.SaveMigration(m)
@@ -108,20 +170,27 @@ func (e *Executor) stepConfigureValues(ctx context.Context, m *Migration) error 
 func (e *Executor) stepEnableAddon(ctx context.Context, m *Migration) error {
 	const clusterAddonsPath = "configuration/cluster-addons.yaml"
 
+	e.addLog(m, 3, e.newRepoLabel(), "reading", "Reading cluster-addons.yaml...")
+
 	data, err := e.newGP.GetFileContent(ctx, clusterAddonsPath, "main")
 	if err != nil {
 		return fmt.Errorf("reading cluster-addons.yaml from NEW repo: %w", err)
 	}
+
+	e.addLog(m, 3, e.newRepoLabel(), "modifying", fmt.Sprintf("Setting %s: enabled for cluster %s", m.AddonName, m.ClusterName))
 
 	updated, err := gitops.EnableAddonLabel(data, m.ClusterName, m.AddonName)
 	if err != nil {
 		return fmt.Errorf("enabling addon label: %w", err)
 	}
 
+	ts := time.Now().Unix()
+	branch := fmt.Sprintf("aap/migration/%s/%s/%d", sanitize(m.AddonName), sanitize(m.ClusterName), ts)
+	e.addLog(m, 3, e.newRepoLabel(), "creating", fmt.Sprintf("Creating branch %s...", branch))
+
 	step := &m.Steps[2]
-	return e.createPR(ctx, e.newGP, m, step,
-		clusterAddonsPath, updated,
-		"enable",
+	return e.createPRWithLog(ctx, e.newGP, m, step, 3,
+		clusterAddonsPath, updated, branch,
 		fmt.Sprintf("Enable %s on %s (migration)", m.AddonName, m.ClusterName),
 		fmt.Sprintf("[Migration] Enable %s on %s", m.AddonName, m.ClusterName),
 		fmt.Sprintf("Migration step 3: enable addon label for **%s** on cluster **%s**.\n\nThis PR sets the addon label to `enabled` in `cluster-addons.yaml`.", m.AddonName, m.ClusterName),
@@ -133,9 +202,12 @@ func (e *Executor) stepVerifyAppCreated(ctx context.Context, m *Migration) error
 	appName := fmt.Sprintf("%s-%s", m.AddonName, m.ClusterName)
 	step := &m.Steps[3]
 
+	e.addLog(m, 4, "NEW ArgoCD", "verifying", fmt.Sprintf("Checking for application %s...", appName))
+
 	var lastErr error
 	for attempt := 0; attempt < 3; attempt++ {
 		if attempt > 0 {
+			e.addLog(m, 4, "NEW ArgoCD", "retrying", fmt.Sprintf("Attempt %d/3 — waiting for application %s...", attempt+1, appName))
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
@@ -149,6 +221,8 @@ func (e *Executor) stepVerifyAppCreated(ctx context.Context, m *Migration) error
 			slog.Info("migration: app not yet visible", "app", appName, "attempt", attempt+1)
 			continue
 		}
+
+		e.addLog(m, 4, "NEW ArgoCD", "completed", fmt.Sprintf("Application found: sync=%s, health=%s", app.SyncStatus, app.HealthStatus))
 
 		assessment, _ := e.aiEvaluate(ctx, step.Title,
 			fmt.Sprintf("Application %q found in NEW ArgoCD. Sync: %s, Health: %s",
@@ -169,10 +243,13 @@ func (e *Executor) stepDisableAddonOld(ctx context.Context, m *Migration) error 
 		return fmt.Errorf("old git provider not configured — cannot disable addon in OLD repo")
 	}
 
+	e.addLog(m, 5, e.oldRepoLabel(), "reading", "Reading clusters.yaml from OLD repo...")
+
 	// Try V2 path first, then V1.
 	clusterFile := "configuration/cluster-addons.yaml"
 	data, err := e.oldGP.GetFileContent(ctx, clusterFile, "main")
 	if err != nil {
+		e.addLog(m, 5, e.oldRepoLabel(), "reading", "V2 path not found, trying V1: values/clusters.yaml...")
 		clusterFile = "values/clusters.yaml"
 		data, err = e.oldGP.GetFileContent(ctx, clusterFile, "main")
 		if err != nil {
@@ -180,15 +257,20 @@ func (e *Executor) stepDisableAddonOld(ctx context.Context, m *Migration) error 
 		}
 	}
 
+	e.addLog(m, 5, e.oldRepoLabel(), "modifying", fmt.Sprintf("Setting %s: disabled for cluster %s", m.AddonName, m.ClusterName))
+
 	updated, err := gitops.DisableAddonLabel(data, m.ClusterName, m.AddonName)
 	if err != nil {
 		return fmt.Errorf("disabling addon label in OLD repo: %w", err)
 	}
 
+	ts := time.Now().Unix()
+	branch := fmt.Sprintf("aap/migration/%s/%s/%d", sanitize(m.AddonName), sanitize(m.ClusterName), ts)
+	e.addLog(m, 5, e.oldRepoLabel(), "creating", fmt.Sprintf("Creating branch %s...", branch))
+
 	step := &m.Steps[4]
-	return e.createPR(ctx, e.oldGP, m, step,
-		clusterFile, updated,
-		"disable",
+	return e.createPRWithLog(ctx, e.oldGP, m, step, 5,
+		clusterFile, updated, branch,
 		fmt.Sprintf("Disable %s on %s (migration)", m.AddonName, m.ClusterName),
 		fmt.Sprintf("[Migration] Disable %s on %s", m.AddonName, m.ClusterName),
 		fmt.Sprintf("Migration step 5: disable addon label for **%s** on cluster **%s** in the OLD repository.\n\nThis PR sets the addon label to `disabled` so the OLD ArgoCD will remove the application on next sync.", m.AddonName, m.ClusterName),
@@ -201,9 +283,13 @@ func (e *Executor) stepSyncOldArgoCD(ctx context.Context, m *Migration) error {
 		return fmt.Errorf("old ArgoCD client not configured")
 	}
 
+	e.addLog(m, 6, "OLD ArgoCD", "syncing", "Triggering sync on clusters application...")
+
 	if err := e.oldArgoCD.SyncApplication(ctx, "clusters"); err != nil {
 		return fmt.Errorf("syncing clusters app in OLD ArgoCD: %w", err)
 	}
+
+	e.addLog(m, 6, "OLD ArgoCD", "completed", "Sync triggered successfully for 'clusters' application")
 
 	step := &m.Steps[5]
 	step.Message = "Triggered sync of 'clusters' application in OLD ArgoCD."
@@ -220,8 +306,11 @@ func (e *Executor) stepVerifyAppRemoved(ctx context.Context, m *Migration) error
 	appName := fmt.Sprintf("%s-%s", m.AddonName, m.ClusterName)
 	step := &m.Steps[6]
 
+	e.addLog(m, 7, "OLD ArgoCD", "verifying", fmt.Sprintf("Checking if application %s was removed...", appName))
+
 	for attempt := 0; attempt < 5; attempt++ {
 		if attempt > 0 {
+			e.addLog(m, 7, "OLD ArgoCD", "retrying", fmt.Sprintf("Attempt %d/5 — application %s still exists, waiting...", attempt+1, appName))
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
@@ -232,6 +321,8 @@ func (e *Executor) stepVerifyAppRemoved(ctx context.Context, m *Migration) error
 		_, err := e.oldArgoCD.GetApplication(ctx, appName)
 		if err != nil {
 			// Application not found — this is the desired state.
+			e.addLog(m, 7, "OLD ArgoCD", "completed", fmt.Sprintf("Application %s is no longer present in OLD ArgoCD", appName))
+
 			assessment, _ := e.aiEvaluate(ctx, step.Title,
 				fmt.Sprintf("Application %q is no longer present in OLD ArgoCD (attempt %d).", appName, attempt+1))
 			step.Message = fmt.Sprintf("Application %q removed from OLD ArgoCD. %s", appName, assessment)
@@ -249,10 +340,14 @@ func (e *Executor) stepVerifyAppRemoved(ctx context.Context, m *Migration) error
 func (e *Executor) stepHardRefresh(ctx context.Context, m *Migration) error {
 	appName := fmt.Sprintf("%s-%s", m.AddonName, m.ClusterName)
 
+	e.addLog(m, 8, "NEW ArgoCD", "refreshing", fmt.Sprintf("Triggering hard refresh for %s...", appName))
+
 	app, err := e.newArgoCD.RefreshApplication(ctx, appName, true)
 	if err != nil {
 		return fmt.Errorf("hard refresh of %q in NEW ArgoCD: %w", appName, err)
 	}
+
+	e.addLog(m, 8, "NEW ArgoCD", "completed", fmt.Sprintf("Hard refresh complete: sync=%s, health=%s", app.SyncStatus, app.HealthStatus))
 
 	step := &m.Steps[7]
 	step.Message = fmt.Sprintf("Hard refresh triggered for %q (sync=%s, health=%s).", appName, app.SyncStatus, app.HealthStatus)
@@ -265,9 +360,12 @@ func (e *Executor) stepVerifyHealthy(ctx context.Context, m *Migration) error {
 	appName := fmt.Sprintf("%s-%s", m.AddonName, m.ClusterName)
 	step := &m.Steps[8]
 
+	e.addLog(m, 9, "NEW ArgoCD", "verifying", fmt.Sprintf("Checking health status of %s...", appName))
+
 	var lastStatus string
 	for attempt := 0; attempt < 3; attempt++ {
 		if attempt > 0 {
+			e.addLog(m, 9, "NEW ArgoCD", "retrying", fmt.Sprintf("Attempt %d/3 — %s is %s, waiting...", attempt+1, appName, lastStatus))
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
@@ -283,6 +381,8 @@ func (e *Executor) stepVerifyHealthy(ctx context.Context, m *Migration) error {
 		lastStatus = fmt.Sprintf("sync=%s, health=%s", app.SyncStatus, app.HealthStatus)
 
 		if app.SyncStatus == "Synced" && app.HealthStatus == "Healthy" {
+			e.addLog(m, 9, "NEW ArgoCD", "completed", fmt.Sprintf("Application %s is Synced and Healthy", appName))
+
 			assessment, _ := e.aiEvaluate(ctx, step.Title,
 				fmt.Sprintf("Application %q is %s.", appName, lastStatus))
 			step.Message = fmt.Sprintf("Application %q is Synced and Healthy. %s", appName, assessment)
@@ -300,20 +400,27 @@ func (e *Executor) stepVerifyHealthy(ctx context.Context, m *Migration) error {
 func (e *Executor) stepDisableMigrationMode(ctx context.Context, m *Migration) error {
 	const catalogPath = "configuration/addons-catalog.yaml"
 
+	e.addLog(m, 10, e.newRepoLabel(), "reading", "Reading addons-catalog.yaml...")
+
 	data, err := e.newGP.GetFileContent(ctx, catalogPath, "main")
 	if err != nil {
 		return fmt.Errorf("reading catalog from NEW repo: %w", err)
 	}
+
+	e.addLog(m, 10, e.newRepoLabel(), "modifying", fmt.Sprintf("Setting inMigration: false for %s", m.AddonName))
 
 	updated, err := setInMigrationFalse(data, m.AddonName)
 	if err != nil {
 		return fmt.Errorf("updating inMigration flag: %w", err)
 	}
 
+	ts := time.Now().Unix()
+	branch := fmt.Sprintf("aap/migration/%s/%s/%d", sanitize(m.AddonName), sanitize(m.ClusterName), ts)
+	e.addLog(m, 10, e.newRepoLabel(), "creating", fmt.Sprintf("Creating branch %s...", branch))
+
 	step := &m.Steps[9]
-	return e.createPR(ctx, e.newGP, m, step,
-		catalogPath, updated,
-		"finalize",
+	return e.createPRWithLog(ctx, e.newGP, m, step, 10,
+		catalogPath, updated, branch,
 		fmt.Sprintf("Disable migration mode for %s", m.AddonName),
 		fmt.Sprintf("[Migration] Finalize %s — disable migration mode", m.AddonName),
 		fmt.Sprintf("Migration step 10: set `inMigration: false` for **%s** in `addons-catalog.yaml`.\n\nThis completes the migration process.", m.AddonName),
@@ -343,6 +450,49 @@ func (e *Executor) createPR(
 	if err != nil {
 		return fmt.Errorf("creating pull request: %w", err)
 	}
+
+	step.PRURL = pr.URL
+	step.PRStatus = "open"
+	step.Status = StepWaiting
+	step.Message = fmt.Sprintf("PR created: %s — waiting for merge", pr.URL)
+	_ = e.store.SaveMigration(m)
+	return nil
+}
+
+// createPRWithLog is like createPR but emits detailed log entries for each sub-operation.
+func (e *Executor) createPRWithLog(
+	ctx context.Context,
+	gp gitprovider.GitProvider,
+	m *Migration,
+	step *MigrationStep,
+	stepNum int,
+	filePath string,
+	content []byte,
+	branch, commitMsg, prTitle, prBody string,
+) error {
+	repoLabel := e.newRepoLabel()
+	if gp == e.oldGP {
+		repoLabel = e.oldRepoLabel()
+	}
+
+	if err := gp.CreateBranch(ctx, branch, "main"); err != nil {
+		return fmt.Errorf("creating branch %q: %w", branch, err)
+	}
+
+	e.addLog(m, stepNum, repoLabel, "committing", "Pushing file changes...")
+
+	if err := gp.CreateOrUpdateFile(ctx, filePath, content, branch, commitMsg); err != nil {
+		return fmt.Errorf("updating file %q on branch %q: %w", filePath, branch, err)
+	}
+
+	e.addLog(m, stepNum, repoLabel, "creating", "Opening pull request...")
+
+	pr, err := gp.CreatePullRequest(ctx, prTitle, prBody, branch, "main")
+	if err != nil {
+		return fmt.Errorf("creating pull request: %w", err)
+	}
+
+	e.addLog(m, stepNum, repoLabel, "waiting", fmt.Sprintf("PR created: %s", pr.URL))
 
 	step.PRURL = pr.URL
 	step.PRStatus = "open"

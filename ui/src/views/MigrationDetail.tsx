@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Pause, XCircle } from 'lucide-react'
+import { ArrowLeft, Pause, XCircle, Terminal, ChevronUp, ChevronDown, CheckCircle } from 'lucide-react'
 import { api } from '@/services/api'
 import type { Migration } from '@/services/api'
 import { MigrationStepper } from '@/components/MigrationStepper'
@@ -8,6 +8,8 @@ import { StatusBadge } from '@/components/StatusBadge'
 import { LoadingState } from '@/components/LoadingState'
 import { ErrorState } from '@/components/ErrorState'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { cn } from '@/lib/utils'
 
 export default function MigrationDetail() {
   const { id } = useParams<{ id: string }>()
@@ -15,7 +17,9 @@ export default function MigrationDetail() {
   const [migration, setMigration] = useState<Migration | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [logsExpanded, setLogsExpanded] = useState(false)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const logEndRef = useRef<HTMLDivElement>(null)
 
   const fetchMigration = useCallback(async () => {
     if (!id) return
@@ -62,6 +66,13 @@ export default function MigrationDetail() {
       }
     }
   }, [migration, fetchMigration])
+
+  // Auto-scroll logs to bottom
+  useEffect(() => {
+    if (logEndRef.current && logsExpanded) {
+      logEndRef.current.scrollTop = logEndRef.current.scrollHeight
+    }
+  }, [migration?.logs?.length, logsExpanded])
 
   const handleContinue = async () => {
     if (!id) return
@@ -115,6 +126,7 @@ export default function MigrationDetail() {
 
   const isTerminal = ['completed', 'failed', 'cancelled'].includes(migration.status)
   const isRunning = migration.status === 'running'
+  const isGated = migration.status === 'gated'
 
   return (
     <div className="space-y-6">
@@ -130,9 +142,16 @@ export default function MigrationDetail() {
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-            {migration.addon_name}
-          </h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+              {migration.addon_name}
+            </h1>
+            {migration.mode && (
+              <Badge variant={migration.mode === 'yolo' ? 'destructive' : 'secondary'}>
+                {migration.mode === 'yolo' ? 'YOLO' : 'Gates'}
+              </Badge>
+            )}
+          </div>
           <p className="mt-1 text-gray-500 dark:text-gray-400">
             Cluster: {migration.cluster_name}
           </p>
@@ -174,6 +193,69 @@ export default function MigrationDetail() {
           onRetry={handleRetry}
         />
       )}
+
+      {/* Action buttons for gated / waiting statuses */}
+      <div className="flex items-center gap-2">
+        {isGated && (
+          <Button onClick={handleContinue}>
+            <CheckCircle className="h-4 w-4" />
+            Approve &amp; Continue
+          </Button>
+        )}
+        {migration.status === 'waiting' && (
+          <Button onClick={handleContinue}>
+            Continue (PR Merged)
+          </Button>
+        )}
+      </div>
+
+      {/* Live Activity Log */}
+      <div className="mt-6 rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
+        <button
+          type="button"
+          onClick={() => setLogsExpanded(!logsExpanded)}
+          className="flex w-full items-center justify-between p-4"
+        >
+          <div className="flex items-center gap-2">
+            <Terminal className="h-4 w-4" />
+            <span className="text-sm font-semibold">Activity Log</span>
+            <Badge variant="secondary">{migration.logs?.length ?? 0}</Badge>
+          </div>
+          {logsExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+        </button>
+
+        {logsExpanded && (
+          <div
+            ref={logEndRef}
+            className="max-h-64 overflow-auto border-t border-gray-200 p-4 dark:border-gray-700"
+          >
+            {migration.logs?.map((log, i) => (
+              <div key={i} className="flex items-start gap-2 py-1 font-mono text-xs">
+                <span className="shrink-0 text-gray-400">
+                  {new Date(log.timestamp).toLocaleTimeString()}
+                </span>
+                <span
+                  className={cn(
+                    'shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold',
+                    log.repo.startsWith('NEW')
+                      ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                      : log.repo.startsWith('OLD')
+                        ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
+                        : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
+                  )}
+                >
+                  {log.repo}
+                </span>
+                <span className="text-gray-500">[{log.action}]</span>
+                <span className="text-gray-700 dark:text-gray-300">{log.detail}</span>
+              </div>
+            ))}
+            {(!migration.logs || migration.logs.length === 0) && (
+              <p className="text-xs text-gray-400">No activity yet...</p>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
