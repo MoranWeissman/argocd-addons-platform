@@ -160,6 +160,8 @@ export const api = {
   pauseMigration: (id: string) => postJSON<void>(`/migration/${id}/pause`),
   retryMigration: (id: string) => postJSON<void>(`/migration/${id}/retry`),
   cancelMigration: (id: string) => postJSON<void>(`/migration/${id}/cancel`),
+  azureListProjects: (org: string, pat: string) => fetchJSON<string[]>(`/migration/azure/projects?org=${encodeURIComponent(org)}&pat=${encodeURIComponent(pat)}`),
+  azureListRepos: (org: string, project: string, pat: string) => fetchJSON<string[]>(`/migration/azure/repos?org=${encodeURIComponent(org)}&project=${encodeURIComponent(project)}&pat=${encodeURIComponent(pat)}`),
 }
 
 // Migration types

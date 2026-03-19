@@ -41,6 +41,13 @@ export function MigrationSettings({ onConfigured }: MigrationSettingsProps) {
   const [argoNamespace, setArgoNamespace] = useState('argocd')
   const [argoInsecure, setArgoInsecure] = useState(false)
 
+  // Azure DevOps auto-discovery
+  const [azProjects, setAzProjects] = useState<string[]>([])
+  const [azRepos, setAzRepos] = useState<string[]>([])
+  const [loadingProjects, setLoadingProjects] = useState(false)
+  const [loadingRepos, setLoadingRepos] = useState(false)
+  const [azDiscovered, setAzDiscovered] = useState(false)
+
   // Test results
   const [testingGit, setTestingGit] = useState(false)
   const [testingArgo, setTestingArgo] = useState(false)
@@ -79,6 +86,43 @@ export function MigrationSettings({ onConfigured }: MigrationSettingsProps) {
   useEffect(() => {
     void loadSettings()
   }, [loadSettings])
+
+  // Azure DevOps: fetch projects when org + PAT are set
+  const handleDiscoverProjects = async () => {
+    if (!azOrg || !azPat) return
+    setLoadingProjects(true)
+    setAzProjects([])
+    setAzRepos([])
+    setAzProject('')
+    setAzRepo('')
+    setAzDiscovered(false)
+    try {
+      const projects = await api.azureListProjects(azOrg, azPat)
+      setAzProjects(projects)
+      setAzDiscovered(true)
+    } catch {
+      setError('Failed to fetch projects. Check organization name and PAT.')
+    } finally {
+      setLoadingProjects(false)
+    }
+  }
+
+  // Azure DevOps: fetch repos when project is selected
+  const handleProjectChange = async (project: string) => {
+    setAzProject(project)
+    setAzRepo('')
+    setAzRepos([])
+    if (!project || !azOrg || !azPat) return
+    setLoadingRepos(true)
+    try {
+      const repos = await api.azureListRepos(azOrg, project, azPat)
+      setAzRepos(repos)
+    } catch {
+      setError('Failed to fetch repositories.')
+    } finally {
+      setLoadingRepos(false)
+    }
+  }
 
   const buildSettings = (): MigrationSettingsType => ({
     old_git: gitProvider === 'github'
@@ -274,21 +318,64 @@ export function MigrationSettings({ onConfigured }: MigrationSettingsProps) {
         ) : (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Organization</label>
-              <Input value={azOrg} onChange={(e) => setAzOrg(e.target.value)} placeholder="my-org" />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Project</label>
-              <Input value={azProject} onChange={(e) => setAzProject(e.target.value)} placeholder="my-project" />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Repository</label>
-              <Input value={azRepo} onChange={(e) => setAzRepo(e.target.value)} placeholder="my-repo" />
-            </div>
-            <div>
               <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">PAT</label>
               <Input type="password" value={azPat} onChange={(e) => setAzPat(e.target.value)} placeholder="Personal Access Token" />
             </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Organization</label>
+              <Input value={azOrg} onChange={(e) => { setAzOrg(e.target.value); setAzDiscovered(false) }} placeholder="my-org" />
+            </div>
+            <div className="sm:col-span-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDiscoverProjects}
+                disabled={!azOrg || !azPat || loadingProjects}
+              >
+                {loadingProjects ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null}
+                {azDiscovered ? 'Refresh' : 'Connect & Discover'}
+              </Button>
+              {azDiscovered && <CheckCircle className="ml-2 inline h-4 w-4 text-green-500" />}
+            </div>
+
+            {azProjects.length > 0 && (
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Project</label>
+                <select
+                  value={azProject}
+                  onChange={(e) => handleProjectChange(e.target.value)}
+                  className="h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30"
+                >
+                  <option value="">Select a project...</option>
+                  {azProjects.map((p) => (
+                    <option key={p} value={p}>{p}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {azRepos.length > 0 && (
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Repository</label>
+                <select
+                  value={azRepo}
+                  onChange={(e) => setAzRepo(e.target.value)}
+                  className="h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30"
+                >
+                  <option value="">Select a repository...</option>
+                  {azRepos.map((r) => (
+                    <option key={r} value={r}>{r}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {loadingRepos && (
+              <div className="flex items-center gap-2 text-sm text-gray-500">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Loading repositories...
+              </div>
+            )}
           </div>
         )}
 
