@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.15.0](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.14.0...v1.15.0) (2026-03-19)
+
+
+### Features
+
+* update login page with high-res background and dynamic cover ([#37](https://github.com/MoranWeissman/argocd-addons-platform/issues/37)) ([75214d8](https://github.com/MoranWeissman/argocd-addons-platform/commit/75214d8c7494954eddfe560b4296fa01b798b182))
+
+
+### Bug Fixes
+
+* read version from release-please manifest instead of stale VERSION file ([#35](https://github.com/MoranWeissman/argocd-addons-platform/issues/35)) ([aea26cb](https://github.com/MoranWeissman/argocd-addons-platform/commit/aea26cbe44d3aefba703d603adbed06920519152))
+
 ## [1.14.0](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.13.2...v1.14.0) (2026-03-19)
 
 
