@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.20.1](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.20.0...v1.20.1) (2026-03-20)
+
+
+### Bug Fixes
+
+* connection update, delete migration, per-step logs, branch cleanup ([#63](https://github.com/MoranWeissman/argocd-addons-platform/issues/63)) ([fec7a3a](https://github.com/MoranWeissman/argocd-addons-platform/commit/fec7a3a4c47622c6f044fd83216808f971af8210))
+
 ## [1.20.0](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.19.2...v1.20.0) (2026-03-19)
 
 
