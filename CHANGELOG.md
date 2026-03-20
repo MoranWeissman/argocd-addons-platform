@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.22.0](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.21.1...v1.22.0) (2026-03-20)
+
+
+### Features
+
+* redesign connection form with test-before-save UX ([cd8eb17](https://github.com/MoranWeissman/argocd-addons-platform/commit/cd8eb1731bacd93dcdd56afd25c1296d1c8e9c74))
+
 ## [1.21.1](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.21.0...v1.21.1) (2026-03-20)
 
 
