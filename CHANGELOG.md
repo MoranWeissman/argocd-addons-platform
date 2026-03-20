@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.20.2](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.20.1...v1.20.2) (2026-03-20)
+
+
+### Bug Fixes
+
+* URL-encode connection name in update/delete API calls ([#65](https://github.com/MoranWeissman/argocd-addons-platform/issues/65)) ([9ed5816](https://github.com/MoranWeissman/argocd-addons-platform/commit/9ed58166d7e2cc58c948b8dcd0d40c11daa782df))
+
 ## [1.20.1](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.20.0...v1.20.1) (2026-03-20)
 
 
