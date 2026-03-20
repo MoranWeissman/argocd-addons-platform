@@ -290,6 +290,51 @@ func TestK8sStore_WrongKeyReturnsError(t *testing.T) {
 	}
 }
 
+func TestK8sStore_DeleteActiveReassigns(t *testing.T) {
+	s := newTestK8sStore(t)
+
+	_ = s.SaveConnection(models.Connection{Name: "conn-a"})
+	_ = s.SaveConnection(models.Connection{Name: "conn-b"})
+	_ = s.SetActiveConnection("conn-a")
+
+	if err := s.DeleteConnection("conn-a"); err != nil {
+		t.Fatalf("DeleteConnection: %v", err)
+	}
+
+	active, err := s.GetActiveConnection()
+	if err != nil {
+		t.Fatalf("GetActiveConnection: %v", err)
+	}
+	if active != "conn-b" {
+		t.Errorf("expected active to shift to 'conn-b', got %q", active)
+	}
+}
+
+func TestK8sStore_IsDefaultMutualExclusion(t *testing.T) {
+	s := newTestK8sStore(t)
+
+	_ = s.SaveConnection(models.Connection{Name: "a", IsDefault: true})
+	_ = s.SaveConnection(models.Connection{Name: "b", IsDefault: true})
+
+	list, err := s.ListConnections()
+	if err != nil {
+		t.Fatalf("ListConnections: %v", err)
+	}
+
+	defaultCount := 0
+	for _, c := range list {
+		if c.IsDefault {
+			defaultCount++
+			if c.Name != "b" {
+				t.Errorf("expected 'b' to be default, got %q", c.Name)
+			}
+		}
+	}
+	if defaultCount != 1 {
+		t.Errorf("expected exactly 1 default, got %d", defaultCount)
+	}
+}
+
 func TestK8sStore_EmptySecretReturnsEmpty(t *testing.T) {
 	s := newTestK8sStore(t)
 

@@ -94,9 +94,10 @@ func (s *K8sStore) load() (*connData, string, error) {
 }
 
 // save encrypts and persists connData to the K8s Secret.
-// It tries Update first, falls back to Create on NotFound, and retries Update on AlreadyExists.
+// It tries Update first (with resourceVersion for optimistic concurrency),
+// falls back to Create on NotFound, and retries Update on AlreadyExists.
 // Caller must hold s.mu.
-func (s *K8sStore) save(data *connData) error {
+func (s *K8sStore) save(data *connData, resourceVersion string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -112,8 +113,9 @@ func (s *K8sStore) save(data *connData) error {
 
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      s.secretName,
-			Namespace: s.namespace,
+			Name:            s.secretName,
+			Namespace:       s.namespace,
+			ResourceVersion: resourceVersion, // optimistic concurrency for updates
 			Labels: map[string]string{
 				"app.kubernetes.io/managed-by": "aap",
 				"app.kubernetes.io/component":  "connection-config",
@@ -189,7 +191,7 @@ func (s *K8sStore) SaveConnection(conn models.Connection) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	data, _, err := s.load()
+	data, rv, err := s.load()
 	if err != nil {
 		return err
 	}
@@ -231,7 +233,7 @@ func (s *K8sStore) SaveConnection(conn models.Connection) error {
 		data.ActiveConnection = data.Connections[0].Name
 	}
 
-	return s.save(data)
+	return s.save(data, rv)
 }
 
 // DeleteConnection removes a connection by name. Returns an error if not found.
@@ -239,7 +241,7 @@ func (s *K8sStore) DeleteConnection(name string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	data, _, err := s.load()
+	data, rv, err := s.load()
 	if err != nil {
 		return err
 	}
@@ -264,7 +266,7 @@ func (s *K8sStore) DeleteConnection(name string) error {
 		}
 	}
 
-	return s.save(data)
+	return s.save(data, rv)
 }
 
 // GetActiveConnection returns the active connection name, falling back to the default
@@ -302,7 +304,7 @@ func (s *K8sStore) SetActiveConnection(name string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	data, _, err := s.load()
+	data, rv, err := s.load()
 	if err != nil {
 		return err
 	}
@@ -320,5 +322,5 @@ func (s *K8sStore) SetActiveConnection(name string) error {
 	}
 
 	data.ActiveConnection = name
-	return s.save(data)
+	return s.save(data, rv)
 }
