@@ -89,6 +89,7 @@ func NewRouter(srv *Server, staticFS fs.FS) http.Handler {
 	mux.HandleFunc("DELETE /api/v1/connections/{name}", srv.handleDeleteConnection)
 	mux.HandleFunc("POST /api/v1/connections/active", srv.handleSetActiveConnection)
 	mux.HandleFunc("POST /api/v1/connections/test", srv.handleTestConnection)
+	mux.HandleFunc("POST /api/v1/connections/test-credentials", srv.handleTestCredentials)
 
 	// Clusters
 	mux.HandleFunc("GET /api/v1/clusters", srv.handleListClusters)

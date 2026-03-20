@@ -134,173 +134,129 @@ const inputCls =
 const selectCls =
   'mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100'
 
+interface TestStatus {
+  git: 'idle' | 'testing' | 'ok' | 'error'
+  argocd: 'idle' | 'testing' | 'ok' | 'error'
+  gitMessage?: string
+  argocdMessage?: string
+}
+
 function ConnectionFormFields({
   form,
   onChange,
   isEdit,
+  testStatus,
+  onTestGit,
+  onTestArgocd,
 }: {
   form: ConnectionFormData
   onChange: (patch: Partial<ConnectionFormData>) => void
   isEdit: boolean
+  testStatus: TestStatus
+  onTestGit: () => void
+  onTestArgocd: () => void
 }) {
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-      {/* Name */}
+    <div className="space-y-6">
+      {/* Git Configuration */}
       <div>
-        <label className={labelCls}>Name</label>
-        <input
-          className={inputCls}
-          value={form.name}
-          onChange={(e) => onChange({ name: e.target.value })}
-          placeholder="e.g. production"
-          disabled={isEdit}
-          required
-        />
-      </div>
-
-      {/* Description */}
-      <div>
-        <label className={labelCls}>Description</label>
-        <input
-          className={inputCls}
-          value={form.description}
-          onChange={(e) => onChange({ description: e.target.value })}
-          placeholder="Optional description"
-        />
-      </div>
-
-      {/* Git Provider */}
-      <div>
-        <label className={labelCls}>Git Provider</label>
-        <select
-          className={selectCls}
-          value={form.git_provider}
-          onChange={(e) =>
-            onChange({
-              git_provider: e.target.value as 'github' | 'azuredevops',
-            })
-          }
-        >
-          <option value="github">GitHub</option>
-          <option value="azuredevops">Azure DevOps</option>
-        </select>
-      </div>
-
-      {/* Conditional git fields */}
-      {form.git_provider === 'github' ? (
-        <>
+        <div className="mb-3 flex items-center gap-2">
+          <GitBranch className="h-4 w-4 text-gray-500" />
+          <h5 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Git Repository</h5>
+        </div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
-            <label className={labelCls}>Owner</label>
-            <input
-              className={inputCls}
-              value={form.github_owner}
-              onChange={(e) => onChange({ github_owner: e.target.value })}
-              placeholder="e.g. my-org"
-              required
-            />
+            <label className={labelCls}>Provider</label>
+            <select
+              className={selectCls}
+              value={form.git_provider}
+              onChange={(e) =>
+                onChange({ git_provider: e.target.value as 'github' | 'azuredevops' })
+              }
+            >
+              <option value="github">GitHub</option>
+              <option value="azuredevops">Azure DevOps</option>
+            </select>
           </div>
+
+          {form.git_provider === 'github' ? (
+            <>
+              <div>
+                <label className={labelCls}>Owner</label>
+                <input className={inputCls} value={form.github_owner} onChange={(e) => onChange({ github_owner: e.target.value })} placeholder="e.g. my-org" required />
+              </div>
+              <div>
+                <label className={labelCls}>Repository</label>
+                <input className={inputCls} value={form.github_repo} onChange={(e) => onChange({ github_repo: e.target.value })} placeholder="e.g. k8s-addons" required />
+              </div>
+              <div>
+                <label className={labelCls}>Token</label>
+                <input className={inputCls} type="password" value={form.github_token} onChange={(e) => onChange({ github_token: e.target.value })} placeholder={isEdit ? 'Leave blank to keep existing' : 'ghp_...'} />
+              </div>
+            </>
+          ) : (
+            <>
+              <div>
+                <label className={labelCls}>Organization</label>
+                <input className={inputCls} value={form.azure_org} onChange={(e) => onChange({ azure_org: e.target.value })} placeholder="e.g. MyOrg" required />
+              </div>
+              <div>
+                <label className={labelCls}>Project</label>
+                <input className={inputCls} value={form.azure_project} onChange={(e) => onChange({ azure_project: e.target.value })} placeholder="e.g. MyProject" required />
+              </div>
+              <div>
+                <label className={labelCls}>Repository</label>
+                <input className={inputCls} value={form.azure_repo} onChange={(e) => onChange({ azure_repo: e.target.value })} placeholder="e.g. k8s-addons" required />
+              </div>
+              <div>
+                <label className={labelCls}>PAT</label>
+                <input className={inputCls} type="password" value={form.azure_pat} onChange={(e) => onChange({ azure_pat: e.target.value })} placeholder={isEdit ? 'Leave blank to keep existing' : 'Personal Access Token'} />
+              </div>
+            </>
+          )}
+        </div>
+        <div className="mt-3 flex items-center gap-3">
+          <button type="button" onClick={onTestGit} disabled={testStatus.git === 'testing'}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700">
+            {testStatus.git === 'testing' ? <Loader2 className="h-3 w-3 animate-spin" /> : <GitBranch className="h-3 w-3" />}
+            Test Git
+          </button>
+          {testStatus.git === 'ok' && <span className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400"><CheckCircle className="h-3.5 w-3.5" /> Connected</span>}
+          {testStatus.git === 'error' && <span className="flex items-center gap-1 text-xs text-red-600 dark:text-red-400"><XCircle className="h-3.5 w-3.5" /> {testStatus.gitMessage || 'Failed'}</span>}
+        </div>
+      </div>
+
+      {/* ArgoCD Configuration */}
+      <div>
+        <div className="mb-3 flex items-center gap-2">
+          <Server className="h-4 w-4 text-gray-500" />
+          <h5 className="text-sm font-semibold text-gray-900 dark:text-gray-100">ArgoCD</h5>
+        </div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
-            <label className={labelCls}>Repository</label>
-            <input
-              className={inputCls}
-              value={form.github_repo}
-              onChange={(e) => onChange({ github_repo: e.target.value })}
-              placeholder="e.g. k8s-addons"
-              required
-            />
+            <label className={labelCls}>Server URL</label>
+            <input className={inputCls} value={form.argocd_server_url} onChange={(e) => onChange({ argocd_server_url: e.target.value })} placeholder="Leave empty for in-cluster" />
+            <p className="mt-1 text-[10px] text-gray-400">Leave empty to auto-discover via K8s DNS</p>
           </div>
           <div>
             <label className={labelCls}>Token</label>
-            <input
-              className={inputCls}
-              type="password"
-              value={form.github_token}
-              onChange={(e) => onChange({ github_token: e.target.value })}
-              placeholder={
-                isEdit ? 'Leave blank to keep existing' : 'ghp_...'
-              }
-            />
-          </div>
-        </>
-      ) : (
-        <>
-          <div>
-            <label className={labelCls}>Organization</label>
-            <input
-              className={inputCls}
-              value={form.azure_org}
-              onChange={(e) => onChange({ azure_org: e.target.value })}
-              placeholder="e.g. MyOrg"
-              required
-            />
+            <input className={inputCls} type="password" value={form.argocd_token} onChange={(e) => onChange({ argocd_token: e.target.value })} placeholder={isEdit ? 'Leave blank to keep existing' : 'Leave empty for ServiceAccount auth'} />
+            <p className="mt-1 text-[10px] text-gray-400">Leave empty to use ServiceAccount (in-cluster)</p>
           </div>
           <div>
-            <label className={labelCls}>Project</label>
-            <input
-              className={inputCls}
-              value={form.azure_project}
-              onChange={(e) => onChange({ azure_project: e.target.value })}
-              placeholder="e.g. MyProject"
-              required
-            />
+            <label className={labelCls}>Namespace</label>
+            <input className={inputCls} value={form.argocd_namespace} onChange={(e) => onChange({ argocd_namespace: e.target.value })} placeholder="argocd" required />
           </div>
-          <div>
-            <label className={labelCls}>Repository</label>
-            <input
-              className={inputCls}
-              value={form.azure_repo}
-              onChange={(e) => onChange({ azure_repo: e.target.value })}
-              placeholder="e.g. k8s-addons"
-              required
-            />
-          </div>
-          <div>
-            <label className={labelCls}>PAT</label>
-            <input
-              className={inputCls}
-              type="password"
-              value={form.azure_pat}
-              onChange={(e) => onChange({ azure_pat: e.target.value })}
-              placeholder={
-                isEdit ? 'Leave blank to keep existing' : 'Personal Access Token'
-              }
-            />
-          </div>
-        </>
-      )}
-
-      {/* ArgoCD fields */}
-      <div>
-        <label className={labelCls}>ArgoCD URL</label>
-        <input
-          className={inputCls}
-          value={form.argocd_server_url}
-          onChange={(e) => onChange({ argocd_server_url: e.target.value })}
-          placeholder="https://argocd.example.com"
-          required
-        />
-      </div>
-      <div>
-        <label className={labelCls}>ArgoCD Token</label>
-        <input
-          className={inputCls}
-          type="password"
-          value={form.argocd_token}
-          onChange={(e) => onChange({ argocd_token: e.target.value })}
-          placeholder={
-            isEdit ? 'Leave blank to keep existing' : 'ArgoCD auth token'
-          }
-        />
-      </div>
-      <div>
-        <label className={labelCls}>ArgoCD Namespace</label>
-        <input
-          className={inputCls}
-          value={form.argocd_namespace}
-          onChange={(e) => onChange({ argocd_namespace: e.target.value })}
-          placeholder="argocd"
-          required
-        />
+        </div>
+        <div className="mt-3 flex items-center gap-3">
+          <button type="button" onClick={onTestArgocd} disabled={testStatus.argocd === 'testing'}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700">
+            {testStatus.argocd === 'testing' ? <Loader2 className="h-3 w-3 animate-spin" /> : <Server className="h-3 w-3" />}
+            Test ArgoCD
+          </button>
+          {testStatus.argocd === 'ok' && <span className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400"><CheckCircle className="h-3.5 w-3.5" /> Connected</span>}
+          {testStatus.argocd === 'error' && <span className="flex items-center gap-1 text-xs text-red-600 dark:text-red-400"><XCircle className="h-3.5 w-3.5" /> {testStatus.argocdMessage || 'Failed'}</span>}
+        </div>
       </div>
     </div>
   )
@@ -322,12 +278,14 @@ export function Connections() {
   const [addForm, setAddForm] = useState<ConnectionFormData>({ ...emptyForm })
   const [addSaving, setAddSaving] = useState(false)
   const [addError, setAddError] = useState<string | null>(null)
+  const [addTestStatus, setAddTestStatus] = useState<TestStatus>({ git: 'idle', argocd: 'idle' })
 
   // Edit form state
   const [editingName, setEditingName] = useState<string | null>(null)
   const [editForm, setEditForm] = useState<ConnectionFormData>({ ...emptyForm })
   const [editSaving, setEditSaving] = useState(false)
   const [editError, setEditError] = useState<string | null>(null)
+  const [editTestStatus, setEditTestStatus] = useState<TestStatus>({ git: 'idle', argocd: 'idle' })
 
   const fetchHealth = useCallback(() => {
     setHealthLoading(true)
@@ -352,6 +310,25 @@ export function Connections() {
     }
   }
 
+  async function testCredentials(form: ConnectionFormData, which: 'git' | 'argocd' | 'both', setStatus: (s: TestStatus | ((prev: TestStatus) => TestStatus)) => void) {
+    const payload = buildPayload(form)
+    if (which === 'git' || which === 'both') setStatus(prev => ({ ...prev, git: 'testing', gitMessage: undefined }))
+    if (which === 'argocd' || which === 'both') setStatus(prev => ({ ...prev, argocd: 'testing', argocdMessage: undefined }))
+    try {
+      const res = await api.testCredentials(payload)
+      if (which === 'git' || which === 'both') {
+        setStatus(prev => ({ ...prev, git: res.git.status === 'ok' ? 'ok' : 'error', gitMessage: res.git.message }))
+      }
+      if (which === 'argocd' || which === 'both') {
+        setStatus(prev => ({ ...prev, argocd: res.argocd.status === 'ok' ? 'ok' : 'error', argocdMessage: res.argocd.message }))
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Test failed'
+      if (which === 'git' || which === 'both') setStatus(prev => ({ ...prev, git: 'error', gitMessage: msg }))
+      if (which === 'argocd' || which === 'both') setStatus(prev => ({ ...prev, argocd: 'error', argocdMessage: msg }))
+    }
+  }
+
   async function handleAddSubmit(e: FormEvent) {
     e.preventDefault()
     setAddSaving(true)
@@ -361,6 +338,7 @@ export function Connections() {
       refreshConnections()
       setShowAddForm(false)
       setAddForm({ ...emptyForm })
+      setAddTestStatus({ git: 'idle', argocd: 'idle' })
     } catch (err) {
       setAddError(err instanceof Error ? err.message : 'Failed to create connection')
     } finally {
@@ -372,6 +350,7 @@ export function Connections() {
     setEditingName(conn.name)
     setEditForm(formFromConnection(conn))
     setEditError(null)
+    setEditTestStatus({ git: 'idle', argocd: 'idle' })
   }
 
   async function handleEditSubmit(e: FormEvent) {
@@ -389,6 +368,9 @@ export function Connections() {
       setEditSaving(false)
     }
   }
+
+  const addTestsPassed = addTestStatus.git === 'ok' && addTestStatus.argocd === 'ok'
+  const editTestsPassed = editTestStatus.git === 'ok' && editTestStatus.argocd === 'ok'
 
   if (loading) {
     return <LoadingState message="Loading settings..." />
@@ -442,10 +424,14 @@ export function Connections() {
             </h4>
             <ConnectionFormFields
               form={addForm}
-              onChange={(patch) =>
+              onChange={(patch) => {
                 setAddForm((prev) => ({ ...prev, ...patch }))
-              }
+                setAddTestStatus({ git: 'idle', argocd: 'idle' })
+              }}
               isEdit={false}
+              testStatus={addTestStatus}
+              onTestGit={() => testCredentials(addForm, 'git', setAddTestStatus)}
+              onTestArgocd={() => testCredentials(addForm, 'argocd', setAddTestStatus)}
             />
             {addError && (
               <p className="mt-3 text-sm text-red-600 dark:text-red-400">
@@ -455,7 +441,8 @@ export function Connections() {
             <div className="mt-4 flex items-center gap-3">
               <button
                 type="submit"
-                disabled={addSaving}
+                disabled={addSaving || !addTestsPassed}
+                title={!addTestsPassed ? 'Test both Git and ArgoCD connections first' : undefined}
                 className="inline-flex items-center gap-1.5 rounded-lg bg-cyan-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-cyan-700 disabled:opacity-50 dark:bg-cyan-700 dark:hover:bg-cyan-600"
               >
                 {addSaving && (
@@ -592,10 +579,14 @@ export function Connections() {
                     </div>
                     <ConnectionFormFields
                       form={editForm}
-                      onChange={(patch) =>
+                      onChange={(patch) => {
                         setEditForm((prev) => ({ ...prev, ...patch }))
-                      }
+                        setEditTestStatus({ git: 'idle', argocd: 'idle' })
+                      }}
                       isEdit={true}
+                      testStatus={editTestStatus}
+                      onTestGit={() => testCredentials(editForm, 'git', setEditTestStatus)}
+                      onTestArgocd={() => testCredentials(editForm, 'argocd', setEditTestStatus)}
                     />
                     {editError && (
                       <p className="mt-3 text-sm text-red-600 dark:text-red-400">
@@ -605,7 +596,8 @@ export function Connections() {
                     <div className="mt-4 flex items-center gap-3">
                       <button
                         type="submit"
-                        disabled={editSaving}
+                        disabled={editSaving || !editTestsPassed}
+                        title={!editTestsPassed ? 'Test both Git and ArgoCD connections first' : undefined}
                         className="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-amber-700 disabled:opacity-50 dark:bg-amber-700 dark:hover:bg-amber-600"
                       >
                         {editSaving && (
