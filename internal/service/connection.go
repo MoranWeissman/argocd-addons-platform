@@ -53,7 +53,26 @@ func (s *ConnectionService) Create(req models.CreateConnectionRequest) error {
 		Argocd:      req.Argocd,
 		IsDefault:   req.SetAsDefault,
 	}
+	// Auto-derive connection name from git repo if not provided
+	if conn.Name == "" || conn.Name == "default" {
+		conn.Name = deriveConnectionName(conn.Git)
+	}
 	return s.store.SaveConnection(conn)
+}
+
+// deriveConnectionName builds a connection name from the git config.
+func deriveConnectionName(git models.GitRepoConfig) string {
+	switch git.Provider {
+	case models.GitProviderGitHub:
+		if git.Owner != "" && git.Repo != "" {
+			return git.Owner + "/" + git.Repo
+		}
+	case models.GitProviderAzureDevOps:
+		if git.Organization != "" && git.Project != "" && git.Repository != "" {
+			return git.Organization + "/" + git.Project + "/" + git.Repository
+		}
+	}
+	return "default"
 }
 
 // Delete removes a connection.
