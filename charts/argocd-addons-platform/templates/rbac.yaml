@@ -69,6 +69,10 @@ rules:
     verbs: ["get", "create", "update", "delete"]
   - apiGroups: [""]
     resources: ["secrets"]
+    resourceNames: [{{ .Values.config.connectionSecretName | default "aap-connections" | quote }}]
+    verbs: ["get", "update"]
+  - apiGroups: [""]
+    resources: ["secrets"]
     verbs: ["create"]  # needed to create new secrets (resourceNames can't restrict create)
   - apiGroups: [""]
     resources: ["configmaps"]

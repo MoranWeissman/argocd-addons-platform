@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 
+	"github.com/moran/argocd-addons-platform/internal/crypto"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -67,7 +68,7 @@ func (ss *SecretStore) SaveSettings(ctx context.Context, settings *MigrationSett
 		return fmt.Errorf("marshaling settings: %w", err)
 	}
 
-	encrypted, err := Encrypt(plaintext, ss.encryptionKey)
+	encrypted, err := crypto.Encrypt(plaintext, ss.encryptionKey)
 	if err != nil {
 		return fmt.Errorf("encrypting settings: %w", err)
 	}
@@ -112,7 +113,7 @@ func (ss *SecretStore) GetSettings(ctx context.Context) (*MigrationSettings, err
 		return &MigrationSettings{}, nil
 	}
 
-	plaintext, err := Decrypt(string(data), ss.encryptionKey)
+	plaintext, err := crypto.Decrypt(string(data), ss.encryptionKey)
 	if err != nil {
 		return nil, fmt.Errorf("decrypting migration settings: %w", err)
 	}

@@ -1,4 +1,4 @@
-package migration
+package crypto
 
 import (
 	"crypto/aes"

@@ -5,24 +5,11 @@ replicaCount: 1
 
 image:
   repository: ghcr.io/moranweissman/argocd-addons-platform
-  tag: "1.20.0"
+  tag: "1.20.2"
   pullPolicy: Always
 
 config:
-  connections:
-    - name: merck-ahtl/argocd-cluster-addons
-      default: true
-      git:
-        provider: github
-        owner: merck-ahtl
-        repo: argocd-cluster-addons
-        token: ${GITHUB_TOKEN}
-      argocd:
-        # In-cluster: use HTTP (port 80) via k8s service DNS + ArgoCD API token
-        server_url: "http://argocd-devops-argocd-addons-dev-eks-server.argocd.svc.cluster.local"
-        token: ${ARGOCD_TOKEN}
-        namespace: argocd
-        insecure: true
+  connectionSecretName: "aap-connections"
 
 rbac:
   create: true

@@ -1,4 +1,4 @@
-package migration
+package crypto
 
 import (
 	"testing"
@@ -46,6 +46,13 @@ func TestDecryptWrongKey(t *testing.T) {
 
 func TestEncryptEmptyKey(t *testing.T) {
 	_, err := Encrypt([]byte("data"), "")
+	if err == nil {
+		t.Fatal("expected error with empty key")
+	}
+}
+
+func TestDecryptEmptyKey(t *testing.T) {
+	_, err := Decrypt("somedata", "")
 	if err == nil {
 		t.Fatal("expected error with empty key")
 	}

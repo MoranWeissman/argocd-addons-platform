@@ -91,13 +91,25 @@ func main() {
 	var store config.Store
 	switch mode {
 	case platform.ModeKubernetes:
-		// In-cluster: still use file store but from a mounted path
-		// K8s Secrets store can be added later
-		mountedConfig := "/etc/aap/config.yaml"
-		if _, err := os.Stat(mountedConfig); err == nil {
-			*configPath = mountedConfig
+		encKey := os.Getenv("AAP_ENCRYPTION_KEY")
+		if encKey == "" {
+			log.Fatal("FATAL: AAP_ENCRYPTION_KEY is required when running on Kubernetes. " +
+				"Set it in your Helm values (secrets.AAP_ENCRYPTION_KEY) or existingSecret.")
 		}
-		store = config.NewFileStore(*configPath)
+		secretName := os.Getenv("CONNECTION_SECRET_NAME")
+		if secretName == "" {
+			secretName = "aap-connections"
+		}
+		namespace := os.Getenv("AAP_NAMESPACE")
+		if namespace == "" {
+			namespace = "argocd-addons-platform"
+		}
+		var err error
+		store, err = config.NewK8sStore(namespace, secretName, encKey)
+		if err != nil {
+			log.Fatalf("Failed to create K8s connection store: %v", err)
+		}
+		log.Printf("Connection config stored in encrypted K8s Secret: %s/%s", namespace, secretName)
 	default:
 		store = config.NewFileStore(*configPath)
 	}
