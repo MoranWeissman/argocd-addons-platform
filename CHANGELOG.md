@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.21.0](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.20.2...v1.21.0) (2026-03-20)
+
+
+### Features
+
+* add K8sStore for encrypted connection storage ([80ff25e](https://github.com/MoranWeissman/argocd-addons-platform/commit/80ff25e92ebd7b4497a5f36a176f2b26caf1d067))
+* **helm:** add RBAC and encryption key for connection Secret store ([aa83f27](https://github.com/MoranWeissman/argocd-addons-platform/commit/aa83f2763d4d195a608106bd4d42c1228915ffde))
+* **helm:** remove connection ConfigMap, use K8s Secret store ([77a0f2e](https://github.com/MoranWeissman/argocd-addons-platform/commit/77a0f2e2ead64c0b42626dc739e4d0b534d8dc9c))
+* **helm:** simplify values — connections managed via UI ([032a0aa](https://github.com/MoranWeissman/argocd-addons-platform/commit/032a0aa95fb019157ab475aa7ed8f78a1805b603))
+* use K8sStore for connections in Kubernetes mode ([dde11c5](https://github.com/MoranWeissman/argocd-addons-platform/commit/dde11c5bc5a2fb4577fbe517fde07b69a4248870))
+
+
+### Bug Fixes
+
+* add resourceVersion optimistic concurrency and extra tests ([8ed0924](https://github.com/MoranWeissman/argocd-addons-platform/commit/8ed0924db45c81b593afa8438c3d31cf9fa1a323))
+
 ## [1.20.2](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.20.1...v1.20.2) (2026-03-20)
 
 
