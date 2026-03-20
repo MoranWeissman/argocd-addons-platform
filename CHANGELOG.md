@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.21.1](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.21.0...v1.21.1) (2026-03-20)
+
+
+### Bug Fixes
+
+* auto-derive connection name from git repo path ([12131b4](https://github.com/MoranWeissman/argocd-addons-platform/commit/12131b46875e30a5e13b6567d6ccc797718a65dd))
+
 ## [1.21.0](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.20.2...v1.21.0) (2026-03-20)
 
 
