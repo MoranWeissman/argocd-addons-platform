@@ -94,6 +94,15 @@ func (s *Store) ListMigrations() ([]*Migration, error) {
 	return migrations, nil
 }
 
+// DeleteMigration removes a migration. Uses K8s ConfigMap in-cluster, file locally.
+func (s *Store) DeleteMigration(id string) error {
+	if s.cmStore != nil {
+		return s.cmStore.DeleteMigration(context.Background(), id)
+	}
+	path := filepath.Join(s.dataDir, id+".json")
+	return os.Remove(path)
+}
+
 // HasActiveMigration checks whether any migration is currently in an active
 // state (running, waiting, paused, or gated). Returns the ID of the first
 // active migration found.

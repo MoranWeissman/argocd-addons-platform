@@ -17,6 +17,7 @@ export default function MigrationDetail() {
   const [migration, setMigration] = useState<Migration | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [selectedStep, setSelectedStep] = useState<number | null>(null) // null = all logs
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const logEndRef = useRef<HTMLDivElement>(null)
 
@@ -86,8 +87,9 @@ export default function MigrationDetail() {
 
   const isRunning = migration.status === 'running'
 
-  // Filter logs for selected step (or show all)
-  const logs = migration.logs ?? []
+  // Filter logs by selected step (null = all)
+  const allLogs = migration.logs ?? []
+  const logs = selectedStep ? allLogs.filter(l => l.step === selectedStep) : allLogs
 
   return (
     <div className="space-y-4">
@@ -158,10 +160,23 @@ export default function MigrationDetail() {
         {/* Right: Activity Log (wide) */}
         <div className="lg:col-span-4">
           <div className="sticky top-4 rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
-            <div className="flex items-center gap-2 border-b border-gray-200 p-4 dark:border-gray-700">
+            <div className="flex items-center gap-2 border-b border-gray-200 p-3 dark:border-gray-700">
               <Terminal className="h-4 w-4 text-gray-500" />
               <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">Activity Log</span>
-              <Badge variant="secondary" className="ml-auto">{logs.length}</Badge>
+              <Badge variant="secondary">{logs.length}</Badge>
+              <div className="ml-auto flex items-center gap-1">
+                <button
+                  onClick={() => setSelectedStep(null)}
+                  className={cn('rounded px-2 py-0.5 text-[10px] font-medium', !selectedStep ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800')}
+                >All</button>
+                {(migration.steps ?? []).map(s => (
+                  <button
+                    key={s.number}
+                    onClick={() => setSelectedStep(s.number)}
+                    className={cn('rounded px-1.5 py-0.5 text-[10px] font-medium', selectedStep === s.number ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800')}
+                  >{s.number}</button>
+                ))}
+              </div>
             </div>
             <div
               ref={logEndRef}

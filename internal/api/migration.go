@@ -265,6 +265,26 @@ func (s *Server) handleCancelMigration(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, m)
 }
 
+// handleDeleteMigration removes a migration session.
+func (s *Server) handleDeleteMigration(w http.ResponseWriter, r *http.Request) {
+	if s.migrationExecutor == nil {
+		writeError(w, http.StatusServiceUnavailable, "migration service not configured")
+		return
+	}
+	id := r.PathValue("id")
+	if id == "" {
+		writeError(w, http.StatusBadRequest, "migration id is required")
+		return
+	}
+	// Cancel first if running
+	_ = s.migrationExecutor.CancelMigration(id)
+	if err := s.migrationExecutor.GetStore().DeleteMigration(id); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
+}
+
 // handleMergePR attempts to merge a PR from a migration step.
 func (s *Server) handleMergePR(w http.ResponseWriter, r *http.Request) {
 	if s.migrationExecutor == nil {
@@ -323,6 +343,14 @@ func (s *Server) handleMergePR(w http.ResponseWriter, r *http.Request) {
 	}
 
 	step.PRStatus = "merged"
+
+	// Delete the source branch after merge
+	if step.PRURL != "" {
+		// Extract branch name from the step's message or use a pattern
+		// The branch was created as aap/migration/... — try to delete it
+		_ = gp.DeleteBranch(r.Context(), fmt.Sprintf("aap/migration/%s/%s", m.AddonName, m.ClusterName))
+	}
+
 	_ = s.migrationExecutor.GetStore().SaveMigration(m)
 
 	writeJSON(w, http.StatusOK, map[string]string{"status": "merged"})

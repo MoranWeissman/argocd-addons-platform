@@ -36,6 +36,28 @@ func (s *Server) handleCreateConnection(w http.ResponseWriter, r *http.Request) 
 	writeJSON(w, http.StatusCreated, map[string]string{"status": "created", "name": req.Name})
 }
 
+func (s *Server) handleUpdateConnection(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	if name == "" {
+		writeError(w, http.StatusBadRequest, "connection name is required")
+		return
+	}
+
+	var req models.CreateConnectionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	req.Name = name // ensure name matches URL
+
+	if err := s.connSvc.Create(req); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"status": "updated", "name": name})
+}
+
 func (s *Server) handleDeleteConnection(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
 	if name == "" {

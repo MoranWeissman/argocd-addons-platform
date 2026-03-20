@@ -2,8 +2,8 @@ apiVersion: v2
 name: argocd-addons-platform
 description: A Helm chart for ArgoCD Addons Platform — centralized addon management, observability, and AI-powered insights
 type: application
-version: 1.19.2
-appVersion: "1.19.2"
+version: 1.20.0
+appVersion: "1.20.0"
 keywords:
   - argocd
   - kubernetes
