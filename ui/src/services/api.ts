@@ -118,8 +118,8 @@ export const api = {
   // Connections
   getConnections: () => fetchJSON<ConnectionsListResponse>('/connections/'),
   createConnection: (data: unknown) => postJSON('/connections/', data),
-  updateConnection: (name: string, data: unknown) => putJSON(`/connections/${name}`, data),
-  deleteConnection: (name: string) => deleteJSON(`/connections/${name}`),
+  updateConnection: (name: string, data: unknown) => putJSON(`/connections/${encodeURIComponent(name)}`, data),
+  deleteConnection: (name: string) => deleteJSON(`/connections/${encodeURIComponent(name)}`),
   setActiveConnection: (name: string) => postJSON('/connections/active', { connection_name: name }),
   testConnection: () => postJSON<{ git: { status: string }; argocd: { status: string } }>('/connections/test'),
 
