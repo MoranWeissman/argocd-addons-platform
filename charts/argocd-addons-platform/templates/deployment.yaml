@@ -13,7 +13,6 @@ spec:
   template:
     metadata:
       annotations:
-        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
         checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
       labels:
         {{- include "aap.selectorLabels" . | nindent 8 }}
@@ -38,8 +37,8 @@ spec:
               value: "8080"
             - name: AAP_STATIC_DIR
               value: "/app/static"
-            - name: AAP_CONFIG
-              value: "/etc/aap/config.yaml"
+            - name: CONNECTION_SECRET_NAME
+              value: {{ .Values.config.connectionSecretName | default "aap-connections" | quote }}
             - name: ARGOCD_NAMESPACE
               value: {{ include "aap.argocdNamespace" . | quote }}
             - name: AAP_NAMESPACE
@@ -97,9 +96,6 @@ spec:
                 name: {{ include "aap.secretName" . }}
                 optional: true
           volumeMounts:
-            - name: config
-              mountPath: /etc/aap
-              readOnly: true
             - name: data
               mountPath: /app/data
           {{- with .Values.livenessProbe }}
@@ -119,9 +115,6 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       volumes:
-        - name: config
-          configMap:
-            name: {{ include "aap.fullname" . }}-config
         - name: data
           {{- if .Values.persistence.enabled }}
           persistentVolumeClaim:
