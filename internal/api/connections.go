@@ -23,11 +23,6 @@ func (s *Server) handleCreateConnection(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	if req.Name == "" {
-		writeError(w, http.StatusBadRequest, "name is required")
-		return
-	}
-
 	if err := s.connSvc.Create(req); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -86,6 +81,35 @@ func (s *Server) handleSetActiveConnection(w http.ResponseWriter, r *http.Reques
 	}
 
 	writeJSON(w, http.StatusOK, map[string]string{"status": "active", "connection": req.ConnectionName})
+}
+
+func (s *Server) handleTestCredentials(w http.ResponseWriter, r *http.Request) {
+	var req models.CreateConnectionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	conn := &models.Connection{
+		Name:   req.Name,
+		Git:    req.Git,
+		Argocd: req.Argocd,
+	}
+
+	gitErr, argocdErr := s.connSvc.TestCredentials(r.Context(), conn)
+
+	result := map[string]interface{}{
+		"git":    map[string]interface{}{"status": "ok"},
+		"argocd": map[string]interface{}{"status": "ok"},
+	}
+	if gitErr != nil {
+		result["git"] = map[string]interface{}{"status": "error", "message": gitErr.Error()}
+	}
+	if argocdErr != nil {
+		result["argocd"] = map[string]interface{}{"status": "error", "message": argocdErr.Error()}
+	}
+
+	writeJSON(w, http.StatusOK, result)
 }
 
 func (s *Server) handleTestConnection(w http.ResponseWriter, r *http.Request) {

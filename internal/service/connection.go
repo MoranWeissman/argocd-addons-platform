@@ -150,6 +150,25 @@ func (s *ConnectionService) TestConnection(ctx context.Context) (gitErr, argocdE
 	return gitErr, argocdErr
 }
 
+// TestCredentials tests Git and ArgoCD connectivity for unsaved credentials.
+func (s *ConnectionService) TestCredentials(ctx context.Context, conn *models.Connection) (gitErr, argocdErr error) {
+	gp, err := s.buildGitProvider(conn)
+	if err != nil {
+		gitErr = err
+	} else {
+		gitErr = gp.TestConnection(ctx)
+	}
+
+	ac, err := s.buildArgocdClient(conn)
+	if err != nil {
+		argocdErr = err
+	} else {
+		argocdErr = ac.TestConnection(ctx)
+	}
+
+	return gitErr, argocdErr
+}
+
 func (s *ConnectionService) getActiveConn() (*models.Connection, error) {
 	activeName, err := s.store.GetActiveConnection()
 	if err != nil {
