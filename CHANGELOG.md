@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.23.0](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.22.0...v1.23.0) (2026-03-21)
+
+
+### Features
+
+* configure AI provider via Settings UI ([bdbbd09](https://github.com/MoranWeissman/argocd-addons-platform/commit/bdbbd0996db659532b99192f1a2e51d79ca45eb7))
+
 ## [1.22.0](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.21.1...v1.22.0) (2026-03-20)
 
 
