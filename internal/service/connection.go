@@ -46,6 +46,10 @@ func (s *ConnectionService) List() (*models.ConnectionsListResponse, error) {
 
 // Create adds a new connection.
 func (s *ConnectionService) Create(req models.CreateConnectionRequest) error {
+	// Parse repo URL into provider/owner/repo if provided
+	if err := req.Git.ParseRepoURL(); err != nil {
+		return fmt.Errorf("invalid git URL: %w", err)
+	}
 	conn := models.Connection{
 		Name:        req.Name,
 		Description: req.Description,
@@ -152,6 +156,10 @@ func (s *ConnectionService) TestConnection(ctx context.Context) (gitErr, argocdE
 
 // TestCredentials tests Git and ArgoCD connectivity for unsaved credentials.
 func (s *ConnectionService) TestCredentials(ctx context.Context, conn *models.Connection) (gitErr, argocdErr error) {
+	// Parse repo URL if provided
+	if err := conn.Git.ParseRepoURL(); err != nil {
+		return err, nil
+	}
 	gp, err := s.buildGitProvider(conn)
 	if err != nil {
 		gitErr = err

@@ -1,5 +1,11 @@
 package models
 
+import (
+	"fmt"
+	"net/url"
+	"strings"
+)
+
 // GitProviderType identifies which Git provider to use.
 type GitProviderType string
 
@@ -12,6 +18,9 @@ const (
 type GitRepoConfig struct {
 	Provider GitProviderType `json:"provider" yaml:"provider"`
 
+	// URL-based input (parsed into owner/repo or org/project/repo)
+	RepoURL string `json:"repo_url,omitempty" yaml:"repo_url,omitempty"`
+
 	// GitHub fields
 	Owner string `json:"owner,omitempty" yaml:"owner,omitempty"`
 	Repo  string `json:"repo,omitempty" yaml:"repo,omitempty"`
@@ -22,6 +31,66 @@ type GitRepoConfig struct {
 	Project      string `json:"project,omitempty" yaml:"project,omitempty"`
 	Repository   string `json:"repository,omitempty" yaml:"repository,omitempty"`
 	PAT          string `json:"pat,omitempty" yaml:"pat,omitempty"`
+}
+
+// ParseRepoURL populates provider, owner/repo (or org/project/repo) from a Git URL.
+// Supports:
+//   - https://github.com/owner/repo
+//   - https://github.example.com/owner/repo (GitHub Enterprise)
+//   - https://dev.azure.com/org/project/_git/repo
+//   - https://org.visualstudio.com/project/_git/repo
+func (g *GitRepoConfig) ParseRepoURL() error {
+	if g.RepoURL == "" {
+		return nil // nothing to parse, fields must be set directly
+	}
+
+	u, err := url.Parse(strings.TrimSuffix(g.RepoURL, ".git"))
+	if err != nil {
+		return fmt.Errorf("invalid git URL: %w", err)
+	}
+
+	host := strings.ToLower(u.Hostname())
+	parts := strings.Split(strings.Trim(u.Path, "/"), "/")
+
+	// Azure DevOps: dev.azure.com/org/project/_git/repo
+	if host == "dev.azure.com" {
+		if len(parts) < 4 || parts[2] != "_git" {
+			return fmt.Errorf("Azure DevOps URL must be https://dev.azure.com/org/project/_git/repo")
+		}
+		g.Provider = GitProviderAzureDevOps
+		g.Organization = parts[0]
+		g.Project = parts[1]
+		g.Repository = parts[3]
+		if g.Token != "" && g.PAT == "" {
+			g.PAT = g.Token
+		}
+		return nil
+	}
+
+	// Azure DevOps: org.visualstudio.com/project/_git/repo
+	if strings.HasSuffix(host, ".visualstudio.com") {
+		g.Provider = GitProviderAzureDevOps
+		g.Organization = strings.TrimSuffix(host, ".visualstudio.com")
+		if len(parts) >= 3 && parts[1] == "_git" {
+			g.Project = parts[0]
+			g.Repository = parts[2]
+		} else {
+			return fmt.Errorf("Azure DevOps URL must be https://org.visualstudio.com/project/_git/repo")
+		}
+		if g.Token != "" && g.PAT == "" {
+			g.PAT = g.Token
+		}
+		return nil
+	}
+
+	// GitHub (github.com or any other host = GitHub Enterprise)
+	if len(parts) < 2 {
+		return fmt.Errorf("Git URL must contain owner/repo (got: %s)", u.Path)
+	}
+	g.Provider = GitProviderGitHub
+	g.Owner = parts[0]
+	g.Repo = strings.Join(parts[1:], "/") // handle nested paths
+	return nil
 }
 
 // ArgocdConfig holds ArgoCD connection configuration.
