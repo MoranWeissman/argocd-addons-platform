@@ -28,60 +28,27 @@ interface PlatformInfo {
 }
 
 interface ConnectionFormData {
-  name: string
-  description: string
-  git_provider: 'github' | 'azuredevops'
-  // GitHub fields
-  github_owner: string
-  github_repo: string
-  github_token: string
-  // Azure DevOps fields
-  azure_org: string
-  azure_project: string
-  azure_repo: string
-  azure_pat: string
-  // ArgoCD fields
+  git_url: string
+  git_token: string
   argocd_server_url: string
   argocd_token: string
   argocd_namespace: string
 }
 
 const emptyForm: ConnectionFormData = {
-  name: '',
-  description: '',
-  git_provider: 'github',
-  github_owner: '',
-  github_repo: '',
-  github_token: '',
-  azure_org: '',
-  azure_project: '',
-  azure_repo: '',
-  azure_pat: '',
+  git_url: '',
+  git_token: '',
   argocd_server_url: '',
   argocd_token: '',
   argocd_namespace: 'argocd',
 }
 
 function buildPayload(form: ConnectionFormData) {
-  const git = form.git_provider === 'github'
-    ? {
-        provider: 'github' as const,
-        owner: form.github_owner,
-        repo: form.github_repo,
-        token: form.github_token || undefined,
-      }
-    : {
-        provider: 'azuredevops' as const,
-        organization: form.azure_org,
-        project: form.azure_project,
-        repository: form.azure_repo,
-        pat: form.azure_pat || undefined,
-      }
-
   return {
-    name: form.name || undefined,
-    description: form.description || undefined,
-    git,
+    git: {
+      repo_url: form.git_url,
+      token: form.git_token || undefined,
+    },
     argocd: {
       server_url: form.argocd_server_url || '',
       token: form.argocd_token || undefined,
@@ -92,35 +59,19 @@ function buildPayload(form: ConnectionFormData) {
 }
 
 function formFromConnection(conn: ConnectionResponse): ConnectionFormData {
-  const parts = conn.git_repo_identifier.split('/')
+  // Reconstruct URL from the identifier
+  let gitUrl = ''
   if (conn.git_provider === 'github') {
-    return {
-      name: conn.name,
-      description: conn.description ?? '',
-      git_provider: 'github',
-      github_owner: parts[0] ?? '',
-      github_repo: parts.slice(1).join('/'),
-      github_token: '',
-      azure_org: '',
-      azure_project: '',
-      azure_repo: '',
-      azure_pat: '',
-      argocd_server_url: conn.argocd_server_url,
-      argocd_token: '',
-      argocd_namespace: conn.argocd_namespace,
+    gitUrl = `https://github.com/${conn.git_repo_identifier}`
+  } else if (conn.git_provider === 'azuredevops') {
+    const parts = conn.git_repo_identifier.split('/')
+    if (parts.length >= 3) {
+      gitUrl = `https://dev.azure.com/${parts[0]}/${parts[1]}/_git/${parts[2]}`
     }
   }
   return {
-    name: conn.name,
-    description: conn.description ?? '',
-    git_provider: 'azuredevops',
-    github_owner: '',
-    github_repo: '',
-    github_token: '',
-    azure_org: parts[0] ?? '',
-    azure_project: parts[1] ?? '',
-    azure_repo: parts.slice(2).join('/'),
-    azure_pat: '',
+    git_url: gitUrl,
+    git_token: '',
     argocd_server_url: conn.argocd_server_url,
     argocd_token: '',
     argocd_namespace: conn.argocd_namespace,
@@ -169,58 +120,20 @@ function ConnectionFormFields({
           <h5 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Git Repository</h5>
         </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div>
-            <label className={labelCls}>Provider</label>
-            <select
-              className={selectCls}
-              value={form.git_provider}
-              onChange={(e) =>
-                onChange({ git_provider: e.target.value as 'github' | 'azuredevops' })
-              }
-            >
-              <option value="github">GitHub</option>
-              <option value="azuredevops">Azure DevOps</option>
-            </select>
+          <div className="sm:col-span-2">
+            <label className={labelCls}>Repository URL</label>
+            <input className={inputCls} value={form.git_url} onChange={(e) => onChange({ git_url: e.target.value })}
+              placeholder="https://github.com/org/repo" required />
+            <p className="mt-1 text-[10px] text-gray-400">GitHub, GitHub Enterprise, or Azure DevOps (auto-detected from URL)</p>
           </div>
-
-          {form.git_provider === 'github' ? (
-            <>
-              <div>
-                <label className={labelCls}>Owner</label>
-                <input className={inputCls} value={form.github_owner} onChange={(e) => onChange({ github_owner: e.target.value })} placeholder="e.g. my-org" required />
-              </div>
-              <div>
-                <label className={labelCls}>Repository</label>
-                <input className={inputCls} value={form.github_repo} onChange={(e) => onChange({ github_repo: e.target.value })} placeholder="e.g. k8s-addons" required />
-              </div>
-              <div>
-                <label className={labelCls}>Token</label>
-                <input className={inputCls} type="password" value={form.github_token} onChange={(e) => onChange({ github_token: e.target.value })} placeholder={isEdit ? 'Leave blank to keep existing' : 'ghp_...'} />
-              </div>
-            </>
-          ) : (
-            <>
-              <div>
-                <label className={labelCls}>Organization</label>
-                <input className={inputCls} value={form.azure_org} onChange={(e) => onChange({ azure_org: e.target.value })} placeholder="e.g. MyOrg" required />
-              </div>
-              <div>
-                <label className={labelCls}>Project</label>
-                <input className={inputCls} value={form.azure_project} onChange={(e) => onChange({ azure_project: e.target.value })} placeholder="e.g. MyProject" required />
-              </div>
-              <div>
-                <label className={labelCls}>Repository</label>
-                <input className={inputCls} value={form.azure_repo} onChange={(e) => onChange({ azure_repo: e.target.value })} placeholder="e.g. k8s-addons" required />
-              </div>
-              <div>
-                <label className={labelCls}>PAT</label>
-                <input className={inputCls} type="password" value={form.azure_pat} onChange={(e) => onChange({ azure_pat: e.target.value })} placeholder={isEdit ? 'Leave blank to keep existing' : 'Personal Access Token'} />
-              </div>
-            </>
-          )}
+          <div>
+            <label className={labelCls}>Token</label>
+            <input className={inputCls} type="password" value={form.git_token} onChange={(e) => onChange({ git_token: e.target.value })}
+              placeholder={isEdit ? 'Leave blank to keep existing' : 'Personal access token'} />
+          </div>
         </div>
         <div className="mt-3 flex items-center gap-3">
-          <button type="button" onClick={onTestGit} disabled={testStatus.git === 'testing'}
+          <button type="button" onClick={onTestGit} disabled={testStatus.git === 'testing' || !form.git_url}
             className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700">
             {testStatus.git === 'testing' ? <Loader2 className="h-3 w-3 animate-spin" /> : <GitBranch className="h-3 w-3" />}
             Test Git
@@ -239,17 +152,20 @@ function ConnectionFormFields({
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <label className={labelCls}>Server URL</label>
-            <input className={inputCls} value={form.argocd_server_url} onChange={(e) => onChange({ argocd_server_url: e.target.value })} placeholder="Leave empty for in-cluster" />
+            <input className={inputCls} value={form.argocd_server_url} onChange={(e) => onChange({ argocd_server_url: e.target.value })}
+              placeholder="Leave empty for in-cluster" />
             <p className="mt-1 text-[10px] text-gray-400">Leave empty to auto-discover via K8s DNS</p>
           </div>
           <div>
             <label className={labelCls}>Token</label>
-            <input className={inputCls} type="password" value={form.argocd_token} onChange={(e) => onChange({ argocd_token: e.target.value })} placeholder={isEdit ? 'Leave blank to keep existing' : 'Leave empty for ServiceAccount auth'} />
+            <input className={inputCls} type="password" value={form.argocd_token} onChange={(e) => onChange({ argocd_token: e.target.value })}
+              placeholder={isEdit ? 'Leave blank to keep existing' : 'Leave empty for ServiceAccount auth'} />
             <p className="mt-1 text-[10px] text-gray-400">Leave empty to use ServiceAccount (in-cluster)</p>
           </div>
           <div>
             <label className={labelCls}>Namespace</label>
-            <input className={inputCls} value={form.argocd_namespace} onChange={(e) => onChange({ argocd_namespace: e.target.value })} placeholder="argocd" required />
+            <input className={inputCls} value={form.argocd_namespace} onChange={(e) => onChange({ argocd_namespace: e.target.value })}
+              placeholder="argocd" required />
           </div>
         </div>
         <div className="mt-3 flex items-center gap-3">
