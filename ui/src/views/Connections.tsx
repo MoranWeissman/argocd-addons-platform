@@ -63,27 +63,31 @@ const emptyForm: ConnectionFormData = {
 }
 
 function buildPayload(form: ConnectionFormData) {
-  const base = {
-    name: form.name,
-    description: form.description || undefined,
-    git_provider: form.git_provider,
-    argocd_server_url: form.argocd_server_url,
-    argocd_namespace: form.argocd_namespace,
-  }
+  const git = form.git_provider === 'github'
+    ? {
+        provider: 'github' as const,
+        owner: form.github_owner,
+        repo: form.github_repo,
+        token: form.github_token || undefined,
+      }
+    : {
+        provider: 'azuredevops' as const,
+        organization: form.azure_org,
+        project: form.azure_project,
+        repository: form.azure_repo,
+        pat: form.azure_pat || undefined,
+      }
 
-  if (form.git_provider === 'github') {
-    return {
-      ...base,
-      git_repo_identifier: `${form.github_owner}/${form.github_repo}`,
-      git_token: form.github_token || undefined,
-      argocd_token: form.argocd_token || undefined,
-    }
-  }
   return {
-    ...base,
-    git_repo_identifier: `${form.azure_org}/${form.azure_project}/${form.azure_repo}`,
-    git_token: form.azure_pat || undefined,
-    argocd_token: form.argocd_token || undefined,
+    name: form.name || undefined,
+    description: form.description || undefined,
+    git,
+    argocd: {
+      server_url: form.argocd_server_url || '',
+      token: form.argocd_token || undefined,
+      namespace: form.argocd_namespace || 'argocd',
+      insecure: true,
+    },
   }
 }
 
@@ -711,7 +715,23 @@ function AIConfigSection() {
   const [loading, setLoading] = useState(true)
   const [testResult, setTestResult] = useState<string | null>(null)
   const [testing, setTesting] = useState(false)
-  const [switching, setSwitching] = useState<string | null>(null)
+  const [showForm, setShowForm] = useState(false)
+  const [formProvider, setFormProvider] = useState('gemini')
+  const [formApiKey, setFormApiKey] = useState('')
+  const [formModel, setFormModel] = useState('')
+  const [formBaseURL, setFormBaseURL] = useState('')
+  const [formOllamaURL, setFormOllamaURL] = useState('http://localhost:11434')
+  const [formTestStatus, setFormTestStatus] = useState<'idle' | 'testing' | 'ok' | 'error'>('idle')
+  const [formTestMsg, setFormTestMsg] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  const defaultModels: Record<string, string> = {
+    gemini: 'gemini-2.5-flash',
+    claude: 'claude-sonnet-4-20250514',
+    openai: 'gpt-4o',
+    ollama: 'llama3.2',
+    'custom-openai': '',
+  }
 
   const fetchConfig = useCallback(() => {
     setLoading(true)
@@ -721,9 +741,10 @@ function AIConfigSection() {
       .finally(() => setLoading(false))
   }, [])
 
-  useEffect(() => {
-    fetchConfig()
-  }, [fetchConfig])
+  useEffect(() => { fetchConfig() }, [fetchConfig])
+
+  const isEnabled = aiConfig?.current_provider && aiConfig.current_provider !== 'none' && aiConfig.current_provider !== ''
+  const activeProvider = aiConfig?.available_providers.find((p: AIProviderInfo) => p.id === aiConfig.current_provider)
 
   const handleTest = async () => {
     setTesting(true)
@@ -733,37 +754,76 @@ function AIConfigSection() {
       setTestResult(res.status === 'ok' ? 'AI is responding correctly' : 'AI returned unexpected response')
     } catch (err) {
       setTestResult(err instanceof Error ? err.message : 'Connection failed')
-    } finally {
-      setTesting(false)
+    } finally { setTesting(false) }
+  }
+
+  const handleFormTest = async () => {
+    setFormTestStatus('testing')
+    setFormTestMsg('')
+    try {
+      const res = await api.testAIConfig({
+        provider: formProvider,
+        api_key: formApiKey || undefined,
+        model: formModel || defaultModels[formProvider] || undefined,
+        base_url: formBaseURL || undefined,
+        ollama_url: formProvider === 'ollama' ? formOllamaURL : undefined,
+      })
+      if (res.status === 'ok') {
+        setFormTestStatus('ok')
+        setFormTestMsg(res.response || 'Connected')
+      } else {
+        setFormTestStatus('error')
+        setFormTestMsg(res.message || 'Test failed')
+      }
+    } catch (err) {
+      setFormTestStatus('error')
+      setFormTestMsg(err instanceof Error ? err.message : 'Test failed')
     }
   }
 
-  const handleSwitchProvider = async (providerId: string) => {
-    setSwitching(providerId)
-    setTestResult(null)
+  const handleSave = async () => {
+    setSaving(true)
     try {
-      await api.setAIProvider(providerId)
+      await api.saveAIConfig({
+        provider: formProvider,
+        api_key: formApiKey || undefined,
+        model: formModel || defaultModels[formProvider] || undefined,
+        base_url: formBaseURL || undefined,
+        ollama_url: formProvider === 'ollama' ? formOllamaURL : undefined,
+      })
+      setShowForm(false)
+      setFormTestStatus('idle')
       fetchConfig()
     } catch (err) {
-      setTestResult(err instanceof Error ? err.message : 'Failed to switch provider')
-    } finally {
-      setSwitching(null)
-    }
+      setFormTestMsg(err instanceof Error ? err.message : 'Save failed')
+    } finally { setSaving(false) }
   }
 
-  const isEnabled = aiConfig?.current_provider && aiConfig.current_provider !== 'none' && aiConfig.current_provider !== ''
-  const activeProvider = aiConfig?.available_providers.find((p: AIProviderInfo) => p.id === aiConfig.current_provider)
+  const handleDisable = async () => {
+    try {
+      await api.saveAIConfig({ provider: 'none' })
+      fetchConfig()
+    } catch { /* ignore */ }
+  }
+
+  const openEditForm = () => {
+    const cfg = aiConfig
+    if (cfg && isEnabled && activeProvider) {
+      setFormProvider(activeProvider.id)
+      setFormModel(activeProvider.model || '')
+    }
+    setFormApiKey('')
+    setFormTestStatus('idle')
+    setFormTestMsg('')
+    setShowForm(true)
+  }
 
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
       {/* Header */}
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-3">
-          <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${
-            isEnabled
-              ? 'bg-purple-100 dark:bg-purple-900/30'
-              : 'bg-gray-100 dark:bg-gray-700'
-          }`}>
+          <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${isEnabled ? 'bg-purple-100 dark:bg-purple-900/30' : 'bg-gray-100 dark:bg-gray-700'}`}>
             <Sparkles className={`h-5 w-5 ${isEnabled ? 'text-purple-600 dark:text-purple-400' : 'text-gray-400'}`} />
           </div>
           <div>
@@ -776,239 +836,118 @@ function AIConfigSection() {
                 </span>
               ) : (
                 <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500 dark:bg-gray-700 dark:text-gray-400">
-                  Disabled
+                  Not Configured
                 </span>
               )}
             </h4>
             <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
               {isEnabled && activeProvider
                 ? `Using ${activeProvider.name}${activeProvider.model ? ` — ${activeProvider.model}` : ''}`
-                : 'AI-powered analysis for the Upgrade Impact Checker (Ollama, Claude, OpenAI, or Gemini)'
-              }
+                : 'Configure an AI provider for upgrade analysis and migration assistance'}
             </p>
           </div>
         </div>
-        {isEnabled && (
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleTest}
-              disabled={testing}
-              className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
-            >
-              {testing ? 'Testing...' : 'Test Connection'}
-            </button>
-            <button
-              onClick={() => handleSwitchProvider('none')}
-              disabled={switching === 'none'}
-              className="rounded-lg border border-red-300 px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-900/20"
-            >
-              {switching === 'none' ? 'Disabling...' : 'Disable AI'}
-            </button>
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          {isEnabled && (
+            <>
+              <button onClick={handleTest} disabled={testing}
+                className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700">
+                {testing ? 'Testing...' : 'Test'}
+              </button>
+              <button onClick={handleDisable}
+                className="rounded-lg border border-red-300 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-900/20">
+                Disable
+              </button>
+            </>
+          )}
+          <button onClick={openEditForm}
+            className="inline-flex items-center gap-1 rounded-lg bg-purple-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-purple-700 dark:bg-purple-700 dark:hover:bg-purple-600">
+            <Pencil className="h-3 w-3" />
+            {isEnabled ? 'Edit' : 'Configure'}
+          </button>
+        </div>
       </div>
 
       {testResult && (
-        <div className={`mt-3 rounded-lg px-3 py-2 text-xs ${
-          testResult.includes('correctly')
-            ? 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400'
-            : 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400'
+        <div className={`mt-3 flex items-center gap-2 rounded-lg px-3 py-2 text-xs ${
+          testResult.includes('correctly') ? 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400' : 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400'
         }`}>
+          {testResult.includes('correctly') ? <CheckCircle className="h-3.5 w-3.5" /> : <XCircle className="h-3.5 w-3.5" />}
           {testResult}
         </div>
       )}
 
-      {/* Provider Selector Cards */}
-      {!loading && aiConfig && (
-        <div className="mt-5">
-          <p className="mb-3 text-sm font-medium text-gray-700 dark:text-gray-300">
-            Available Providers
-          </p>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {aiConfig.available_providers.map((provider: AIProviderInfo) => {
-              const isActive = provider.id === aiConfig.current_provider
-              const canSwitch = provider.configured && !isActive
-
-              const providerMeta: Record<string, { privacy: string; privacyColor: string; toolCalling: string; toolColor: string; note: string }> = {
-                ollama: {
-                  privacy: 'Local — no data leaves the cluster',
-                  privacyColor: 'text-green-600 dark:text-green-400',
-                  toolCalling: 'Depends on model (3B weak, 8B+ moderate, 70B+ good)',
-                  toolColor: 'text-amber-600 dark:text-amber-400',
-                  note: 'Requires persistent storage. Image ~3GB. Models 2-40+ GB RAM.',
-                },
-                claude: {
-                  privacy: 'Data sent to Anthropic (external)',
-                  privacyColor: 'text-amber-600 dark:text-amber-400',
-                  toolCalling: 'Excellent — best reasoning and tool use',
-                  toolColor: 'text-green-600 dark:text-green-400',
-                  note: 'Cluster names, addon configs, and health data are sent to the API.',
-                },
-                openai: {
-                  privacy: 'Data sent to OpenAI (external)',
-                  privacyColor: 'text-amber-600 dark:text-amber-400',
-                  toolCalling: 'Very good',
-                  toolColor: 'text-green-600 dark:text-green-400',
-                  note: 'Cluster names, addon configs, and health data are sent to the API.',
-                },
-                gemini: {
-                  privacy: 'Data sent to Google (external)',
-                  privacyColor: 'text-amber-600 dark:text-amber-400',
-                  toolCalling: 'Good — free tier available',
-                  toolColor: 'text-green-600 dark:text-green-400',
-                  note: 'Cluster names, addon configs, and health data are sent to the API.',
-                },
-              }
-              const meta = providerMeta[provider.id]
-
-              return (
-                <div
-                  key={provider.id}
-                  className={`relative rounded-lg border p-4 transition-all ${
-                    isActive
-                      ? 'border-purple-500 bg-purple-50 ring-2 ring-purple-200 dark:border-purple-400 dark:bg-purple-950/20 dark:ring-purple-900/50'
-                      : provider.configured
-                        ? 'border-gray-200 bg-white hover:border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:hover:border-gray-500'
-                        : 'border-gray-300 bg-gray-50 opacity-60 dark:border-gray-700 dark:bg-gray-900'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className={`text-sm font-semibold ${
-                      isActive
-                        ? 'text-purple-700 dark:text-purple-300'
-                        : 'text-gray-900 dark:text-gray-100'
-                    }`}>
-                      {provider.name}
-                    </span>
-                    {provider.configured ? (
-                      <span className="inline-block h-2 w-2 rounded-full bg-green-500" title="Configured" />
-                    ) : (
-                      <span className="inline-block h-2 w-2 rounded-full bg-gray-300 dark:bg-gray-600" title="Not configured" />
-                    )}
-                  </div>
-
-                  <p className="mt-1 font-mono text-xs text-gray-500 dark:text-gray-400">
-                    {provider.configured && provider.model
-                      ? provider.model
-                      : 'Not configured'}
-                  </p>
-
-                  {meta && (
-                    <div className="mt-2 space-y-1 border-t border-gray-100 pt-2 dark:border-gray-700">
-                      <p className={`text-[10px] ${meta.privacyColor}`}>
-                        {meta.privacy}
-                      </p>
-                      <p className={`text-[10px] ${meta.toolColor}`}>
-                        Tool calling: {meta.toolCalling}
-                      </p>
-                      <p className="text-[10px] text-gray-400 dark:text-gray-500">
-                        {meta.note}
-                      </p>
-                    </div>
-                  )}
-
-                  <div className="mt-3">
-                    {isActive ? (
-                      <span className="inline-flex items-center gap-1 text-xs font-medium text-purple-600 dark:text-purple-400">
-                        <span className="inline-block h-1.5 w-1.5 rounded-full bg-purple-500" />
-                        Active
-                      </span>
-                    ) : canSwitch ? (
-                      <button
-                        onClick={() => handleSwitchProvider(provider.id)}
-                        disabled={switching === provider.id}
-                        className="inline-flex items-center gap-1 rounded-md bg-purple-600 px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-purple-700 disabled:opacity-50 dark:bg-purple-700 dark:hover:bg-purple-600"
-                      >
-                        {switching === provider.id ? (
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                        ) : null}
-                        Switch
-                      </button>
-                    ) : (
-                      <span className="text-xs text-gray-400 dark:text-gray-500">
-                        Setup required
-                      </span>
-                    )}
-                  </div>
-                </div>
-              )
-            })}
+      {/* Configure Form */}
+      {showForm && (
+        <div className="mt-4 rounded-lg border border-purple-200 bg-purple-50/50 p-4 dark:border-purple-800 dark:bg-purple-950/20">
+          <div className="mb-3 flex items-center justify-between">
+            <h5 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Configure AI Provider</h5>
+            <button onClick={() => setShowForm(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+              <X className="h-4 w-4" />
+            </button>
           </div>
-        </div>
-      )}
-
-      {/* Setup guide for unconfigured providers */}
-      {!loading && aiConfig && aiConfig.available_providers.some((p: AIProviderInfo) => !p.configured) && (
-        <div className="mt-5 rounded-lg bg-gray-50 p-4 dark:bg-gray-900">
-          <p className="text-sm font-medium text-gray-700 dark:text-gray-300">How to enable additional providers</p>
-          <p className="mt-2 text-xs text-gray-600 dark:text-gray-400">
-            Add the configuration to{' '}
-            <code className="rounded bg-gray-200 px-1 dark:bg-gray-700">.env.secrets</code> and restart:
-          </p>
-
-          <div className="mt-3 space-y-3">
-            {!aiConfig.available_providers.find((p: AIProviderInfo) => p.id === 'ollama')?.configured && (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <label className={labelCls}>Provider</label>
+              <select className={selectCls} value={formProvider} onChange={(e) => {
+                setFormProvider(e.target.value)
+                setFormModel(defaultModels[e.target.value] || '')
+                setFormTestStatus('idle')
+              }}>
+                <option value="gemini">Gemini (Google)</option>
+                <option value="claude">Claude (Anthropic)</option>
+                <option value="openai">OpenAI</option>
+                <option value="ollama">Ollama (Local)</option>
+                <option value="custom-openai">Custom OpenAI-compatible</option>
+              </select>
+            </div>
+            {formProvider !== 'ollama' && (
               <div>
-                <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">Ollama (local, free)</p>
-                <ol className="mt-1 space-y-1 text-xs text-gray-600 dark:text-gray-400">
-                  <li className="flex gap-2">
-                    <span className="font-medium text-gray-500">1.</span>
-                    Install: <code className="rounded bg-gray-200 px-1 dark:bg-gray-700">brew install ollama</code>
-                  </li>
-                  <li className="flex gap-2">
-                    <span className="font-medium text-gray-500">2.</span>
-                    Start: <code className="rounded bg-gray-200 px-1 dark:bg-gray-700">ollama serve</code>
-                  </li>
-                  <li className="flex gap-2">
-                    <span className="font-medium text-gray-500">3.</span>
-                    Pull model: <code className="rounded bg-gray-200 px-1 dark:bg-gray-700">ollama pull llama3.2</code>
-                  </li>
-                </ol>
-                <pre className="mt-1 rounded-lg bg-gray-900 p-2 font-mono text-xs text-gray-300">
-{`AI_PROVIDER=ollama
-AI_OLLAMA_URL=http://localhost:11434
-AI_OLLAMA_MODEL=llama3.2`}
-                </pre>
+                <label className={labelCls}>API Key</label>
+                <input className={inputCls} type="password" value={formApiKey} onChange={(e) => { setFormApiKey(e.target.value); setFormTestStatus('idle') }}
+                  placeholder={formProvider === 'gemini' ? 'AIzaSy...' : formProvider === 'claude' ? 'sk-ant-...' : 'sk-...'} />
               </div>
             )}
-
-            {!aiConfig.available_providers.find((p: AIProviderInfo) => p.id === 'claude')?.configured && (
+            <div>
+              <label className={labelCls}>Model</label>
+              <input className={inputCls} value={formModel} onChange={(e) => { setFormModel(e.target.value); setFormTestStatus('idle') }}
+                placeholder={defaultModels[formProvider] || 'model name'} />
+            </div>
+            {formProvider === 'ollama' && (
               <div>
-                <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">Claude (Anthropic)</p>
-                <pre className="mt-1 rounded-lg bg-gray-900 p-2 font-mono text-xs text-gray-300">
-{`AI_PROVIDER=claude
-AI_API_KEY=sk-ant-...
-AI_CLOUD_MODEL=claude-sonnet-4-20250514`}
-                </pre>
+                <label className={labelCls}>Ollama URL</label>
+                <input className={inputCls} value={formOllamaURL} onChange={(e) => { setFormOllamaURL(e.target.value); setFormTestStatus('idle') }}
+                  placeholder="http://localhost:11434" />
               </div>
             )}
-
-            {!aiConfig.available_providers.find((p: AIProviderInfo) => p.id === 'openai')?.configured && (
+            {formProvider === 'custom-openai' && (
               <div>
-                <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">OpenAI</p>
-                <pre className="mt-1 rounded-lg bg-gray-900 p-2 font-mono text-xs text-gray-300">
-{`AI_PROVIDER=openai
-AI_API_KEY=sk-...
-AI_CLOUD_MODEL=gpt-4o`}
-                </pre>
-              </div>
-            )}
-
-            {!aiConfig.available_providers.find((p: AIProviderInfo) => p.id === 'gemini')?.configured && (
-              <div>
-                <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">Google Gemini (free tier available)</p>
-                <pre className="mt-1 rounded-lg bg-gray-900 p-2 font-mono text-xs text-gray-300">
-{`AI_PROVIDER=gemini
-AI_API_KEY=AIzaSy...
-AI_CLOUD_MODEL=gemini-2.5-flash`}
-                </pre>
+                <label className={labelCls}>Base URL</label>
+                <input className={inputCls} value={formBaseURL} onChange={(e) => { setFormBaseURL(e.target.value); setFormTestStatus('idle') }}
+                  placeholder="https://your-gateway.example.com/api" />
               </div>
             )}
           </div>
-
-          <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
-            Then restart the platform with <code className="rounded bg-gray-200 px-1 dark:bg-gray-700">make dev</code>
-          </p>
+          <div className="mt-3 flex items-center gap-3">
+            <button onClick={handleFormTest} disabled={formTestStatus === 'testing'}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700">
+              {formTestStatus === 'testing' ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+              Test AI
+            </button>
+            {formTestStatus === 'ok' && <span className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400"><CheckCircle className="h-3.5 w-3.5" /> Connected</span>}
+            {formTestStatus === 'error' && <span className="flex items-center gap-1 text-xs text-red-600 dark:text-red-400"><XCircle className="h-3.5 w-3.5" /> {formTestMsg}</span>}
+          </div>
+          <div className="mt-4 flex items-center gap-3">
+            <button onClick={handleSave} disabled={saving || formTestStatus !== 'ok'}
+              title={formTestStatus !== 'ok' ? 'Test the connection first' : undefined}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-purple-700 disabled:opacity-50 dark:bg-purple-700 dark:hover:bg-purple-600">
+              {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              Save
+            </button>
+            <button onClick={() => setShowForm(false)} className="rounded-lg px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200">
+              Cancel
+            </button>
+          </div>
         </div>
       )}
     </div>

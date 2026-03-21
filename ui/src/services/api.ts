@@ -135,8 +135,10 @@ export const api = {
   getAIStatus: () => fetchJSON<{ enabled: boolean }>('/upgrade/ai-status'),
   getAISummary: (addonName: string, targetVersion: string) => postJSON<{ summary: string }>('/upgrade/ai-summary', { addon_name: addonName, target_version: targetVersion }),
   getAIConfig: () => fetchJSON<AIConfigResponse>('/ai/config'),
+  saveAIConfig: (data: { provider: string; api_key?: string; model?: string; base_url?: string; ollama_url?: string }) => postJSON<{ status: string }>('/ai/config', data),
   setAIProvider: (provider: string) => postJSON<{ status: string; provider: string }>('/ai/provider', { provider }),
   testAI: () => postJSON<{ status: string; response: string }>('/ai/test', {}),
+  testAIConfig: (data: { provider: string; api_key?: string; model?: string; base_url?: string; ollama_url?: string }) => postJSON<{ status: string; message?: string; response?: string }>('/ai/test-config', data),
 
   // Datadog
   getDatadogStatus: () => fetchJSON<{ enabled: boolean; site: string }>('/datadog/status'),

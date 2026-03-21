@@ -73,6 +73,10 @@ rules:
     verbs: ["get", "update"]
   - apiGroups: [""]
     resources: ["secrets"]
+    resourceNames: ["aap-ai-config"]
+    verbs: ["get", "update"]
+  - apiGroups: [""]
+    resources: ["secrets"]
     verbs: ["create"]  # needed to create new secrets (resourceNames can't restrict create)
   - apiGroups: [""]
     resources: ["configmaps"]

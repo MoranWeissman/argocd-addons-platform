@@ -74,6 +74,11 @@ func (c *Client) SetProvider(provider Provider) {
 	c.config.Provider = provider
 }
 
+// SetConfig replaces the full AI configuration at runtime.
+func (c *Client) SetConfig(cfg Config) {
+	c.config = cfg
+}
+
 // GetProviderName returns the current provider as a string.
 func (c *Client) GetProviderName() string {
 	return string(c.config.Provider)

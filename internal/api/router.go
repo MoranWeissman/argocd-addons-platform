@@ -15,6 +15,7 @@ import (
 
 	"github.com/moran/argocd-addons-platform/internal/ai"
 	"github.com/moran/argocd-addons-platform/internal/auth"
+	"github.com/moran/argocd-addons-platform/internal/config"
 	"github.com/moran/argocd-addons-platform/internal/datadog"
 	"github.com/moran/argocd-addons-platform/internal/migration"
 	"github.com/moran/argocd-addons-platform/internal/service"
@@ -34,6 +35,7 @@ type Server struct {
 	agentMemory       *ai.MemoryStore
 	authStore         *auth.Store
 	migrationExecutor *migration.Executor
+	aiConfigStore     *config.AIConfigStore
 }
 
 // NewServer creates a new API server.
@@ -71,7 +73,13 @@ func NewServer(
 		agentMemory:       agentMemory,
 		authStore:         authStore,
 		migrationExecutor: migrationExecutor,
+		aiConfigStore:     nil, // set via SetAIConfigStore
 	}
+}
+
+// SetAIConfigStore sets the persistent AI config store (K8s mode only).
+func (s *Server) SetAIConfigStore(store *config.AIConfigStore) {
+	s.aiConfigStore = store
 }
 
 // NewRouter builds the HTTP router with all API routes and static file serving.
@@ -117,8 +125,10 @@ func NewRouter(srv *Server, staticFS fs.FS) http.Handler {
 
 	// AI Configuration
 	mux.HandleFunc("GET /api/v1/ai/config", srv.handleGetAIConfig)
+	mux.HandleFunc("POST /api/v1/ai/config", srv.handleSaveAIConfig)
 	mux.HandleFunc("POST /api/v1/ai/provider", srv.handleSetAIProvider)
 	mux.HandleFunc("POST /api/v1/ai/test", srv.handleTestAI)
+	mux.HandleFunc("POST /api/v1/ai/test-config", srv.handleTestAIConfig)
 
 	// Observability
 	mux.HandleFunc("GET /api/v1/observability/overview", srv.handleGetObservabilityOverview)

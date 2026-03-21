@@ -77,6 +77,103 @@ func cloudModelForProvider(cfg ai.Config, p ai.Provider) string {
 	return cfg.CloudModel
 }
 
+type saveAIConfigRequest struct {
+	Provider  string `json:"provider"`
+	APIKey    string `json:"api_key,omitempty"`
+	Model     string `json:"model,omitempty"`
+	BaseURL   string `json:"base_url,omitempty"`
+	OllamaURL string `json:"ollama_url,omitempty"`
+}
+
+func (s *Server) handleSaveAIConfig(w http.ResponseWriter, r *http.Request) {
+	var req saveAIConfigRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	provider := ai.Provider(req.Provider)
+	switch provider {
+	case ai.ProviderOllama, ai.ProviderClaude, ai.ProviderOpenAI, ai.ProviderGemini, ai.ProviderCustomOpenAI, ai.ProviderNone:
+	default:
+		writeError(w, http.StatusBadRequest, fmt.Sprintf("unsupported provider: %s", req.Provider))
+		return
+	}
+
+	// Build new config preserving non-UI fields from current config
+	current := s.aiClient.GetConfig()
+	newCfg := ai.Config{
+		Provider:      provider,
+		APIKey:        req.APIKey,
+		CloudModel:    req.Model,
+		BaseURL:       req.BaseURL,
+		OllamaURL:     req.OllamaURL,
+		OllamaModel:   req.Model, // for ollama, model goes here
+		AuthHeader:    current.AuthHeader,
+		AuthPrefix:    current.AuthPrefix,
+		MaxIterations: current.MaxIterations,
+		GitOpsEnabled: current.GitOpsEnabled,
+		AgentModel:    current.AgentModel,
+	}
+	if provider == ai.ProviderOllama {
+		if newCfg.OllamaURL == "" {
+			newCfg.OllamaURL = "http://localhost:11434"
+		}
+		if newCfg.OllamaModel == "" {
+			newCfg.OllamaModel = "llama3.2"
+		}
+	}
+
+	s.aiClient.SetConfig(newCfg)
+
+	// Persist to K8s Secret if store is available
+	if s.aiConfigStore != nil {
+		cfgJSON, _ := json.Marshal(newCfg)
+		if err := s.aiConfigStore.SaveJSON(cfgJSON); err != nil {
+			writeError(w, http.StatusInternalServerError, "failed to persist AI config: "+err.Error())
+			return
+		}
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok", "provider": req.Provider})
+}
+
+func (s *Server) handleTestAIConfig(w http.ResponseWriter, r *http.Request) {
+	var req saveAIConfigRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	// Create temporary client with the provided config
+	testCfg := ai.Config{
+		Provider:   ai.Provider(req.Provider),
+		APIKey:     req.APIKey,
+		CloudModel: req.Model,
+		BaseURL:    req.BaseURL,
+		OllamaURL:  req.OllamaURL,
+		OllamaModel: req.Model,
+	}
+	if testCfg.Provider == ai.ProviderOllama && testCfg.OllamaURL == "" {
+		testCfg.OllamaURL = "http://localhost:11434"
+	}
+
+	testClient := ai.NewClient(testCfg)
+	result, err := testClient.Summarize(r.Context(), "Say 'AI connection successful' in one short sentence.")
+	if err != nil {
+		writeJSON(w, http.StatusOK, map[string]interface{}{
+			"status":  "error",
+			"message": err.Error(),
+		})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"status":   "ok",
+		"response": result,
+	})
+}
+
 func (s *Server) handleSetAIProvider(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Provider string `json:"provider"`

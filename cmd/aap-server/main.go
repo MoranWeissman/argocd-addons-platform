@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io/fs"
@@ -210,6 +211,35 @@ func main() {
 
 	// Build server
 	srv := api.NewServer(connSvc, clusterSvc, addonSvc, dashboardSvc, observabilitySvc, upgradeSvc, aiClient, ddClient, migrationExecutor)
+
+	// AI config persistence (K8s mode — encrypted Secret)
+	if mode == platform.ModeKubernetes {
+		encKey := os.Getenv("AAP_ENCRYPTION_KEY")
+		namespace := os.Getenv("AAP_NAMESPACE")
+		if namespace == "" {
+			namespace = "argocd-addons-platform"
+		}
+		if encKey != "" {
+			aiStore, err := config.NewAIConfigStore(namespace, encKey)
+			if err != nil {
+				log.Printf("WARNING: Could not create AI config store: %v", err)
+			} else {
+				srv.SetAIConfigStore(aiStore)
+				// Load persisted AI config (UI-set values override env vars)
+				if savedJSON, err := aiStore.LoadJSON(); err != nil {
+					log.Printf("WARNING: Could not load AI config: %v", err)
+				} else if savedJSON != nil {
+					var savedCfg ai.Config
+					if err := json.Unmarshal(savedJSON, &savedCfg); err != nil {
+						log.Printf("WARNING: Could not decode AI config: %v", err)
+					} else if savedCfg.Provider != "" {
+						aiClient.SetConfig(savedCfg)
+						log.Printf("AI config loaded from K8s Secret (provider: %s)", savedCfg.Provider)
+					}
+				}
+			}
+		}
+	}
 
 	// Static files
 	var staticFS fs.FS
