@@ -281,9 +281,10 @@ export default function MigrationDetail() {
                       </span>
                       <span className={cn(
                         'shrink-0 font-bold uppercase',
-                        log.repo.includes('NEW') ? 'text-green-400'
-                          : log.repo.includes('OLD') ? 'text-orange-400'
-                            : 'text-blue-400'
+                        log.repo === 'SYSTEM' ? 'text-cyan-400'
+                          : log.repo.includes('NEW') ? 'text-green-400'
+                            : log.repo.includes('OLD') ? 'text-orange-400'
+                              : 'text-blue-400'
                       )}>
                         {log.repo}
                       </span>

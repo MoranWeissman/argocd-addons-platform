@@ -43,7 +43,7 @@ func (e *Executor) executeStep(ctx context.Context, m *Migration, stepNum int) e
 func (e *Executor) stepVerifyCatalog(ctx context.Context, m *Migration) error {
 	const catalogPath = "configuration/addons-catalog.yaml"
 
-	e.addLog(m, 1, e.newRepoLabel(), "reading", "Reading addons-catalog.yaml from NEW repo...")
+	e.addLog(m, 1, e.newRepoLabel(), "reading", "Reading addon catalog...")
 
 	data, err := e.newGP.GetFileContent(ctx, catalogPath, "main")
 	if err != nil {
@@ -83,7 +83,7 @@ func (e *Executor) stepConfigureValues(ctx context.Context, m *Migration) error 
 
 	// 1. Read addon global values from NEW repo.
 	newGlobalPath := fmt.Sprintf("configuration/addons-global-values/%s.yaml", m.AddonName)
-	e.addLog(m, 2, e.newRepoLabel(), "reading", fmt.Sprintf("Reading %s...", newGlobalPath))
+	e.addLog(m, 2, e.newRepoLabel(), "reading", fmt.Sprintf("Reading global values for %s from NEW repo...", m.AddonName))
 	newGlobalValues, newGlobalErr := e.newGP.GetFileContent(ctx, newGlobalPath, "main")
 	newGlobalStr := "(not available)"
 	if newGlobalErr != nil {
@@ -98,18 +98,18 @@ func (e *Executor) stepConfigureValues(ctx context.Context, m *Migration) error 
 	if e.oldGP != nil {
 		// Try V2 path first.
 		oldGlobalPath := fmt.Sprintf("configuration/addons-global-values/%s.yaml", m.AddonName)
-		e.addLog(m, 2, e.oldRepoLabel(), "reading", fmt.Sprintf("Reading %s (V2 path)...", oldGlobalPath))
+		e.addLog(m, 2, e.oldRepoLabel(), "reading", fmt.Sprintf("Reading global values for %s from OLD repo...", m.AddonName))
 		oldGlobalValues, err := e.oldGP.GetFileContent(ctx, oldGlobalPath, "main")
 		if err != nil {
 			// Try V1 path: read defaults.yaml and extract addon section.
 			v1Path := "values/addons-config/defaults.yaml"
-			e.addLog(m, 2, e.oldRepoLabel(), "reading", fmt.Sprintf("V2 path not found, trying V1: %s...", v1Path))
+			e.addLog(m, 2, e.oldRepoLabel(), "reading", "Trying alternative config location in OLD repo...")
 			oldGlobalValues, err = e.oldGP.GetFileContent(ctx, v1Path, "main")
 			if err != nil {
 				e.addLog(m, 2, e.oldRepoLabel(), "warning", "No global values found in OLD repo (tried V2 and V1 paths)")
 			} else {
 				oldGlobalStr = truncate(string(oldGlobalValues), 1500)
-				e.addLog(m, 2, e.oldRepoLabel(), "completed", fmt.Sprintf("Read V1 defaults.yaml (%d bytes)", len(oldGlobalValues)))
+				e.addLog(m, 2, e.oldRepoLabel(), "completed", fmt.Sprintf("Read global values for %s (%d bytes)", m.AddonName, len(oldGlobalValues)))
 			}
 		} else {
 			oldGlobalStr = truncate(string(oldGlobalValues), 1500)
@@ -119,7 +119,7 @@ func (e *Executor) stepConfigureValues(ctx context.Context, m *Migration) error 
 
 	// 3. Read cluster values from NEW repo.
 	newClusterPath := fmt.Sprintf("configuration/addons-clusters-values/%s.yaml", m.ClusterName)
-	e.addLog(m, 2, e.newRepoLabel(), "reading", fmt.Sprintf("Reading %s...", newClusterPath))
+	e.addLog(m, 2, e.newRepoLabel(), "reading", fmt.Sprintf("Reading cluster values for %s from NEW repo...", m.ClusterName))
 	newClusterValues, newClusterErr := e.newGP.GetFileContent(ctx, newClusterPath, "main")
 	newClusterStr := "(not available)"
 	if newClusterErr != nil {
@@ -134,18 +134,18 @@ func (e *Executor) stepConfigureValues(ctx context.Context, m *Migration) error 
 	if e.oldGP != nil {
 		// Try V2 path first.
 		oldClusterPath := fmt.Sprintf("configuration/addons-clusters-values/%s.yaml", m.ClusterName)
-		e.addLog(m, 2, e.oldRepoLabel(), "reading", fmt.Sprintf("Reading %s (V2 path)...", oldClusterPath))
+		e.addLog(m, 2, e.oldRepoLabel(), "reading", fmt.Sprintf("Reading cluster values for %s from OLD repo...", m.ClusterName))
 		oldClusterValues, err := e.oldGP.GetFileContent(ctx, oldClusterPath, "main")
 		if err != nil {
 			// Try V1 path.
 			v1Path := fmt.Sprintf("values/addons-config/overrides/%s/%s.yaml", m.ClusterName, m.AddonName)
-			e.addLog(m, 2, e.oldRepoLabel(), "reading", fmt.Sprintf("V2 path not found, trying V1: %s...", v1Path))
+			e.addLog(m, 2, e.oldRepoLabel(), "reading", "Trying alternative config location in OLD repo...")
 			oldClusterValues, err = e.oldGP.GetFileContent(ctx, v1Path, "main")
 			if err != nil {
 				e.addLog(m, 2, e.oldRepoLabel(), "warning", "No cluster values found in OLD repo (tried V2 and V1 paths)")
 			} else {
 				oldClusterStr = truncate(string(oldClusterValues), 1500)
-				e.addLog(m, 2, e.oldRepoLabel(), "completed", fmt.Sprintf("Read V1 cluster override for %s/%s (%d bytes)", m.ClusterName, m.AddonName, len(oldClusterValues)))
+				e.addLog(m, 2, e.oldRepoLabel(), "completed", fmt.Sprintf("Read cluster values for %s/%s (%d bytes)", m.ClusterName, m.AddonName, len(oldClusterValues)))
 			}
 		} else {
 			oldClusterStr = truncate(string(oldClusterValues), 1500)
@@ -170,7 +170,7 @@ func (e *Executor) stepConfigureValues(ctx context.Context, m *Migration) error 
 func (e *Executor) stepEnableAddon(ctx context.Context, m *Migration) error {
 	const clusterAddonsPath = "configuration/cluster-addons.yaml"
 
-	e.addLog(m, 3, e.newRepoLabel(), "reading", "Reading cluster-addons.yaml...")
+	e.addLog(m, 3, e.newRepoLabel(), "reading", "Reading cluster configuration...")
 
 	data, err := e.newGP.GetFileContent(ctx, clusterAddonsPath, "main")
 	if err != nil {
@@ -186,7 +186,7 @@ func (e *Executor) stepEnableAddon(ctx context.Context, m *Migration) error {
 
 	ts := time.Now().Unix()
 	branch := fmt.Sprintf("aap/migration/%s/%s/%d", sanitize(m.AddonName), sanitize(m.ClusterName), ts)
-	e.addLog(m, 3, e.newRepoLabel(), "creating", fmt.Sprintf("Creating branch %s...", branch))
+	e.addLog(m, 3, e.newRepoLabel(), "creating", "Preparing pull request...")
 
 	step := &m.Steps[2]
 	return e.createPRWithLog(ctx, e.newGP, m, step, 3,
@@ -243,13 +243,13 @@ func (e *Executor) stepDisableAddonOld(ctx context.Context, m *Migration) error 
 		return fmt.Errorf("old git provider not configured — cannot disable addon in OLD repo")
 	}
 
-	e.addLog(m, 5, e.oldRepoLabel(), "reading", "Reading clusters.yaml from OLD repo...")
+	e.addLog(m, 5, e.oldRepoLabel(), "reading", "Reading cluster configuration from OLD repo...")
 
 	// Try V2 path first, then V1.
 	clusterFile := "configuration/cluster-addons.yaml"
 	data, err := e.oldGP.GetFileContent(ctx, clusterFile, "main")
 	if err != nil {
-		e.addLog(m, 5, e.oldRepoLabel(), "reading", "V2 path not found, trying V1: values/clusters.yaml...")
+		e.addLog(m, 5, e.oldRepoLabel(), "reading", "Trying alternative config location in OLD repo...")
 		clusterFile = "values/clusters.yaml"
 		data, err = e.oldGP.GetFileContent(ctx, clusterFile, "main")
 		if err != nil {
@@ -266,7 +266,7 @@ func (e *Executor) stepDisableAddonOld(ctx context.Context, m *Migration) error 
 
 	ts := time.Now().Unix()
 	branch := fmt.Sprintf("aap/migration/%s/%s/%d", sanitize(m.AddonName), sanitize(m.ClusterName), ts)
-	e.addLog(m, 5, e.oldRepoLabel(), "creating", fmt.Sprintf("Creating branch %s...", branch))
+	e.addLog(m, 5, e.oldRepoLabel(), "creating", "Preparing pull request...")
 
 	step := &m.Steps[4]
 	return e.createPRWithLog(ctx, e.oldGP, m, step, 5,
@@ -400,7 +400,7 @@ func (e *Executor) stepVerifyHealthy(ctx context.Context, m *Migration) error {
 func (e *Executor) stepDisableMigrationMode(ctx context.Context, m *Migration) error {
 	const catalogPath = "configuration/addons-catalog.yaml"
 
-	e.addLog(m, 10, e.newRepoLabel(), "reading", "Reading addons-catalog.yaml...")
+	e.addLog(m, 10, e.newRepoLabel(), "reading", "Reading addon catalog...")
 
 	data, err := e.newGP.GetFileContent(ctx, catalogPath, "main")
 	if err != nil {
@@ -416,7 +416,7 @@ func (e *Executor) stepDisableMigrationMode(ctx context.Context, m *Migration) e
 
 	ts := time.Now().Unix()
 	branch := fmt.Sprintf("aap/migration/%s/%s/%d", sanitize(m.AddonName), sanitize(m.ClusterName), ts)
-	e.addLog(m, 10, e.newRepoLabel(), "creating", fmt.Sprintf("Creating branch %s...", branch))
+	e.addLog(m, 10, e.newRepoLabel(), "creating", "Preparing pull request...")
 
 	step := &m.Steps[9]
 	return e.createPRWithLog(ctx, e.newGP, m, step, 10,

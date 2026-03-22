@@ -111,16 +111,16 @@ var StepDefinitions = []struct {
 	Title       string
 	Description string
 }{
-	{"Verify addon in catalog", "Read-only — check addon exists in addons-catalog.yaml with inMigration: true"},
-	{"Compare values (OLD vs NEW)", "Read-only — compare global and cluster values between repos"},
-	{"Enable addon on cluster → PR", "Creates PR on NEW repo to set addon label to enabled"},
-	{"Verify app created in NEW ArgoCD", "Read-only — check ArgoCD created the application"},
-	{"Disable addon in OLD repo → PR", "Creates PR on OLD repo to disable the addon label"},
-	{"Sync clusters app in OLD ArgoCD", "Triggers sync so OLD ArgoCD processes the removal"},
-	{"Verify app removed from OLD ArgoCD", "Read-only — confirm application no longer exists in OLD ArgoCD"},
-	{"Hard refresh in NEW ArgoCD", "Triggers hard refresh so NEW ArgoCD adopts orphaned resources"},
-	{"Verify healthy in NEW ArgoCD", "Read-only — confirm Synced + Healthy with no pod restarts"},
-	{"Disable migration mode", "Create PR to set inMigration: false in addons-catalog.yaml"},
+	{"Verify addon in catalog", "Checks that the addon exists in the NEW repo's catalog and is marked for migration."},
+	{"Compare values", "Reads and compares addon configuration values between the OLD and NEW repositories to identify any differences."},
+	{"Enable addon in NEW repo", "Creates a pull request in the NEW repo to enable the addon on the target cluster."},
+	{"Verify app in NEW ArgoCD", "Waits for ArgoCD to detect the new configuration and create the application."},
+	{"Disable addon in OLD repo", "Creates a pull request in the OLD repo to disable the addon, preparing for handover."},
+	{"Sync OLD ArgoCD", "Triggers a sync in the OLD ArgoCD so it processes the removal."},
+	{"Verify removal from OLD ArgoCD", "Confirms the application has been removed from the OLD ArgoCD instance."},
+	{"Refresh NEW ArgoCD", "Triggers a hard refresh in the NEW ArgoCD so it adopts any orphaned resources."},
+	{"Verify healthy", "Confirms the application is Synced and Healthy in the NEW ArgoCD with no issues."},
+	{"Finalize migration", "Creates a pull request to mark the migration as complete in the addon catalog."},
 }
 
 // NewMigration creates a new Migration with all 10 steps pre-populated in
