@@ -370,6 +370,46 @@ func (s *Server) handleMergePR(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "merged", "message": fmt.Sprintf("PR #%d merged", step.PRNumber)})
 }
 
+// --- Migration Chat (Troubleshooting) ---
+
+func (s *Server) handleMigrationChat(w http.ResponseWriter, r *http.Request) {
+	if s.migrationExecutor == nil {
+		writeError(w, http.StatusServiceUnavailable, "migration service not configured")
+		return
+	}
+	id := r.PathValue("id")
+	if id == "" {
+		writeError(w, http.StatusBadRequest, "migration id is required")
+		return
+	}
+
+	var req struct {
+		Message string `json:"message"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if req.Message == "" {
+		writeError(w, http.StatusBadRequest, "message is required")
+		return
+	}
+
+	agent := s.migrationExecutor.GetAgent(id)
+	if agent == nil {
+		writeError(w, http.StatusNotFound, "no active agent for this migration")
+		return
+	}
+
+	response, err := agent.Chat(r.Context(), req.Message)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"response": response})
+}
+
 // --- Azure DevOps Discovery ---
 
 func (s *Server) handleAzureListProjects(w http.ResponseWriter, r *http.Request) {
