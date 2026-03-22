@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.29.3](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.29.2...v1.29.3) (2026-03-22)
+
+
+### Bug Fixes
+
+* Azure DevOps auto-approve before merge + re-merge UI ([a8b8757](https://github.com/MoranWeissman/argocd-addons-platform/commit/a8b87577da50878ce42bf7b0d95cead9d7faf514))
+
 ## [1.29.2](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.29.1...v1.29.2) (2026-03-22)
 
 
