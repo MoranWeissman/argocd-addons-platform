@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.26.4](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.26.3...v1.26.4) (2026-03-22)
+
+
+### Bug Fixes
+
+* TypeScript build error in PlatformInfo type ([40e42c5](https://github.com/MoranWeissman/argocd-addons-platform/commit/40e42c549f86cba8000c291bec000b08dc7f0f61))
+
 ## [1.26.3](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.26.2...v1.26.3) (2026-03-22)
 
 
