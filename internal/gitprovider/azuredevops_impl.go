@@ -29,7 +29,8 @@ func (a *AzureDevOpsProvider) TestConnection(_ context.Context) error {
 
 // GetFileContent retrieves the raw content of a single file at the given ref.
 func (a *AzureDevOpsProvider) GetFileContent(_ context.Context, filePath, ref string) ([]byte, error) {
-	apiURL := fmt.Sprintf("%s/items?path=%s&versionDescriptor.version=%s&api-version=7.1",
+	// $format=text returns raw file content instead of JSON metadata
+	apiURL := fmt.Sprintf("%s/items?path=%s&versionDescriptor.version=%s&$format=text&api-version=7.1",
 		a.baseURL, url.QueryEscape(filePath), url.QueryEscape(ref))
 
 	resp, body, err := a.doGet(apiURL)
