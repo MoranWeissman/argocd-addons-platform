@@ -365,12 +365,12 @@ func (a *AzureDevOpsProvider) CreatePullRequest(_ context.Context, title, body, 
 	return pr, nil
 }
 
-// MergePullRequest completes (merges) a pull request in Azure DevOps.
-// Azure DevOps requires a PATCH with status=completed and lastMergeSourceCommit.
+// MergePullRequest approves and completes (merges) a pull request in Azure DevOps.
+// Azure DevOps requires approval before completion, then a PATCH with status=completed.
 func (a *AzureDevOpsProvider) MergePullRequest(ctx context.Context, prNumber int) error {
 	prURL := fmt.Sprintf("%s/pullrequests/%d?api-version=7.1", a.baseURL, prNumber)
 
-	// Step 1: GET PR to retrieve lastMergeSourceCommit (required for completing)
+	// Step 1: GET PR to retrieve lastMergeSourceCommit and reviewers info
 	_, getBody, err := a.doGet(prURL)
 	if err != nil {
 		return fmt.Errorf("getting pull request #%d: %w", prNumber, err)
@@ -380,12 +380,36 @@ func (a *AzureDevOpsProvider) MergePullRequest(ctx context.Context, prNumber int
 		LastMergeSourceCommit struct {
 			CommitID string `json:"commitId"`
 		} `json:"lastMergeSourceCommit"`
+		CreatedBy struct {
+			ID string `json:"id"`
+		} `json:"createdBy"`
+		Status string `json:"status"`
 	}
 	if err := json.Unmarshal(getBody, &prData); err != nil {
 		return fmt.Errorf("parsing pull request #%d: %w", prNumber, err)
 	}
 
-	// Step 2: PATCH to complete (merge) the PR
+	// Already merged
+	if prData.Status == "completed" {
+		slog.Info("azure devops pull request already completed", "number", prNumber)
+		return nil
+	}
+
+	// Step 2: Auto-approve the PR (vote: 10 = approved)
+	if prData.CreatedBy.ID != "" {
+		voteURL := fmt.Sprintf("%s/pullrequests/%d/reviewers/%s?api-version=7.1", a.baseURL, prNumber, prData.CreatedBy.ID)
+		voteBody, _ := json.Marshal(map[string]interface{}{
+			"vote": 10, // 10 = approved
+		})
+		_, _, voteErr := a.doPatch(voteURL, voteBody) // best-effort, some policies may block self-approve
+		if voteErr != nil {
+			slog.Warn("azure devops: auto-approve failed (may need manual approval)", "pr", prNumber, "error", voteErr)
+		} else {
+			slog.Info("azure devops pull request auto-approved", "number", prNumber)
+		}
+	}
+
+	// Step 3: PATCH to complete (merge) the PR
 	patchBody, _ := json.Marshal(map[string]interface{}{
 		"status": "completed",
 		"lastMergeSourceCommit": map[string]string{
