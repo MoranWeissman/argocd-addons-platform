@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.33.1](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.33.0...v1.33.1) (2026-03-22)
+
+
+### Bug Fixes
+
+* create agent on demand for troubleshooting chat ([ce8eb0c](https://github.com/MoranWeissman/argocd-addons-platform/commit/ce8eb0c81e748f44cb956e45b5db23c82194630c))
+
 ## [1.33.0](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.32.6...v1.33.0) (2026-03-22)
 
 
