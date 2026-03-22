@@ -59,7 +59,16 @@ func (a *AzureDevOpsProvider) doGet(url string) (*http.Response, []byte, error) 
 
 // doPost performs an authenticated POST request with a JSON body.
 func (a *AzureDevOpsProvider) doPost(url string, jsonBody []byte) (*http.Response, []byte, error) {
-	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(jsonBody))
+	return a.doRequest(http.MethodPost, url, jsonBody)
+}
+
+// doPatch performs an authenticated PATCH request with a JSON body.
+func (a *AzureDevOpsProvider) doPatch(url string, jsonBody []byte) (*http.Response, []byte, error) {
+	return a.doRequest(http.MethodPatch, url, jsonBody)
+}
+
+func (a *AzureDevOpsProvider) doRequest(method, url string, jsonBody []byte) (*http.Response, []byte, error) {
+	req, err := http.NewRequest(method, url, bytes.NewReader(jsonBody))
 	if err != nil {
 		return nil, nil, fmt.Errorf("create request: %w", err)
 	}
