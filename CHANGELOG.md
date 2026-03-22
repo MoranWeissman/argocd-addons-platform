@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.24.2](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.24.1...v1.24.2) (2026-03-22)
+
+
+### Bug Fixes
+
+* fallback to GITHUB_TOKEN env var when token not provided ([8077b46](https://github.com/MoranWeissman/argocd-addons-platform/commit/8077b463b1a1ee16cc99832ca7f711d5da6de449))
+
 ## [1.24.1](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.24.0...v1.24.1) (2026-03-22)
 
 
