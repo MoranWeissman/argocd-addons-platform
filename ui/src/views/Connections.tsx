@@ -46,8 +46,9 @@ const emptyForm: ConnectionFormData = {
   argocd_namespace: 'argocd',
 }
 
-function buildPayload(form: ConnectionFormData) {
+function buildPayload(form: ConnectionFormData, name?: string) {
   return {
+    name: name || undefined,
     git: {
       repo_url: form.git_url,
       token: form.git_token || undefined,
@@ -254,13 +255,13 @@ export function Connections() {
     }
   }
 
-  async function testAndSave(form: ConnectionFormData, setStatus: (s: TestStatus | ((prev: TestStatus) => TestStatus)) => void, saveFn: () => Promise<void>, setError: (e: string | null) => void, setSaving: (b: boolean) => void) {
+  async function testAndSave(form: ConnectionFormData, setStatus: (s: TestStatus | ((prev: TestStatus) => TestStatus)) => void, saveFn: () => Promise<void>, setError: (e: string | null) => void, setSaving: (b: boolean) => void, connectionName?: string) {
     setSaving(true)
     setError(null)
-    // Auto-test before saving
+    // Auto-test before saving (name included so backend can fill missing tokens from saved connection)
     setStatus({ git: 'testing', argocd: 'testing' })
     try {
-      const payload = buildPayload(form)
+      const payload = buildPayload(form, connectionName)
       const res = await api.testCredentials(payload)
       const gitOk = res.git.status === 'ok'
       const argocdOk = res.argocd.status === 'ok'
@@ -312,10 +313,10 @@ export function Connections() {
     if (!editingName) return
     const name = editingName
     await testAndSave(editForm, setEditTestStatus, async () => {
-      await api.updateConnection(name, buildPayload(editForm))
+      await api.updateConnection(name, buildPayload(editForm, name))
       refreshConnections()
       setEditingName(null)
-    }, setEditError, setEditSaving)
+    }, setEditError, setEditSaving, name)
   }
 
   if (loading) {

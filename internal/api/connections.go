@@ -46,6 +46,19 @@ func (s *Server) handleUpdateConnection(w http.ResponseWriter, r *http.Request) 
 	}
 	req.Name = name // ensure name matches URL
 
+	// For edits: if token fields are empty, keep existing values
+	if saved, err := s.connSvc.GetConnection(name); err == nil && saved != nil {
+		if req.Git.Token == "" {
+			req.Git.Token = saved.Git.Token
+		}
+		if req.Git.PAT == "" {
+			req.Git.PAT = saved.Git.PAT
+		}
+		if req.Argocd.Token == "" {
+			req.Argocd.Token = saved.Argocd.Token
+		}
+	}
+
 	if err := s.connSvc.Create(req); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -95,6 +108,21 @@ func (s *Server) handleTestCredentials(w http.ResponseWriter, r *http.Request) {
 		Name:   req.Name,
 		Git:    req.Git,
 		Argocd: req.Argocd,
+	}
+
+	// For edits: if token fields are empty, fill from saved connection
+	if conn.Name != "" {
+		if saved, err := s.connSvc.GetConnection(conn.Name); err == nil && saved != nil {
+			if conn.Git.Token == "" {
+				conn.Git.Token = saved.Git.Token
+			}
+			if conn.Git.PAT == "" {
+				conn.Git.PAT = saved.Git.PAT
+			}
+			if conn.Argocd.Token == "" {
+				conn.Argocd.Token = saved.Argocd.Token
+			}
+		}
 	}
 
 	gitErr, argocdErr, authInfo := s.connSvc.TestCredentials(r.Context(), conn)
