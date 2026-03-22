@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.29.6](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.29.5...v1.29.6) (2026-03-22)
+
+
+### Bug Fixes
+
+* bypass Azure DevOps branch policies + inline merge errors ([1e30196](https://github.com/MoranWeissman/argocd-addons-platform/commit/1e30196e36f5237e42e6510fd7cb9b39482a90d5))
+
 ## [1.29.5](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.29.4...v1.29.5) (2026-03-22)
 
 
