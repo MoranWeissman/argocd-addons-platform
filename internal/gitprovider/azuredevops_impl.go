@@ -50,8 +50,13 @@ func (a *AzureDevOpsProvider) GetFileContent(_ context.Context, filePath, ref st
 		return []byte(item.Content), nil
 	}
 
-	// Fallback: body might be raw content (e.g., when $format=text works)
-	slog.Info("azure devops file fetched (raw)", "path", filePath, "ref", ref, "size", len(body))
+	// Debug: log first 200 chars of the response to understand the format
+	preview := string(body)
+	if len(preview) > 200 {
+		preview = preview[:200]
+	}
+	slog.Info("azure devops file response debug", "path", filePath, "size", len(body), "preview", preview)
+
 	return body, nil
 }
 
