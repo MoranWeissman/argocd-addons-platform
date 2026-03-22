@@ -303,8 +303,18 @@ func (c *Client) doGet(ctx context.Context, path string) ([]byte, error) {
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		slog.Error("argocd call failed", "endpoint", path, "status", resp.StatusCode)
-		return nil, fmt.Errorf("unexpected status %d from %s: %s", resp.StatusCode, path, string(body))
+		slog.Error("argocd call failed", "endpoint", path, "status", resp.StatusCode, "body", string(body))
+		// Translate common errors into user-friendly messages
+		switch resp.StatusCode {
+		case 401:
+			return nil, fmt.Errorf("invalid ArgoCD token — check that the token is correct and not expired")
+		case 403:
+			return nil, fmt.Errorf("ArgoCD access denied — the token does not have permission for this operation")
+		case 404:
+			return nil, fmt.Errorf("ArgoCD endpoint not found (%s) — check the server URL", path)
+		default:
+			return nil, fmt.Errorf("ArgoCD returned status %d from %s", resp.StatusCode, path)
+		}
 	}
 
 	return body, nil
