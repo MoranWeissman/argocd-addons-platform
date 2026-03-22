@@ -567,7 +567,7 @@ export function Connections() {
                 Deployment Mode
               </dt>
               <dd className="mt-1 text-sm font-medium text-gray-900 dark:text-gray-100">
-                Local Development
+                {(platformInfo as Record<string, string>)?.mode ?? 'Unknown'}
               </dd>
             </div>
 
