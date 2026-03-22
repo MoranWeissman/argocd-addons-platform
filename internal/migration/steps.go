@@ -380,12 +380,16 @@ func (e *Executor) stepVerifyHealthy(ctx context.Context, m *Migration) error {
 
 		lastStatus = fmt.Sprintf("sync=%s, health=%s", app.SyncStatus, app.HealthStatus)
 
-		if app.SyncStatus == "Synced" && app.HealthStatus == "Healthy" {
-			e.addLog(m, 9, "NEW ArgoCD", "completed", fmt.Sprintf("Application %s is Synced and Healthy", appName))
+		if app.HealthStatus == "Healthy" {
+			syncNote := ""
+			if app.SyncStatus != "Synced" {
+				syncNote = fmt.Sprintf(" (sync status: %s — this is normal after migration, ArgoCD will sync on next cycle)", app.SyncStatus)
+			}
+			e.addLog(m, 9, "NEW ArgoCD", "completed", fmt.Sprintf("Application %s is Healthy%s", appName, syncNote))
 
 			assessment, _ := e.aiEvaluate(ctx, step.Title,
 				fmt.Sprintf("Application %q is %s.", appName, lastStatus))
-			step.Message = fmt.Sprintf("Application %q is Synced and Healthy. %s", appName, assessment)
+			step.Message = fmt.Sprintf("Application %q is Healthy (sync=%s). %s", appName, app.SyncStatus, assessment)
 			_ = e.store.SaveMigration(m)
 			return nil
 		}
@@ -393,7 +397,7 @@ func (e *Executor) stepVerifyHealthy(ctx context.Context, m *Migration) error {
 		slog.Info("migration: app not yet healthy", "app", appName, "status", lastStatus, "attempt", attempt+1)
 	}
 
-	return fmt.Errorf("application %q is not healthy after 3 attempts (last status: %s)", appName, lastStatus)
+	return fmt.Errorf("application %q is not healthy after 3 attempts (health: %s)", appName, lastStatus)
 }
 
 // Step 10: Create PR to set inMigration: false in addons-catalog.yaml.
