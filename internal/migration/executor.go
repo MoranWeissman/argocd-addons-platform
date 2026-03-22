@@ -20,10 +20,11 @@ type Executor struct {
 	oldGP     gitprovider.GitProvider
 	newArgoCD *argocd.Client
 	oldArgoCD *argocd.Client
-	aiClient  *ai.Client
+	aiClient *ai.Client
 
 	mu      sync.Mutex
 	running map[string]context.CancelFunc // active goroutines keyed by migration ID
+	agents  map[string]*MigrationAgent    // active agents by migration ID
 }
 
 // NewExecutor creates a migration executor wired to the given providers.
@@ -42,6 +43,7 @@ func NewExecutor(
 		oldArgoCD: oldAC,
 		aiClient:  aiClient,
 		running:   make(map[string]context.CancelFunc),
+		agents:    make(map[string]*MigrationAgent),
 	}
 }
 
@@ -168,9 +170,35 @@ func (e *Executor) RunSteps(ctx context.Context, migrationID string) {
 		// Emit step description as the first log entry
 		e.addLog(m, m.CurrentStep, "SYSTEM", "starting", step.Description)
 
-		// Execute step with timeout (2 minutes per step)
-		stepCtx, stepCancel := context.WithTimeout(ctx, 2*time.Minute)
-		stepErr := e.executeStep(stepCtx, m, m.CurrentStep)
+		// Execute step with timeout (5 minutes per step to allow for agent execution)
+		stepCtx, stepCancel := context.WithTimeout(ctx, 5*time.Minute)
+		var stepErr error
+		if e.aiClient != nil && e.aiClient.IsEnabled() {
+			agent := e.getOrCreateAgent(m)
+			result, msg, agentErr := agent.ExecuteStep(stepCtx, m.CurrentStep)
+			if agentErr != nil {
+				stepErr = agentErr
+			} else {
+				switch result {
+				case StepResultSuccess:
+					stepErr = nil
+				case StepResultFailed:
+					stepErr = fmt.Errorf("%s", msg)
+				case StepResultNeedsUser:
+					// Set step to waiting, don't treat as error
+					step.Status = StepWaiting
+					step.Message = msg
+					m.Status = StatusWaiting
+					m.UpdatedAt = now()
+					_ = e.store.SaveMigration(m)
+					stepCancel()
+					slog.Info("migration: step needs user action", "id", migrationID, "step", m.CurrentStep)
+					return // pause execution
+				}
+			}
+		} else {
+			stepErr = e.executeStep(stepCtx, m, m.CurrentStep)
+		}
 		stepCancel()
 
 		// Re-read in case the step handler updated the migration.
@@ -392,6 +420,38 @@ func (e *Executor) CancelMigration(migrationID string) error {
 	m.Status = StatusCancelled
 	m.UpdatedAt = now()
 	return e.store.SaveMigration(m)
+}
+
+// getOrCreateAgent returns an existing MigrationAgent for the migration or
+// creates a new one. Agents are cached per migration ID so that conversation
+// history is preserved across steps and troubleshooting chat.
+func (e *Executor) getOrCreateAgent(m *Migration) *MigrationAgent {
+	if e.agents == nil {
+		e.agents = make(map[string]*MigrationAgent)
+	}
+	if agent, ok := e.agents[m.ID]; ok {
+		return agent
+	}
+	agent := NewMigrationAgent(
+		e.aiClient,
+		e.newGP, e.oldGP,
+		e.newArgoCD, e.oldArgoCD,
+		m.AddonName, m.ClusterName,
+		m.Steps,
+		func(step int, repo, action, detail string) {
+			e.addLog(m, step, repo, action, detail)
+		},
+	)
+	e.agents[m.ID] = agent
+	return agent
+}
+
+// GetAgent returns the active MigrationAgent for a migration, or nil if none exists.
+func (e *Executor) GetAgent(migrationID string) *MigrationAgent {
+	if e.agents == nil {
+		return nil
+	}
+	return e.agents[migrationID]
 }
 
 // aiEvaluate asks the AI provider for a brief assessment of a migration step.
