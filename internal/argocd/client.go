@@ -114,11 +114,14 @@ func discoverArgocdServer(namespace string) string {
 	return fmt.Sprintf("https://argocd-server.%s.svc.cluster.local", namespace)
 }
 
-// TestConnection verifies that the client can reach the ArgoCD server.
+// TestConnection verifies that the client can reach the ArgoCD server
+// AND that the token has valid permissions (uses an authenticated endpoint).
 func (c *Client) TestConnection(ctx context.Context) error {
-	_, err := c.doGet(ctx, "/api/version")
+	// Use /api/v1/clusters which requires authentication,
+	// unlike /api/version which is public and doesn't validate the token.
+	_, err := c.doGet(ctx, "/api/v1/clusters")
 	if err != nil {
-		return fmt.Errorf("argocd connection test failed: %w", err)
+		return err
 	}
 	return nil
 }

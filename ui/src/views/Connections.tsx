@@ -251,21 +251,50 @@ export function Connections() {
     }
   }
 
+  async function testAndSave(form: ConnectionFormData, setStatus: (s: TestStatus | ((prev: TestStatus) => TestStatus)) => void, saveFn: () => Promise<void>, setError: (e: string | null) => void, setSaving: (b: boolean) => void) {
+    setSaving(true)
+    setError(null)
+    // Auto-test before saving
+    setStatus({ git: 'testing', argocd: 'testing' })
+    try {
+      const payload = buildPayload(form)
+      const res = await api.testCredentials(payload)
+      const gitOk = res.git.status === 'ok'
+      const argocdOk = res.argocd.status === 'ok'
+      setStatus({
+        git: gitOk ? 'ok' : 'error',
+        argocd: argocdOk ? 'ok' : 'error',
+        gitMessage: res.git.message,
+        argocdMessage: res.argocd.message,
+        gitAuth: res.git.auth,
+        argocdAuth: res.argocd.auth,
+      })
+      if (!gitOk || !argocdOk) {
+        const errors = []
+        if (!gitOk) errors.push(`Git: ${res.git.message || 'failed'}`)
+        if (!argocdOk) errors.push(`ArgoCD: ${res.argocd.message || 'failed'}`)
+        setError(`Connection test failed — ${errors.join(', ')}`)
+        setSaving(false)
+        return
+      }
+      // Tests passed — save
+      await saveFn()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save connection')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   async function handleAddSubmit(e: FormEvent) {
     e.preventDefault()
-    setAddSaving(true)
-    setAddError(null)
-    try {
+    await testAndSave(addForm, setAddTestStatus, async () => {
       await api.createConnection(buildPayload(addForm))
       refreshConnections()
       setShowAddForm(false)
       setAddForm({ ...emptyForm })
       setAddTestStatus({ git: 'idle', argocd: 'idle' })
-    } catch (err) {
-      setAddError(err instanceof Error ? err.message : 'Failed to create connection')
-    } finally {
-      setAddSaving(false)
-    }
+    }, setAddError, setAddSaving)
   }
 
   function handleEditStart(conn: ConnectionResponse) {
@@ -278,21 +307,13 @@ export function Connections() {
   async function handleEditSubmit(e: FormEvent) {
     e.preventDefault()
     if (!editingName) return
-    setEditSaving(true)
-    setEditError(null)
-    try {
-      await api.updateConnection(editingName, buildPayload(editForm))
+    const name = editingName
+    await testAndSave(editForm, setEditTestStatus, async () => {
+      await api.updateConnection(name, buildPayload(editForm))
       refreshConnections()
       setEditingName(null)
-    } catch (err) {
-      setEditError(err instanceof Error ? err.message : 'Failed to update connection')
-    } finally {
-      setEditSaving(false)
-    }
+    }, setEditError, setEditSaving)
   }
-
-  const addTestsPassed = addTestStatus.git === 'ok' && addTestStatus.argocd === 'ok'
-  const editTestsPassed = editTestStatus.git === 'ok' && editTestStatus.argocd === 'ok'
 
   if (loading) {
     return <LoadingState message="Loading settings..." />
@@ -373,8 +394,7 @@ export function Connections() {
             <div className="mt-4 flex items-center gap-3">
               <button
                 type="submit"
-                disabled={addSaving || !addTestsPassed}
-                title={!addTestsPassed ? 'Test both Git and ArgoCD connections first' : undefined}
+                disabled={addSaving}
                 className="inline-flex items-center gap-1.5 rounded-lg bg-cyan-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-cyan-700 disabled:opacity-50 dark:bg-cyan-700 dark:hover:bg-cyan-600"
               >
                 {addSaving && (
@@ -528,8 +548,7 @@ export function Connections() {
                     <div className="mt-4 flex items-center gap-3">
                       <button
                         type="submit"
-                        disabled={editSaving || !editTestsPassed}
-                        title={!editTestsPassed ? 'Test both Git and ArgoCD connections first' : undefined}
+                        disabled={editSaving}
                         className="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-amber-700 disabled:opacity-50 dark:bg-amber-700 dark:hover:bg-amber-600"
                       >
                         {editSaving && (
