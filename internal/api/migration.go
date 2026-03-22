@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/moran/argocd-addons-platform/internal/argocd"
 	"github.com/moran/argocd-addons-platform/internal/gitprovider"
@@ -343,17 +344,30 @@ func (s *Server) handleMergePR(w http.ResponseWriter, r *http.Request) {
 	}
 
 	step.PRStatus = "merged"
+	step.Message = fmt.Sprintf("PR #%d merged successfully", step.PRNumber)
 
-	// Delete the source branch after merge
-	if step.PRURL != "" {
-		// Extract branch name from the step's message or use a pattern
-		// The branch was created as aap/migration/... — try to delete it
-		_ = gp.DeleteBranch(r.Context(), fmt.Sprintf("aap/migration/%s/%s", m.AddonName, m.ClusterName))
+	// If step was waiting, mark it completed and advance
+	if step.Status == "waiting" {
+		step.Status = "completed"
+		step.CompletedAt = time.Now().UTC().Format(time.RFC3339)
+		m.CurrentStep++
+		// Resume the migration if it was waiting
+		if m.Status == "waiting" {
+			m.Status = "running"
+			m.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
+			_ = s.migrationExecutor.GetStore().SaveMigration(m)
+			// Re-resolve providers and continue execution
+			if err := s.resolveExecutorProviders(); err == nil {
+				go s.migrationExecutor.ContinueAfterPR(context.Background(), id)
+			}
+			writeJSON(w, http.StatusOK, map[string]string{"status": "merged", "message": "PR merged, migration continuing..."})
+			return
+		}
 	}
 
 	_ = s.migrationExecutor.GetStore().SaveMigration(m)
 
-	writeJSON(w, http.StatusOK, map[string]string{"status": "merged"})
+	writeJSON(w, http.StatusOK, map[string]string{"status": "merged", "message": fmt.Sprintf("PR #%d merged", step.PRNumber)})
 }
 
 // --- Azure DevOps Discovery ---
