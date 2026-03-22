@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.26.0](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.25.0...v1.26.0) (2026-03-22)
+
+
+### Features
+
+* dev mode flag for credential env var fallback ([4e12f52](https://github.com/MoranWeissman/argocd-addons-platform/commit/4e12f5283e2b0e58071b12be3061a8008af322af))
+
 ## [1.25.0](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.24.5...v1.25.0) (2026-03-22)
 
 
