@@ -86,6 +86,11 @@ func deriveConnectionName(git models.GitRepoConfig) string {
 	return "default"
 }
 
+// GetConnection returns a connection by name.
+func (s *ConnectionService) GetConnection(name string) (*models.Connection, error) {
+	return s.store.GetConnection(name)
+}
+
 // Delete removes a connection.
 func (s *ConnectionService) Delete(name string) error {
 	return s.store.DeleteConnection(name)
