@@ -165,6 +165,9 @@ func (e *Executor) RunSteps(ctx context.Context, migrationID string) {
 
 		slog.Info("migration: executing step", "id", migrationID, "step", m.CurrentStep, "title", step.Title)
 
+		// Emit step description as the first log entry
+		e.addLog(m, m.CurrentStep, "SYSTEM", "starting", step.Description)
+
 		// Execute step with timeout (2 minutes per step)
 		stepCtx, stepCancel := context.WithTimeout(ctx, 2*time.Minute)
 		stepErr := e.executeStep(stepCtx, m, m.CurrentStep)
