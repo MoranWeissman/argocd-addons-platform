@@ -265,6 +265,17 @@ export default function MigrationDetail() {
                     </Button>
                   </div>
                 )}
+
+                {/* Show merge button on completed steps with unmerged PRs */}
+                {activeStep.status === 'completed' && activeStep.pr_url && activeStep.pr_status === 'open' && activeStep.pr_number && (
+                  <div className="mt-2 ml-7 flex items-center gap-2">
+                    <span className="text-xs text-amber-600 dark:text-amber-400">PR still open — was not merged</span>
+                    <Button size="sm" variant="outline" onClick={() => handleMergePR(activeStep.number)}
+                      className="h-6 px-2 text-xs bg-green-50 border-green-300 text-green-700 hover:bg-green-100 dark:bg-green-900/20 dark:border-green-700 dark:text-green-400">
+                      Approve &amp; Merge PR
+                    </Button>
+                  </div>
+                )}
               </div>
 
               {/* Log entries */}
