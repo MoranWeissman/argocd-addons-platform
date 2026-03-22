@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.33.0](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.32.6...v1.33.0) (2026-03-22)
+
+
+### Features
+
+* stream agent reasoning to log in real-time ([d76bdf3](https://github.com/MoranWeissman/argocd-addons-platform/commit/d76bdf3dfd681434acd9ab8766ff95f925f7893b))
+
 ## [1.32.6](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.32.5...v1.32.6) (2026-03-22)
 
 
