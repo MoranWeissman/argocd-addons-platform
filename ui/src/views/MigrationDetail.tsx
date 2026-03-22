@@ -243,17 +243,19 @@ export default function MigrationDetail() {
                 )}
 
                 {activeStep.status === 'waiting' && (
-                  <div className="mt-2 ml-7 flex items-center gap-2">
-                    <span className="text-xs text-amber-600 dark:text-amber-400">Waiting for PR merge</span>
-                    {activeStep.pr_number && (
-                      <Button size="sm" variant="outline" onClick={() => handleMergePR(activeStep.number)}
-                        className="h-6 px-2 text-xs bg-green-50 border-green-300 text-green-700 hover:bg-green-100 dark:bg-green-900/20 dark:border-green-700 dark:text-green-400">
-                        Merge PR
+                  <div className="mt-2 ml-7 flex items-center gap-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 dark:border-amber-700 dark:bg-amber-900/20">
+                    <span className="text-xs font-medium text-amber-700 dark:text-amber-400">Waiting for PR merge</span>
+                    <div className="ml-auto flex items-center gap-2">
+                      {activeStep.pr_number && (
+                        <Button size="sm" onClick={() => handleMergePR(activeStep.number)}
+                          className="h-7 bg-green-600 hover:bg-green-700 text-xs">
+                          Auto Merge
+                        </Button>
+                      )}
+                      <Button size="sm" variant="outline" onClick={handleContinue} className="h-7 text-xs">
+                        I Merged It
                       </Button>
-                    )}
-                    <Button size="sm" variant="outline" onClick={handleContinue} className="h-6 px-2 text-xs">
-                      PR Merged &rarr; Continue
-                    </Button>
+                    </div>
                   </div>
                 )}
 
@@ -268,11 +270,11 @@ export default function MigrationDetail() {
 
                 {/* Show merge button on completed steps with unmerged PRs */}
                 {activeStep.status === 'completed' && activeStep.pr_url && activeStep.pr_status === 'open' && activeStep.pr_number && (
-                  <div className="mt-2 ml-7 flex items-center gap-2">
-                    <span className="text-xs text-amber-600 dark:text-amber-400">PR still open — was not merged</span>
-                    <Button size="sm" variant="outline" onClick={() => handleMergePR(activeStep.number)}
-                      className="h-6 px-2 text-xs bg-green-50 border-green-300 text-green-700 hover:bg-green-100 dark:bg-green-900/20 dark:border-green-700 dark:text-green-400">
-                      Approve &amp; Merge PR
+                  <div className="mt-2 ml-7 flex items-center gap-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 dark:border-amber-700 dark:bg-amber-900/20">
+                    <span className="text-xs font-medium text-amber-700 dark:text-amber-400">PR still open</span>
+                    <Button size="sm" onClick={() => handleMergePR(activeStep.number)}
+                      className="ml-auto h-7 bg-green-600 hover:bg-green-700 text-xs">
+                      Auto Merge
                     </Button>
                   </div>
                 )}
