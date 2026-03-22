@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.26.2](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.26.1...v1.26.2) (2026-03-22)
+
+
+### Bug Fixes
+
+* user-friendly error messages for auth failures ([f78a89d](https://github.com/MoranWeissman/argocd-addons-platform/commit/f78a89d06a1be638289a970ef35cb0b92b3626a7))
+
 ## [1.26.1](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.26.0...v1.26.1) (2026-03-22)
 
 
