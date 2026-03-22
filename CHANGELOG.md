@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.29.4](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.29.3...v1.29.4) (2026-03-22)
+
+
+### Bug Fixes
+
+* verify PR is merged before marking step as completed ([dce2c35](https://github.com/MoranWeissman/argocd-addons-platform/commit/dce2c354f25137deda6384bec94b769df66dbe1b))
+
 ## [1.29.3](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.29.2...v1.29.3) (2026-03-22)
 
 
