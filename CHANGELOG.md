@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.25.0](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.24.5...v1.25.0) (2026-03-22)
+
+
+### Features
+
+* auto-discover ArgoCD URL and pre-fill connection form ([af41238](https://github.com/MoranWeissman/argocd-addons-platform/commit/af41238ec5490039786067bbd21108bc0afcdbce))
+
 ## [1.24.5](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.24.4...v1.24.5) (2026-03-22)
 
 
