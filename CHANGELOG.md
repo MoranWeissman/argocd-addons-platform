@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.31.0](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.30.0...v1.31.0) (2026-03-22)
+
+
+### Features
+
+* agent chat UI for migration troubleshooting ([22a0d6d](https://github.com/MoranWeissman/argocd-addons-platform/commit/22a0d6dd86cec47d504b45ff0db952c6b01c7f44))
+* Migration v3 Phase 2+3 — agent execution + UI ([a803960](https://github.com/MoranWeissman/argocd-addons-platform/commit/a803960847606e77bdd8600cbd031e6f63bf4014))
+* wire MigrationAgent into pipeline executor ([553eb09](https://github.com/MoranWeissman/argocd-addons-platform/commit/553eb099773328755af9f9af54aff5cf72fb1a96))
+
 ## [1.30.0](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.29.8...v1.30.0) (2026-03-22)
 
 
