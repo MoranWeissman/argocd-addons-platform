@@ -167,12 +167,20 @@ export default function MigrationDetail() {
             Cluster: {migration.cluster_name} &middot; Step {migration.current_step} of {steps.length}
           </p>
         </div>
-        {isRunning && (
-          <Button variant="outline" size="sm" onClick={handlePause}
-            className="border-amber-300 text-amber-600 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400">
-            <Pause className="h-4 w-4" /> Pause
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {isRunning && (
+            <Button variant="outline" size="sm" onClick={handlePause}
+              className="border-amber-300 text-amber-600 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400">
+              <Pause className="h-4 w-4" /> Pause
+            </Button>
+          )}
+          {['paused', 'failed', 'cancelled'].includes(migration.status) && (
+            <Button size="sm" onClick={handleContinue}
+              className="bg-green-600 hover:bg-green-700 text-white">
+              Resume
+            </Button>
+          )}
+        </div>
       </div>
 
       {migration.error && (
