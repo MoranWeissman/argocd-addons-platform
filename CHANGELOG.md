@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.26.3](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.26.2...v1.26.3) (2026-03-22)
+
+
+### Bug Fixes
+
+* connection test UX improvements ([717b90b](https://github.com/MoranWeissman/argocd-addons-platform/commit/717b90bd0f529f80269a454302efabf1eb216157))
+
 ## [1.26.2](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.26.1...v1.26.2) (2026-03-22)
 
 
