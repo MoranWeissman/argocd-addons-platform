@@ -25,6 +25,9 @@ import type { AIConfigResponse, AIProviderInfo, ConnectionResponse } from '@/ser
 
 interface PlatformInfo {
   status: string
+  mode?: string
+  dev_mode?: string
+  version?: string
 }
 
 interface ConnectionFormData {
@@ -586,7 +589,7 @@ export function Connections() {
                 Deployment Mode
               </dt>
               <dd className="mt-1 text-sm font-medium text-gray-900 dark:text-gray-100">
-                {(platformInfo as Record<string, string>)?.mode ?? 'Unknown'}
+                {platformInfo?.mode ?? 'Unknown'}
               </dd>
             </div>
 
