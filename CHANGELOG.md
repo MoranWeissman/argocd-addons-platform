@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.32.5](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.32.4...v1.32.5) (2026-03-22)
+
+
+### Bug Fixes
+
+* add Resume button for paused/failed/cancelled migrations ([54f9dbe](https://github.com/MoranWeissman/argocd-addons-platform/commit/54f9dbe02bcbbd7eddf8356a937a26099bc87ca6))
+
 ## [1.32.4](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.32.3...v1.32.4) (2026-03-22)
 
 
