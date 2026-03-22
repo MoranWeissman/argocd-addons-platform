@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.29.5](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.29.4...v1.29.5) (2026-03-22)
+
+
+### Bug Fixes
+
+* cleaner PR action buttons in migration UI ([3a920ba](https://github.com/MoranWeissman/argocd-addons-platform/commit/3a920bae678030cd9e3d15d81b6f2f117c286c3d))
+
 ## [1.29.4](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.29.3...v1.29.4) (2026-03-22)
 
 
