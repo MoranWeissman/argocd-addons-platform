@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.28.0](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.27.1...v1.28.0) (2026-03-22)
+
+
+### Features
+
+* Azure Pipeline-style migration log UI ([641d4b1](https://github.com/MoranWeissman/argocd-addons-platform/commit/641d4b155b9d79ab922f613c8bd13cd1a5a7a103))
+
 ## [1.27.1](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.27.0...v1.27.1) (2026-03-22)
 
 
