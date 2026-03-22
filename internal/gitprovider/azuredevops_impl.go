@@ -409,15 +409,19 @@ func (a *AzureDevOpsProvider) MergePullRequest(ctx context.Context, prNumber int
 		}
 	}
 
-	// Step 3: PATCH to complete (merge) the PR
+	// Step 3: PATCH to complete (merge) the PR, bypassing branch policies
+	// The bypass is needed because automated migrations may not satisfy all
+	// branch policies (required reviewers, build validation, etc.)
 	patchBody, _ := json.Marshal(map[string]interface{}{
 		"status": "completed",
 		"lastMergeSourceCommit": map[string]string{
 			"commitId": prData.LastMergeSourceCommit.CommitID,
 		},
 		"completionOptions": map[string]interface{}{
-			"deleteSourceBranch": true,
-			"mergeStrategy":     "squash",
+			"deleteSourceBranch":    true,
+			"mergeStrategy":         "squash",
+			"bypassPolicy":         true,
+			"bypassReason":         "Automated migration via ArgoCD Addons Platform",
 		},
 	})
 

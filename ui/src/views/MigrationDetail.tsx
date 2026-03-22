@@ -97,10 +97,20 @@ export default function MigrationDetail() {
     if (!id) return
     try { await api.retryMigration(id); void fetchMigration() } catch { /* poll */ }
   }
+  const [mergeError, setMergeError] = useState<string | null>(null)
+  const [merging, setMerging] = useState(false)
   const handleMergePR = async (step: number) => {
     if (!id) return
-    try { await api.mergeMigrationPR(id, step); void fetchMigration() }
-    catch (e: unknown) { alert(e instanceof Error ? e.message : 'Failed to merge PR') }
+    setMerging(true)
+    setMergeError(null)
+    try {
+      await api.mergeMigrationPR(id, step)
+      void fetchMigration()
+    } catch (e: unknown) {
+      setMergeError(e instanceof Error ? e.message : 'Failed to merge PR')
+    } finally {
+      setMerging(false)
+    }
   }
   const handlePause = async () => {
     if (!id) return
@@ -243,19 +253,28 @@ export default function MigrationDetail() {
                 )}
 
                 {activeStep.status === 'waiting' && (
-                  <div className="mt-2 ml-7 flex items-center gap-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 dark:border-amber-700 dark:bg-amber-900/20">
-                    <span className="text-xs font-medium text-amber-700 dark:text-amber-400">Waiting for PR merge</span>
-                    <div className="ml-auto flex items-center gap-2">
-                      {activeStep.pr_number && (
-                        <Button size="sm" onClick={() => handleMergePR(activeStep.number)}
-                          className="h-7 bg-green-600 hover:bg-green-700 text-xs">
-                          Auto Merge
+                  <div className="mt-2 ml-7 space-y-2">
+                    <div className="flex items-center gap-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 dark:border-amber-700 dark:bg-amber-900/20">
+                      <span className="text-xs font-medium text-amber-700 dark:text-amber-400">Waiting for PR merge</span>
+                      <div className="ml-auto flex items-center gap-2">
+                        {activeStep.pr_number && (
+                          <Button size="sm" onClick={() => handleMergePR(activeStep.number)} disabled={merging}
+                            className="h-7 bg-green-600 hover:bg-green-700 text-xs">
+                            {merging ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
+                            Auto Merge
+                          </Button>
+                        )}
+                        <Button size="sm" variant="outline" onClick={handleContinue} className="h-7 text-xs">
+                          I Merged It
                         </Button>
-                      )}
-                      <Button size="sm" variant="outline" onClick={handleContinue} className="h-7 text-xs">
-                        I Merged It
-                      </Button>
+                      </div>
                     </div>
+                    {mergeError && (
+                      <div className="rounded-md border border-red-300 bg-red-50 px-3 py-2 dark:border-red-700 dark:bg-red-900/20">
+                        <p className="text-xs font-medium text-red-700 dark:text-red-400">Merge failed</p>
+                        <p className="mt-1 select-all font-mono text-[10px] text-red-600 dark:text-red-400">{mergeError}</p>
+                      </div>
+                    )}
                   </div>
                 )}
 
