@@ -2,7 +2,6 @@ package api
 
 import (
 	"encoding/json"
-	"log/slog"
 	"net/http"
 
 	"github.com/moran/argocd-addons-platform/internal/models"
@@ -96,15 +95,6 @@ func (s *Server) handleTestCredentials(w http.ResponseWriter, r *http.Request) {
 		Git:    req.Git,
 		Argocd: req.Argocd,
 	}
-
-	slog.Info("test-credentials request",
-		"git_provider", conn.Git.Provider,
-		"git_repo_url", conn.Git.RepoURL,
-		"git_owner", conn.Git.Owner,
-		"git_repo", conn.Git.Repo,
-		"has_token", conn.Git.Token != "",
-		"argocd_url", conn.Argocd.ServerURL,
-	)
 
 	gitErr, argocdErr := s.connSvc.TestCredentials(r.Context(), conn)
 
