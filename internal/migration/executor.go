@@ -211,13 +211,30 @@ func (e *Executor) RunSteps(ctx context.Context, migrationID string) {
 		step = &m.Steps[m.CurrentStep-1]
 
 		if stepErr != nil {
+			rawErr := stepErr.Error()
+			slog.Error("migration: step failed", "id", migrationID, "step", m.CurrentStep, "error", rawErr)
+
+			// Ask the agent to diagnose the error in human-friendly language
+			diagnosis := rawErr
+			if e.aiClient != nil && e.aiClient.IsEnabled() {
+				agent := e.getOrCreateAgent(m)
+				diagCtx, diagCancel := context.WithTimeout(context.Background(), 30*time.Second)
+				diagResult, diagErr := agent.Chat(diagCtx, fmt.Sprintf(
+					"Step %d failed with this error:\n%s\n\nExplain what went wrong in 2-3 sentences that a user can understand. Then suggest what they should do to fix it.",
+					m.CurrentStep, rawErr))
+				diagCancel()
+				if diagErr == nil && diagResult != "" {
+					diagnosis = diagResult
+					e.addLog(m, m.CurrentStep, "AGENT", "diagnosis", diagnosis)
+				}
+			}
+
 			step.Status = StepFailed
-			step.Error = stepErr.Error()
+			step.Error = diagnosis
 			m.Status = StatusFailed
-			m.Error = stepErr.Error()
+			m.Error = diagnosis
 			m.UpdatedAt = now()
 			_ = e.store.SaveMigration(m)
-			slog.Error("migration: step failed", "id", migrationID, "step", m.CurrentStep, "error", stepErr)
 			return
 		}
 
