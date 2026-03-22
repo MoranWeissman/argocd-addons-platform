@@ -10,8 +10,12 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/moran/argocd-addons-platform/internal/models"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 )
 
 // Client is a REST API client for ArgoCD.
@@ -62,26 +66,51 @@ func NewInClusterClient(serverURL, namespace string) (*Client, error) {
 	return NewClient(serverURL, strings.TrimSpace(string(tokenBytes)), true), nil
 }
 
+// DiscoverServerURL finds the ArgoCD server URL for the given namespace.
+// Exported for use by connection service when token is provided but URL is not.
+func DiscoverServerURL(namespace string) string {
+	return discoverArgocdServer(namespace)
+}
+
 // discoverArgocdServer tries to find the ArgoCD server service in the given namespace.
-// It checks common naming patterns and falls back to the default.
+// Priority: ARGOCD_SERVER_URL env var → K8s service discovery → default name.
 func discoverArgocdServer(namespace string) string {
-	// Check ARGOCD_SERVER_URL env var first (set by Helm or user)
+	// Check ARGOCD_SERVER_URL env var first
 	if url := os.Getenv("ARGOCD_SERVER_URL"); url != "" {
 		return url
 	}
 
-	// Try K8s DNS lookup for common ArgoCD server service patterns
-	patterns := []string{
-		fmt.Sprintf("argocd-server.%s.svc.cluster.local", namespace),
+	// Try K8s API to find ArgoCD server service by label or name pattern
+	cfg, err := rest.InClusterConfig()
+	if err == nil {
+		clientset, err := kubernetes.NewForConfig(cfg)
+		if err == nil {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+
+			svcs, err := clientset.CoreV1().Services(namespace).List(ctx, metav1.ListOptions{})
+			if err == nil {
+				for _, svc := range svcs.Items {
+					// Look for a service with "server" in the name that exposes port 80 or 443
+					if !strings.Contains(svc.Name, "server") || strings.Contains(svc.Name, "repo-server") {
+						continue
+					}
+					for _, port := range svc.Spec.Ports {
+						if port.Port == 80 || port.Port == 443 {
+							url := fmt.Sprintf("http://%s.%s.svc.cluster.local", svc.Name, namespace)
+							if port.Port == 443 {
+								url = fmt.Sprintf("https://%s.%s.svc.cluster.local", svc.Name, namespace)
+							}
+							slog.Info("discovered ArgoCD server service", "service", svc.Name, "url", url)
+							return url
+						}
+					}
+				}
+			}
+		}
 	}
 
-	// Also try to discover by listing services (needs K8s client)
-	// For now, use the env var or default pattern
-	for _, addr := range patterns {
-		slog.Info("trying ArgoCD server address", "addr", addr)
-		return "https://" + addr
-	}
-
+	// Fallback to default
 	return fmt.Sprintf("https://argocd-server.%s.svc.cluster.local", namespace)
 }
 

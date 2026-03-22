@@ -129,13 +129,13 @@ func (s *ConnectionService) buildArgocdClient(conn *models.Connection) (*argocd.
 	}
 
 	if serverURL == "" {
-		// Token provided but no URL — use in-cluster DNS with the token
+		// Token provided but no URL — discover ArgoCD server via K8s API
 		ns := conn.Argocd.Namespace
 		if ns == "" {
 			ns = "argocd"
 		}
-		serverURL = fmt.Sprintf("http://argocd-server.%s.svc.cluster.local", ns)
-		slog.Info("argocd: no server URL, using in-cluster DNS", "url", serverURL)
+		serverURL = argocd.DiscoverServerURL(ns)
+		slog.Info("argocd: no server URL, auto-discovered", "url", serverURL)
 	}
 
 	return argocd.NewClient(serverURL, token, true), nil
