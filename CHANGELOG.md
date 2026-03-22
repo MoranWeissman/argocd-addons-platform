@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.24.1](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.24.0...v1.24.1) (2026-03-22)
+
+
+### Bug Fixes
+
+* add test-credentials debug logging ([c0aef4c](https://github.com/MoranWeissman/argocd-addons-platform/commit/c0aef4c2ec3544da01a40fa512f782d5b37c9f1d))
+
 ## [1.24.0](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.23.0...v1.24.0) (2026-03-21)
 
 
