@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.29.1](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.29.0...v1.29.1) (2026-03-22)
+
+
+### Bug Fixes
+
+* human-friendly migration logs and step descriptions ([e8437d3](https://github.com/MoranWeissman/argocd-addons-platform/commit/e8437d32314ad51b4a70ad8a1d764e323ca42430))
+
 ## [1.29.0](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.28.0...v1.29.0) (2026-03-22)
 
 
