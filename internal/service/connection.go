@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"os"
 
 	"github.com/moran/argocd-addons-platform/internal/argocd"
 	"github.com/moran/argocd-addons-platform/internal/config"
@@ -200,9 +201,17 @@ func (s *ConnectionService) getActiveConn() (*models.Connection, error) {
 func (s *ConnectionService) buildGitProvider(conn *models.Connection) (gitprovider.GitProvider, error) {
 	switch conn.Git.Provider {
 	case models.GitProviderGitHub:
-		return gitprovider.NewGitHubProvider(conn.Git.Owner, conn.Git.Repo, conn.Git.Token), nil
+		token := conn.Git.Token
+		if token == "" {
+			token = os.Getenv("GITHUB_TOKEN") // fallback to env var
+		}
+		return gitprovider.NewGitHubProvider(conn.Git.Owner, conn.Git.Repo, token), nil
 	case models.GitProviderAzureDevOps:
-		return gitprovider.NewAzureDevOpsProvider(conn.Git.Organization, conn.Git.Project, conn.Git.Repository, conn.Git.PAT), nil
+		pat := conn.Git.PAT
+		if pat == "" {
+			pat = os.Getenv("AZURE_DEVOPS_PAT") // fallback to env var
+		}
+		return gitprovider.NewAzureDevOpsProvider(conn.Git.Organization, conn.Git.Project, conn.Git.Repository, pat), nil
 	default:
 		return nil, fmt.Errorf("unsupported git provider: %s", conn.Git.Provider)
 	}
