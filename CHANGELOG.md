@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.24.5](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.24.4...v1.24.5) (2026-03-22)
+
+
+### Bug Fixes
+
+* show actual auth method used when testing connections ([ae2aacb](https://github.com/MoranWeissman/argocd-addons-platform/commit/ae2aacbbde634e71b87160e52e2e3e7ee510ddbc))
+
 ## [1.24.4](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.24.3...v1.24.4) (2026-03-22)
 
 
