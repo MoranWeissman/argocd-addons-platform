@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.31.1](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.31.0...v1.31.1) (2026-03-22)
+
+
+### Bug Fixes
+
+* add logging to old repo addon/cluster discovery ([8eaeb94](https://github.com/MoranWeissman/argocd-addons-platform/commit/8eaeb942f0ebd241e4bab3252f09f179e49bd23e))
+
 ## [1.31.0](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.30.0...v1.31.0) (2026-03-22)
 
 
