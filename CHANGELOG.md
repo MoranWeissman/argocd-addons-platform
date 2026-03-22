@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.24.3](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.24.2...v1.24.3) (2026-03-22)
+
+
+### Bug Fixes
+
+* ArgoCD connection — env var fallback and better error handling ([bbba134](https://github.com/MoranWeissman/argocd-addons-platform/commit/bbba134efd60ddd232acf94a0849c5688ff65991))
+
 ## [1.24.2](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.24.1...v1.24.2) (2026-03-22)
 
 
