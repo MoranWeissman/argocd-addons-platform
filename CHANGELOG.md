@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.27.1](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.27.0...v1.27.1) (2026-03-22)
+
+
+### Bug Fixes
+
+* keep existing tokens when editing connection ([36214a8](https://github.com/MoranWeissman/argocd-addons-platform/commit/36214a8ae0f424857017f9db188079c56a4eaef9))
+
 ## [1.27.0](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.26.4...v1.27.0) (2026-03-22)
 
 
