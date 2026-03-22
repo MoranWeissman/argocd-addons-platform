@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.32.6](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.32.5...v1.32.6) (2026-03-22)
+
+
+### Bug Fixes
+
+* step advancement bug — don't re-read migration state after agent steps ([c423eeb](https://github.com/MoranWeissman/argocd-addons-platform/commit/c423eebdf1e019d27b9e9645d65549d82a8441c4))
+
 ## [1.32.5](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.32.4...v1.32.5) (2026-03-22)
 
 
