@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"sort"
 	"strings"
@@ -531,6 +532,9 @@ func (s *Server) handleOldRepoAddons(w http.ResponseWriter, r *http.Request) {
 	data, err := oldGP.GetFileContent(r.Context(), "configuration/addons-catalog.yaml", "main")
 	if err == nil {
 		addons = parseAddonNames(data)
+		slog.Info("old repo addons: V2 path", "count", len(addons))
+	} else {
+		slog.Info("old repo addons: V2 path not found", "error", err.Error())
 	}
 
 	// Fall back to V1 structure
@@ -538,11 +542,14 @@ func (s *Server) handleOldRepoAddons(w http.ResponseWriter, r *http.Request) {
 		data, err = oldGP.GetFileContent(r.Context(), "values/addons-list.yaml", "main")
 		if err == nil {
 			addons = parseAddonNamesV1(data)
+			slog.Info("old repo addons: V1 path", "count", len(addons))
+		} else {
+			slog.Info("old repo addons: V1 path not found", "error", err.Error())
 		}
 	}
 
 	if len(addons) == 0 {
-		writeError(w, http.StatusNotFound, "no addons found in old repo")
+		writeError(w, http.StatusNotFound, "no addons found in old repo (tried configuration/addons-catalog.yaml and values/addons-list.yaml)")
 		return
 	}
 	writeJSON(w, http.StatusOK, addons)
