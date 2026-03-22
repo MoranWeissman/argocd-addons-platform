@@ -105,6 +105,11 @@ func (a *MigrationAgent) ExecuteStep(ctx context.Context, stepNum int) (StepResu
 			return a.parseResult(resp.Content)
 		}
 
+		// Log the agent's reasoning text (if any) before processing tool calls
+		if resp.Content != "" {
+			a.logFn(stepNum, "AGENT", "thinking", resp.Content)
+		}
+
 		// Process tool calls
 		a.messages = append(a.messages, ai.ChatMessage{
 			Role:      "assistant",
