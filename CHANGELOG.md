@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.29.8](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.29.7...v1.29.8) (2026-03-22)
+
+
+### Bug Fixes
+
+* accept OutOfSync+Healthy as valid in migration step 9 ([bc8abfe](https://github.com/MoranWeissman/argocd-addons-platform/commit/bc8abfe48dd903f2e993465bdda900eb72be46b2))
+
 ## [1.29.7](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.29.6...v1.29.7) (2026-03-22)
 
 
