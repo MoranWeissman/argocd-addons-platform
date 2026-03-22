@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.29.2](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.29.1...v1.29.2) (2026-03-22)
+
+
+### Bug Fixes
+
+* Azure DevOps PR merge — use PATCH with lastMergeSourceCommit ([ffc284a](https://github.com/MoranWeissman/argocd-addons-platform/commit/ffc284a6c93e9cc3018bc5fadb32a342c8f52e56))
+
 ## [1.29.1](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.29.0...v1.29.1) (2026-03-22)
 
 
