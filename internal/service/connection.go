@@ -223,6 +223,11 @@ func (s *ConnectionService) TestCredentials(ctx context.Context, conn *models.Co
 	return gitErr, argocdErr, auth
 }
 
+// DiscoverArgocdURL finds the ArgoCD server URL for the given namespace.
+func (s *ConnectionService) DiscoverArgocdURL(namespace string) string {
+	return argocd.DiscoverServerURL(namespace)
+}
+
 func (s *ConnectionService) getActiveConn() (*models.Connection, error) {
 	activeName, err := s.store.GetActiveConnection()
 	if err != nil {

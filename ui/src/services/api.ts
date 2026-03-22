@@ -123,6 +123,7 @@ export const api = {
   setActiveConnection: (name: string) => postJSON('/connections/active', { connection_name: name }),
   testConnection: () => postJSON<{ git: { status: string }; argocd: { status: string } }>('/connections/test'),
   testCredentials: (data: unknown) => postJSON<{ git: { status: string; message?: string; auth?: string }; argocd: { status: string; message?: string; auth?: string } }>('/connections/test-credentials', data),
+  discoverArgocd: (namespace?: string) => fetchJSON<{ server_url: string; has_env_token: boolean; namespace: string }>(`/connections/discover-argocd${namespace ? `?namespace=${namespace}` : ''}`),
 
   // Observability
   getObservability: () => fetchJSON<ObservabilityOverviewResponse>('/observability/overview'),

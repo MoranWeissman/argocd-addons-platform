@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+	"os"
 
 	"github.com/moran/argocd-addons-platform/internal/models"
 )
@@ -114,6 +115,21 @@ func (s *Server) handleTestCredentials(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, result)
+}
+
+func (s *Server) handleDiscoverArgocd(w http.ResponseWriter, r *http.Request) {
+	ns := r.URL.Query().Get("namespace")
+	if ns == "" {
+		ns = "argocd"
+	}
+	url := s.connSvc.DiscoverArgocdURL(ns)
+	hasEnvToken := os.Getenv("ARGOCD_TOKEN") != ""
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"server_url":    url,
+		"has_env_token": hasEnvToken,
+		"namespace":     ns,
+	})
 }
 
 func (s *Server) handleTestConnection(w http.ResponseWriter, r *http.Request) {
