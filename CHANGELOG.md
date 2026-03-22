@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.32.2](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.32.1...v1.32.2) (2026-03-22)
+
+
+### Bug Fixes
+
+* Azure DevOps GetFileContent — parse content from JSON response ([3b6447c](https://github.com/MoranWeissman/argocd-addons-platform/commit/3b6447c4f2188e486a63ca84d7d41c8a753b9afa))
+
 ## [1.32.1](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.32.0...v1.32.1) (2026-03-22)
 
 
