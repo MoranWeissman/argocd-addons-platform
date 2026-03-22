@@ -33,6 +33,9 @@ config:
   # Connections are managed via the Settings UI and stored in an encrypted K8s Secret.
   # The Secret name can be customized below. On first deploy, open the UI to configure.
   connectionSecretName: "aap-connections"
+  # Dev mode: enables env var fallback for credentials (GITHUB_TOKEN, ARGOCD_TOKEN, etc.)
+  # In production, set to false — credentials must be configured via Settings UI.
+  devMode: false
 
 # ---------------------------------------------------------------------------
 # Secrets
