@@ -201,14 +201,16 @@ func (e *Executor) RunSteps(ctx context.Context, migrationID string) {
 		}
 		stepCancel()
 
-		// Re-read in case the step handler updated the migration.
-		m, err = e.store.GetMigration(migrationID)
-		if err != nil {
-			slog.Error("migration: failed to re-read state", "id", migrationID, "error", err)
-			return
+		// Re-read state only for non-agent execution (old hardcoded steps modify migration directly).
+		// Agent steps return results without modifying migration state.
+		if !(e.aiClient != nil && e.aiClient.IsEnabled()) {
+			m, err = e.store.GetMigration(migrationID)
+			if err != nil {
+				slog.Error("migration: failed to re-read state", "id", migrationID, "error", err)
+				return
+			}
+			step = &m.Steps[m.CurrentStep-1]
 		}
-
-		step = &m.Steps[m.CurrentStep-1]
 
 		if stepErr != nil {
 			rawErr := stepErr.Error()
