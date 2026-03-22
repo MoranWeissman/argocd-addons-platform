@@ -398,8 +398,17 @@ func (s *Server) handleMigrationChat(w http.ResponseWriter, r *http.Request) {
 
 	agent := s.migrationExecutor.GetAgent(id)
 	if agent == nil {
-		writeError(w, http.StatusNotFound, "no active agent for this migration")
-		return
+		// Agent not in memory (pod restart or step already finished) — create one from stored state
+		m, mErr := s.migrationExecutor.GetStore().GetMigration(id)
+		if mErr != nil || m == nil {
+			writeError(w, http.StatusNotFound, "migration not found")
+			return
+		}
+		if err := s.resolveExecutorProviders(); err != nil {
+			writeError(w, http.StatusServiceUnavailable, err.Error())
+			return
+		}
+		agent = s.migrationExecutor.CreateAgentForMigration(m)
 	}
 
 	response, err := agent.Chat(r.Context(), req.Message)
