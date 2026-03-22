@@ -139,10 +139,17 @@ func (g *GitHubProvider) ListPullRequests(ctx context.Context, state string) ([]
 func (g *GitHubProvider) TestConnection(ctx context.Context) error {
 	_, resp, err := g.client.Repositories.Get(ctx, g.owner, g.repo)
 	if err != nil {
-		return fmt.Errorf("test connection: %w", err)
-	}
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("test connection: unexpected status %d", resp.StatusCode)
+		if resp != nil {
+			switch resp.StatusCode {
+			case 401:
+				return fmt.Errorf("invalid GitHub token — check that the token is correct and not expired")
+			case 403:
+				return fmt.Errorf("GitHub access denied — the token does not have permission for this repository")
+			case 404:
+				return fmt.Errorf("GitHub repository not found — check the URL, or the token may not have access to %s/%s", g.owner, g.repo)
+			}
+		}
+		return fmt.Errorf("GitHub connection failed: %w", err)
 	}
 	return nil
 }
