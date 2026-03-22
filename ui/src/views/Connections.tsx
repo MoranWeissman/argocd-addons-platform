@@ -155,14 +155,14 @@ function ConnectionFormFields({
           <div>
             <label className={labelCls}>Server URL</label>
             <input className={inputCls} value={form.argocd_server_url} onChange={(e) => onChange({ argocd_server_url: e.target.value })}
-              placeholder="Leave empty for in-cluster" />
-            <p className="mt-1 text-[10px] text-gray-400">Leave empty to auto-discover via K8s DNS</p>
+              placeholder="Auto-discovered from cluster" />
+            <p className="mt-1 text-[10px] text-gray-400">Auto-filled for in-cluster. Override for external ArgoCD.</p>
           </div>
           <div>
             <label className={labelCls}>Token</label>
             <input className={inputCls} type="password" value={form.argocd_token} onChange={(e) => onChange({ argocd_token: e.target.value })}
-              placeholder={isEdit ? 'Leave blank to keep existing' : 'Leave empty for ServiceAccount auth'} />
-            <p className="mt-1 text-[10px] text-gray-400">Leave empty to use ServiceAccount (in-cluster)</p>
+              placeholder={isEdit ? 'Leave blank to keep existing' : 'ArgoCD API token'} />
+            <p className="mt-1 text-[10px] text-gray-400">ArgoCD account token (e.g. aap-api-user). Falls back to ARGOCD_TOKEN env var.</p>
           </div>
           <div>
             <label className={labelCls}>Namespace</label>
@@ -323,10 +323,20 @@ export function Connections() {
             Active Connections
           </h3>
           <button
-            onClick={() => {
-              setShowAddForm((prev) => !prev)
+            onClick={async () => {
+              const opening = !showAddForm
+              setShowAddForm(opening)
               setAddForm({ ...emptyForm })
               setAddError(null)
+              setAddTestStatus({ git: 'idle', argocd: 'idle' })
+              if (opening) {
+                try {
+                  const disc = await api.discoverArgocd()
+                  if (disc.server_url) {
+                    setAddForm(prev => ({ ...prev, argocd_server_url: disc.server_url }))
+                  }
+                } catch { /* ignore — user can enter manually */ }
+              }
             }}
             className="inline-flex items-center gap-1.5 rounded-lg bg-cyan-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-cyan-700 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2 dark:bg-cyan-700 dark:hover:bg-cyan-600 dark:focus:ring-offset-gray-900"
           >
