@@ -365,14 +365,46 @@ func (a *AzureDevOpsProvider) CreatePullRequest(_ context.Context, title, body, 
 	return pr, nil
 }
 
-// MergePullRequest completes a pull request in Azure DevOps.
+// MergePullRequest completes (merges) a pull request in Azure DevOps.
+// Azure DevOps requires a PATCH with status=completed and lastMergeSourceCommit.
 func (a *AzureDevOpsProvider) MergePullRequest(ctx context.Context, prNumber int) error {
-	url := fmt.Sprintf("%s/pullrequests/%d?api-version=7.1", a.baseURL, prNumber)
-	body := []byte(`{"status":"completed"}`)
-	_, _, err := a.doPost(url, body)
+	prURL := fmt.Sprintf("%s/pullrequests/%d?api-version=7.1", a.baseURL, prNumber)
+
+	// Step 1: GET PR to retrieve lastMergeSourceCommit (required for completing)
+	_, getBody, err := a.doGet(prURL)
+	if err != nil {
+		return fmt.Errorf("getting pull request #%d: %w", prNumber, err)
+	}
+
+	var prData struct {
+		LastMergeSourceCommit struct {
+			CommitID string `json:"commitId"`
+		} `json:"lastMergeSourceCommit"`
+	}
+	if err := json.Unmarshal(getBody, &prData); err != nil {
+		return fmt.Errorf("parsing pull request #%d: %w", prNumber, err)
+	}
+
+	// Step 2: PATCH to complete (merge) the PR
+	patchBody, _ := json.Marshal(map[string]interface{}{
+		"status": "completed",
+		"lastMergeSourceCommit": map[string]string{
+			"commitId": prData.LastMergeSourceCommit.CommitID,
+		},
+		"completionOptions": map[string]interface{}{
+			"deleteSourceBranch": true,
+			"mergeStrategy":     "squash",
+		},
+	})
+
+	resp, respBody, err := a.doPatch(prURL, patchBody)
 	if err != nil {
 		return fmt.Errorf("merge pull request #%d: %w", prNumber, err)
 	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("merge pull request #%d failed (status %d): %s", prNumber, resp.StatusCode, string(respBody))
+	}
+
 	slog.Info("azure devops pull request merged", "number", prNumber)
 	return nil
 }
