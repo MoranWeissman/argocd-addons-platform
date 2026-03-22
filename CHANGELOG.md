@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.32.3](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.32.2...v1.32.3) (2026-03-22)
+
+
+### Bug Fixes
+
+* debug azure devops response format ([57fb23c](https://github.com/MoranWeissman/argocd-addons-platform/commit/57fb23c32d69a626318cd740d8ab7d19c5fbe891))
+
 ## [1.32.2](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.32.1...v1.32.2) (2026-03-22)
 
 
