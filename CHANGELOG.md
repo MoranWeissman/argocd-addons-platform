@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.30.0](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.29.8...v1.30.0) (2026-03-22)
+
+
+### Features
+
+* add migration agent tool definitions and executor ([6da1cc1](https://github.com/MoranWeissman/argocd-addons-platform/commit/6da1cc16c51ffe25058f87cce7f31c242c6a8f2a))
+* add MigrationAgent with tool calling and knowledge files ([9caf71f](https://github.com/MoranWeissman/argocd-addons-platform/commit/9caf71f4fa375ee0b08bf2b6f27e6acbde3aaafc))
+
 ## [1.29.8](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.29.7...v1.29.8) (2026-03-22)
 
 
