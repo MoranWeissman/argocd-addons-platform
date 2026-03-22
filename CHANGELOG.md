@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.32.1](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.32.0...v1.32.1) (2026-03-22)
+
+
+### Bug Fixes
+
+* Azure DevOps GetFileContent returns raw content instead of JSON ([bf78340](https://github.com/MoranWeissman/argocd-addons-platform/commit/bf7834052928cd30d19c0b0728d27bad7fb9879d))
+
 ## [1.32.0](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.31.1...v1.32.0) (2026-03-22)
 
 
