@@ -473,6 +473,11 @@ func (e *Executor) GetAgent(migrationID string) *MigrationAgent {
 	return e.agents[migrationID]
 }
 
+// CreateAgentForMigration creates a new agent for an existing migration (e.g., for troubleshooting chat).
+func (e *Executor) CreateAgentForMigration(m *Migration) *MigrationAgent {
+	return e.getOrCreateAgent(m)
+}
+
 // aiEvaluate asks the AI provider for a brief assessment of a migration step.
 // If AI is not configured, it returns a neutral message.
 func (e *Executor) aiEvaluate(ctx context.Context, stepTitle, prompt string) (string, error) {
