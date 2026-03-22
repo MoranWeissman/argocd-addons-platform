@@ -122,7 +122,7 @@ export const api = {
   deleteConnection: (name: string) => deleteJSON(`/connections/${encodeURIComponent(name)}`),
   setActiveConnection: (name: string) => postJSON('/connections/active', { connection_name: name }),
   testConnection: () => postJSON<{ git: { status: string }; argocd: { status: string } }>('/connections/test'),
-  testCredentials: (data: unknown) => postJSON<{ git: { status: string; message?: string }; argocd: { status: string; message?: string } }>('/connections/test-credentials', data),
+  testCredentials: (data: unknown) => postJSON<{ git: { status: string; message?: string; auth?: string }; argocd: { status: string; message?: string; auth?: string } }>('/connections/test-credentials', data),
 
   // Observability
   getObservability: () => fetchJSON<ObservabilityOverviewResponse>('/observability/overview'),

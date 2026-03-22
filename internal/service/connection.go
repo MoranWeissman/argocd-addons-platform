@@ -177,17 +177,40 @@ func (s *ConnectionService) TestConnection(ctx context.Context) (gitErr, argocdE
 	return gitErr, argocdErr
 }
 
+// AuthInfo describes which auth method was used for each service.
+type AuthInfo struct {
+	GitSource    string // "provided", "env:GITHUB_TOKEN", ""
+	ArgocdSource string // "provided", "env:ARGOCD_TOKEN", "serviceaccount", ""
+}
+
 // TestCredentials tests Git and ArgoCD connectivity for unsaved credentials.
-func (s *ConnectionService) TestCredentials(ctx context.Context, conn *models.Connection) (gitErr, argocdErr error) {
+func (s *ConnectionService) TestCredentials(ctx context.Context, conn *models.Connection) (gitErr, argocdErr error, auth AuthInfo) {
 	// Parse repo URL if provided
 	if err := conn.Git.ParseRepoURL(); err != nil {
-		return err, nil
+		return err, nil, auth
 	}
+
+	// Track git auth source
+	if conn.Git.Token != "" {
+		auth.GitSource = "provided"
+	} else if os.Getenv("GITHUB_TOKEN") != "" {
+		auth.GitSource = "env:GITHUB_TOKEN"
+	}
+
 	gp, err := s.buildGitProvider(conn)
 	if err != nil {
 		gitErr = err
 	} else {
 		gitErr = gp.TestConnection(ctx)
+	}
+
+	// Track argocd auth source
+	if conn.Argocd.Token != "" {
+		auth.ArgocdSource = "provided"
+	} else if os.Getenv("ARGOCD_TOKEN") != "" {
+		auth.ArgocdSource = "env:ARGOCD_TOKEN"
+	} else {
+		auth.ArgocdSource = "serviceaccount"
 	}
 
 	ac, err := s.buildArgocdClient(conn)
@@ -197,7 +220,7 @@ func (s *ConnectionService) TestCredentials(ctx context.Context, conn *models.Co
 		argocdErr = ac.TestConnection(ctx)
 	}
 
-	return gitErr, argocdErr
+	return gitErr, argocdErr, auth
 }
 
 func (s *ConnectionService) getActiveConn() (*models.Connection, error) {

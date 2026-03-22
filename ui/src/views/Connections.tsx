@@ -94,6 +94,8 @@ interface TestStatus {
   argocd: 'idle' | 'testing' | 'ok' | 'error'
   gitMessage?: string
   argocdMessage?: string
+  gitAuth?: string
+  argocdAuth?: string
 }
 
 function ConnectionFormFields({
@@ -138,7 +140,7 @@ function ConnectionFormFields({
             {testStatus.git === 'testing' ? <Loader2 className="h-3 w-3 animate-spin" /> : <GitBranch className="h-3 w-3" />}
             Test Git
           </button>
-          {testStatus.git === 'ok' && <span className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400"><CheckCircle className="h-3.5 w-3.5" /> Connected</span>}
+          {testStatus.git === 'ok' && <span className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400"><CheckCircle className="h-3.5 w-3.5" /> Connected{testStatus.gitAuth && testStatus.gitAuth !== 'provided' ? ` (via ${testStatus.gitAuth})` : ''}</span>}
           {testStatus.git === 'error' && <span className="flex items-center gap-1 text-xs text-red-600 dark:text-red-400"><XCircle className="h-3.5 w-3.5" /> {testStatus.gitMessage || 'Failed'}</span>}
         </div>
       </div>
@@ -174,7 +176,7 @@ function ConnectionFormFields({
             {testStatus.argocd === 'testing' ? <Loader2 className="h-3 w-3 animate-spin" /> : <Server className="h-3 w-3" />}
             Test ArgoCD
           </button>
-          {testStatus.argocd === 'ok' && <span className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400"><CheckCircle className="h-3.5 w-3.5" /> Connected</span>}
+          {testStatus.argocd === 'ok' && <span className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400"><CheckCircle className="h-3.5 w-3.5" /> Connected{testStatus.argocdAuth && testStatus.argocdAuth !== 'provided' ? ` (via ${testStatus.argocdAuth})` : ''}</span>}
           {testStatus.argocd === 'error' && <span className="flex items-center gap-1 text-xs text-red-600 dark:text-red-400"><XCircle className="h-3.5 w-3.5" /> {testStatus.argocdMessage || 'Failed'}</span>}
         </div>
       </div>
@@ -237,10 +239,10 @@ export function Connections() {
     try {
       const res = await api.testCredentials(payload)
       if (which === 'git' || which === 'both') {
-        setStatus(prev => ({ ...prev, git: res.git.status === 'ok' ? 'ok' : 'error', gitMessage: res.git.message }))
+        setStatus(prev => ({ ...prev, git: res.git.status === 'ok' ? 'ok' : 'error', gitMessage: res.git.message, gitAuth: res.git.auth }))
       }
       if (which === 'argocd' || which === 'both') {
-        setStatus(prev => ({ ...prev, argocd: res.argocd.status === 'ok' ? 'ok' : 'error', argocdMessage: res.argocd.message }))
+        setStatus(prev => ({ ...prev, argocd: res.argocd.status === 'ok' ? 'ok' : 'error', argocdMessage: res.argocd.message, argocdAuth: res.argocd.auth }))
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Test failed'

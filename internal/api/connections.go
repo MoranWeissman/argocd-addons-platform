@@ -96,7 +96,7 @@ func (s *Server) handleTestCredentials(w http.ResponseWriter, r *http.Request) {
 		Argocd: req.Argocd,
 	}
 
-	gitErr, argocdErr := s.connSvc.TestCredentials(r.Context(), conn)
+	gitErr, argocdErr, authInfo := s.connSvc.TestCredentials(r.Context(), conn)
 
 	result := map[string]interface{}{
 		"git":    map[string]interface{}{"status": "ok"},
@@ -104,9 +104,13 @@ func (s *Server) handleTestCredentials(w http.ResponseWriter, r *http.Request) {
 	}
 	if gitErr != nil {
 		result["git"] = map[string]interface{}{"status": "error", "message": gitErr.Error()}
+	} else if authInfo.GitSource != "" {
+		result["git"] = map[string]interface{}{"status": "ok", "auth": authInfo.GitSource}
 	}
 	if argocdErr != nil {
 		result["argocd"] = map[string]interface{}{"status": "error", "message": argocdErr.Error()}
+	} else if authInfo.ArgocdSource != "" {
+		result["argocd"] = map[string]interface{}{"status": "ok", "auth": authInfo.ArgocdSource}
 	}
 
 	writeJSON(w, http.StatusOK, result)
