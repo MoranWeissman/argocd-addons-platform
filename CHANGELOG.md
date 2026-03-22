@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.29.7](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.29.6...v1.29.7) (2026-03-22)
+
+
+### Bug Fixes
+
+* Auto Merge marks step complete and continues migration ([3e95aa6](https://github.com/MoranWeissman/argocd-addons-platform/commit/3e95aa618b0ab2fca2b50d66166396e771cab44b))
+
 ## [1.29.6](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.29.5...v1.29.6) (2026-03-22)
 
 
