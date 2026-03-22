@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.24.4](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.24.3...v1.24.4) (2026-03-22)
+
+
+### Bug Fixes
+
+* auto-discover ArgoCD server service via K8s API ([b92960e](https://github.com/MoranWeissman/argocd-addons-platform/commit/b92960e8951c1aa414f1ea36c7d1ebc042ab1597))
+
 ## [1.24.3](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.24.2...v1.24.3) (2026-03-22)
 
 
