@@ -29,6 +29,7 @@ type MigrationAgent struct {
 	toolExecutor  *MigrationToolExecutor
 	messages      []ai.ChatMessage
 	maxIterations int
+	currentStep   int // tracks which step the agent is executing (for log routing)
 
 	// Context for the current migration
 	addonName   string
@@ -46,15 +47,8 @@ func NewMigrationAgent(
 	steps []MigrationStep,
 	logFn func(step int, repo, action, detail string),
 ) *MigrationAgent {
-	// Create a step-aware log wrapper; currentStep is captured by reference via the closure.
-	var currentStep int
-	stepLogFn := func(repo, action, detail string) {
-		logFn(currentStep, repo, action, detail)
-	}
-
 	agent := &MigrationAgent{
 		client:        client,
-		toolExecutor:  NewMigrationToolExecutor(newGP, oldGP, newArgoCD, oldArgoCD, stepLogFn),
 		maxIterations: 20,
 		addonName:     addonName,
 		clusterName:   clusterName,
@@ -62,18 +56,23 @@ func NewMigrationAgent(
 		logFn:         logFn,
 	}
 
+	// Create tool executor with a closure that reads the current step from the agent
+	stepLogFn := func(repo, action, detail string) {
+		logFn(agent.currentStep, repo, action, detail)
+	}
+	agent.toolExecutor = NewMigrationToolExecutor(newGP, oldGP, newArgoCD, oldArgoCD, stepLogFn)
+
 	// Allow override from config
 	if client != nil && client.GetConfig().MaxIterations > 0 {
 		agent.maxIterations = client.GetConfig().MaxIterations
 	}
-
-	_ = currentStep // suppress unused-variable warning; used via closure in stepLogFn
 
 	return agent
 }
 
 // ExecuteStep runs the agent for a specific migration step.
 func (a *MigrationAgent) ExecuteStep(ctx context.Context, stepNum int) (StepResult, string, error) {
+	a.currentStep = stepNum
 	if !a.client.IsEnabled() {
 		return StepResultFailed, "", fmt.Errorf("AI provider is required for migration. Configure one in Settings → AI Configuration")
 	}
