@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.26.1](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.26.0...v1.26.1) (2026-03-22)
+
+
+### Bug Fixes
+
+* show actual deployment mode in Platform Info (Kubernetes vs Local) ([e2e1601](https://github.com/MoranWeissman/argocd-addons-platform/commit/e2e1601cc62128aff3e6a809059d16bcec2f915b))
+
 ## [1.26.0](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.25.0...v1.26.0) (2026-03-22)
 
 
