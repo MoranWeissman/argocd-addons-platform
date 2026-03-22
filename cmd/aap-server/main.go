@@ -113,6 +113,10 @@ func main() {
 		log.Printf("Connection config stored in encrypted K8s Secret: %s/%s", namespace, secretName)
 	default:
 		store = config.NewFileStore(*configPath)
+		// Local dev is always dev mode (env var fallback for credentials)
+		if os.Getenv("AAP_DEV_MODE") == "" {
+			os.Setenv("AAP_DEV_MODE", "true")
+		}
 	}
 
 	// AI configuration — resolve per-provider API key and model

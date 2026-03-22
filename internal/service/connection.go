@@ -14,12 +14,18 @@ import (
 
 // ConnectionService manages connections and provides active provider instances.
 type ConnectionService struct {
-	store config.Store
+	store   config.Store
+	devMode bool // when true, falls back to env vars for missing credentials
 }
 
 // NewConnectionService creates a new ConnectionService.
+// devMode enables env var fallback for credentials (set AAP_DEV_MODE=true or config.devMode in Helm).
 func NewConnectionService(store config.Store) *ConnectionService {
-	return &ConnectionService{store: store}
+	devMode := os.Getenv("AAP_DEV_MODE") == "true"
+	if devMode {
+		slog.Info("connection service running in DEV MODE — env var credential fallback enabled")
+	}
+	return &ConnectionService{store: store, devMode: devMode}
 }
 
 // List returns all connections with masked tokens.
@@ -114,28 +120,30 @@ func (s *ConnectionService) buildArgocdClient(conn *models.Connection) (*argocd.
 	token := conn.Argocd.Token
 	serverURL := conn.Argocd.ServerURL
 
-	// Fallback to env vars if not provided
-	if token == "" {
-		token = os.Getenv("ARGOCD_TOKEN")
-	}
-	if serverURL == "" {
-		serverURL = os.Getenv("ARGOCD_SERVER_URL")
+	// Dev mode: fall back to env vars
+	if s.devMode {
+		if token == "" {
+			token = os.Getenv("ARGOCD_TOKEN")
+			if token != "" {
+				slog.Info("argocd: using ARGOCD_TOKEN env var (dev mode fallback)")
+			}
+		}
+		if serverURL == "" {
+			serverURL = os.Getenv("ARGOCD_SERVER_URL")
+		}
 	}
 
-	if token == "" {
-		// No token at all — try in-cluster ServiceAccount auth
-		slog.Info("argocd: no token configured, attempting in-cluster ServiceAccount auth")
-		return argocd.NewInClusterClient(serverURL, conn.Argocd.Namespace)
-	}
-
+	// Auto-discover server URL if still empty
 	if serverURL == "" {
-		// Token provided but no URL — discover ArgoCD server via K8s API
 		ns := conn.Argocd.Namespace
 		if ns == "" {
 			ns = "argocd"
 		}
 		serverURL = argocd.DiscoverServerURL(ns)
-		slog.Info("argocd: no server URL, auto-discovered", "url", serverURL)
+	}
+
+	if token == "" {
+		return nil, fmt.Errorf("ArgoCD token not configured. Provide it via Settings UI or set ARGOCD_TOKEN env var with AAP_DEV_MODE=true")
 	}
 
 	return argocd.NewClient(serverURL, token, true), nil
@@ -252,14 +260,26 @@ func (s *ConnectionService) buildGitProvider(conn *models.Connection) (gitprovid
 	switch conn.Git.Provider {
 	case models.GitProviderGitHub:
 		token := conn.Git.Token
+		if token == "" && s.devMode {
+			token = os.Getenv("GITHUB_TOKEN")
+			if token != "" {
+				slog.Info("git: using GITHUB_TOKEN env var (dev mode fallback)")
+			}
+		}
 		if token == "" {
-			token = os.Getenv("GITHUB_TOKEN") // fallback to env var
+			return nil, fmt.Errorf("GitHub token not configured. Provide it via Settings UI or set GITHUB_TOKEN env var with AAP_DEV_MODE=true")
 		}
 		return gitprovider.NewGitHubProvider(conn.Git.Owner, conn.Git.Repo, token), nil
 	case models.GitProviderAzureDevOps:
 		pat := conn.Git.PAT
+		if pat == "" && s.devMode {
+			pat = os.Getenv("AZURE_DEVOPS_PAT")
+			if pat != "" {
+				slog.Info("git: using AZURE_DEVOPS_PAT env var (dev mode fallback)")
+			}
+		}
 		if pat == "" {
-			pat = os.Getenv("AZURE_DEVOPS_PAT") // fallback to env var
+			return nil, fmt.Errorf("Azure DevOps PAT not configured. Provide it via Settings UI or set AZURE_DEVOPS_PAT env var with AAP_DEV_MODE=true")
 		}
 		return gitprovider.NewAzureDevOpsProvider(conn.Git.Organization, conn.Git.Project, conn.Git.Repository, pat), nil
 	default:
