@@ -29,8 +29,8 @@ func (a *AzureDevOpsProvider) TestConnection(_ context.Context) error {
 
 // GetFileContent retrieves the raw content of a single file at the given ref.
 func (a *AzureDevOpsProvider) GetFileContent(_ context.Context, filePath, ref string) ([]byte, error) {
-	// $format=text returns raw file content instead of JSON metadata
-	apiURL := fmt.Sprintf("%s/items?path=%s&versionDescriptor.version=%s&$format=text&api-version=7.1",
+	// Use includeContent=true to get raw file content
+	apiURL := fmt.Sprintf("%s/items?path=%s&versionDescriptor.version=%s&includeContent=true&api-version=7.1",
 		a.baseURL, url.QueryEscape(filePath), url.QueryEscape(ref))
 
 	resp, body, err := a.doGet(apiURL)
@@ -41,7 +41,17 @@ func (a *AzureDevOpsProvider) GetFileContent(_ context.Context, filePath, ref st
 		return nil, fmt.Errorf("get file content: unexpected status %d", resp.StatusCode)
 	}
 
-	slog.Info("azure devops file fetched", "path", filePath, "ref", ref, "size", len(body))
+	// Azure DevOps returns JSON with a "content" field when using includeContent=true
+	var item struct {
+		Content string `json:"content"`
+	}
+	if err := json.Unmarshal(body, &item); err == nil && item.Content != "" {
+		slog.Info("azure devops file fetched", "path", filePath, "ref", ref, "size", len(item.Content))
+		return []byte(item.Content), nil
+	}
+
+	// Fallback: body might be raw content (e.g., when $format=text works)
+	slog.Info("azure devops file fetched (raw)", "path", filePath, "ref", ref, "size", len(body))
 	return body, nil
 }
 
