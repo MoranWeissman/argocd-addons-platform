@@ -97,6 +97,9 @@ export default function MigrationDetail() {
     if (!id) return
     try { await api.retryMigration(id); void fetchMigration() } catch { /* poll */ }
   }
+  const [chatInput, setChatInput] = useState('')
+  const [chatMessages, setChatMessages] = useState<{role: string; content: string}[]>([])
+  const [chatting, setChatting] = useState(false)
   const [mergeError, setMergeError] = useState<string | null>(null)
   const [merging, setMerging] = useState(false)
   const handleMergePR = async (step: number) => {
@@ -110,6 +113,21 @@ export default function MigrationDetail() {
       setMergeError(e instanceof Error ? e.message : 'Failed to merge PR')
     } finally {
       setMerging(false)
+    }
+  }
+  const handleChat = async () => {
+    if (!id || !chatInput.trim()) return
+    const msg = chatInput.trim()
+    setChatInput('')
+    setChatMessages(prev => [...prev, { role: 'user', content: msg }])
+    setChatting(true)
+    try {
+      const res = await api.migrationChat(id, msg)
+      setChatMessages(prev => [...prev, { role: 'agent', content: res.response }])
+    } catch (e) {
+      setChatMessages(prev => [...prev, { role: 'agent', content: `Error: ${e instanceof Error ? e.message : 'Failed'}` }])
+    } finally {
+      setChatting(false)
     }
   }
   const handlePause = async () => {
@@ -278,12 +296,45 @@ export default function MigrationDetail() {
                   </div>
                 )}
 
-                {activeStep.status === 'failed' && activeStep.error && (
-                  <div className="mt-2 ml-7 flex items-center gap-2">
-                    <span className="text-xs text-red-600 dark:text-red-400">{activeStep.error}</span>
-                    <Button size="sm" variant="destructive" onClick={handleRetry} className="h-6 px-2 text-xs">
-                      Retry
-                    </Button>
+                {activeStep.status === 'failed' && (
+                  <div className="mt-3 ml-7 space-y-2">
+                    {/* Error + retry button */}
+                    {activeStep.error && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-red-600 dark:text-red-400">{activeStep.error}</span>
+                        <Button size="sm" variant="destructive" onClick={handleRetry} className="h-6 px-2 text-xs">
+                          Retry
+                        </Button>
+                      </div>
+                    )}
+
+                    {/* Chat messages */}
+                    {chatMessages.length > 0 && (
+                      <div className="rounded-md border border-gray-700 bg-gray-900 p-2 space-y-2 max-h-60 overflow-y-auto">
+                        {chatMessages.map((msg, i) => (
+                          <div key={i} className={cn('text-xs', msg.role === 'user' ? 'text-blue-400' : 'text-violet-400')}>
+                            <span className="font-bold">{msg.role === 'user' ? 'You' : 'Agent'}:</span> {msg.content}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Chat input */}
+                    <div className="flex items-center gap-2">
+                      <input
+                        value={chatInput}
+                        onChange={(e) => setChatInput(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && !chatting && handleChat()}
+                        placeholder="Ask the agent about this error..."
+                        className="flex-1 rounded-md border border-gray-600 bg-gray-800 px-2 py-1 text-xs text-gray-200 placeholder:text-gray-500 focus:border-violet-500 focus:outline-none"
+                        disabled={chatting}
+                      />
+                      <Button size="sm" onClick={handleChat} disabled={chatting || !chatInput.trim()}
+                        className="h-7 bg-violet-600 hover:bg-violet-700 text-xs">
+                        {chatting ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
+                        Ask
+                      </Button>
+                    </div>
                   </div>
                 )}
 
@@ -313,10 +364,11 @@ export default function MigrationDetail() {
                       </span>
                       <span className={cn(
                         'shrink-0 font-bold uppercase',
-                        log.repo === 'SYSTEM' ? 'text-cyan-400'
-                          : log.repo.includes('NEW') ? 'text-green-400'
-                            : log.repo.includes('OLD') ? 'text-orange-400'
-                              : 'text-blue-400'
+                        log.repo === 'AGENT' ? 'text-violet-400'
+                          : log.repo === 'SYSTEM' ? 'text-cyan-400'
+                            : log.repo.includes('NEW') ? 'text-green-400'
+                              : log.repo.includes('OLD') ? 'text-orange-400'
+                                : 'text-blue-400'
                       )}>
                         {log.repo}
                       </span>
