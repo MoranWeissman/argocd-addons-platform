@@ -230,8 +230,31 @@ func (e *Executor) ContinueAfterPR(ctx context.Context, migrationID string) erro
 
 	switch m.Status {
 	case StatusWaiting:
-		// PR was merged — mark step completed, advance
 		step := &m.Steps[m.CurrentStep-1]
+		// Try to verify/merge the PR before marking complete
+		if step.PRNumber > 0 && step.PRStatus != "merged" {
+			gp := e.newGP
+			if step.PRRepo == "old" {
+				gp = e.oldGP
+			}
+			if gp != nil {
+				mergeErr := gp.MergePullRequest(ctx, step.PRNumber)
+				if mergeErr != nil {
+					// PR not mergeable — don't mark complete, report error
+					e.addLog(m, m.CurrentStep, "SYSTEM", "error",
+						fmt.Sprintf("PR #%d could not be merged: %s", step.PRNumber, mergeErr.Error()))
+					step.Error = fmt.Sprintf("PR #%d not merged: %s", step.PRNumber, mergeErr.Error())
+					step.Status = StepFailed
+					m.Status = StatusFailed
+					m.Error = step.Error
+					m.UpdatedAt = now()
+					_ = e.store.SaveMigration(m)
+					return fmt.Errorf("PR #%d not merged: %w", step.PRNumber, mergeErr)
+				}
+				e.addLog(m, m.CurrentStep, "SYSTEM", "completed",
+					fmt.Sprintf("PR #%d merged successfully", step.PRNumber))
+			}
+		}
 		step.Status = StepCompleted
 		step.CompletedAt = now()
 		step.PRStatus = "merged"
