@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.32.4](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.32.3...v1.32.4) (2026-03-22)
+
+
+### Bug Fixes
+
+* agent diagnoses errors in human language + fix step log routing ([8f81567](https://github.com/MoranWeissman/argocd-addons-platform/commit/8f8156727f887cbb56c6b1ff0ff41b624c160af9))
+
 ## [1.32.3](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.32.2...v1.32.3) (2026-03-22)
 
 
