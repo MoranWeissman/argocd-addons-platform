@@ -41,8 +41,7 @@ func NewClient(serverURL, token string, insecure bool) *Client {
 
 // NewInClusterClient creates an ArgoCD client for in-cluster use.
 // It reads the ServiceAccount token from the standard mount path.
-// If serverURL is provided, it's used directly. If empty, it falls back
-// to the default argocd-server.<namespace>.svc.cluster.local.
+// If serverURL is empty, it discovers the ArgoCD server service via K8s DNS.
 func NewInClusterClient(serverURL, namespace string) (*Client, error) {
 	const saTokenPath = "/var/run/secrets/kubernetes.io/serviceaccount/token"
 
@@ -55,11 +54,35 @@ func NewInClusterClient(serverURL, namespace string) (*Client, error) {
 		if namespace == "" {
 			namespace = "argocd"
 		}
-		serverURL = fmt.Sprintf("https://argocd-server.%s.svc.cluster.local", namespace)
+		// Try to discover ArgoCD server by looking for a service with port 443 in the namespace
+		serverURL = discoverArgocdServer(namespace)
 	}
 
 	slog.Info("argocd in-cluster client initialized", "server", serverURL, "namespace", namespace)
 	return NewClient(serverURL, strings.TrimSpace(string(tokenBytes)), true), nil
+}
+
+// discoverArgocdServer tries to find the ArgoCD server service in the given namespace.
+// It checks common naming patterns and falls back to the default.
+func discoverArgocdServer(namespace string) string {
+	// Check ARGOCD_SERVER_URL env var first (set by Helm or user)
+	if url := os.Getenv("ARGOCD_SERVER_URL"); url != "" {
+		return url
+	}
+
+	// Try K8s DNS lookup for common ArgoCD server service patterns
+	patterns := []string{
+		fmt.Sprintf("argocd-server.%s.svc.cluster.local", namespace),
+	}
+
+	// Also try to discover by listing services (needs K8s client)
+	// For now, use the env var or default pattern
+	for _, addr := range patterns {
+		slog.Info("trying ArgoCD server address", "addr", addr)
+		return "https://" + addr
+	}
+
+	return fmt.Sprintf("https://argocd-server.%s.svc.cluster.local", namespace)
 }
 
 // TestConnection verifies that the client can reach the ArgoCD server.

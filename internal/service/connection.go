@@ -111,12 +111,34 @@ func (s *ConnectionService) GetActiveArgocdClient() (*argocd.Client, error) {
 }
 
 func (s *ConnectionService) buildArgocdClient(conn *models.Connection) (*argocd.Client, error) {
-	// If token is empty and we're running in K8s, use ServiceAccount token
-	if conn.Argocd.Token == "" {
-		slog.Info("argocd: no token configured, attempting in-cluster ServiceAccount auth")
-		return argocd.NewInClusterClient(conn.Argocd.ServerURL, conn.Argocd.Namespace)
+	token := conn.Argocd.Token
+	serverURL := conn.Argocd.ServerURL
+
+	// Fallback to env vars if not provided
+	if token == "" {
+		token = os.Getenv("ARGOCD_TOKEN")
 	}
-	return argocd.NewClient(conn.Argocd.ServerURL, conn.Argocd.Token, conn.Argocd.Insecure), nil
+	if serverURL == "" {
+		serverURL = os.Getenv("ARGOCD_SERVER_URL")
+	}
+
+	if token == "" {
+		// No token at all — try in-cluster ServiceAccount auth
+		slog.Info("argocd: no token configured, attempting in-cluster ServiceAccount auth")
+		return argocd.NewInClusterClient(serverURL, conn.Argocd.Namespace)
+	}
+
+	if serverURL == "" {
+		// Token provided but no URL — use in-cluster DNS with the token
+		ns := conn.Argocd.Namespace
+		if ns == "" {
+			ns = "argocd"
+		}
+		serverURL = fmt.Sprintf("http://argocd-server.%s.svc.cluster.local", ns)
+		slog.Info("argocd: no server URL, using in-cluster DNS", "url", serverURL)
+	}
+
+	return argocd.NewClient(serverURL, token, true), nil
 }
 
 // GetGitProviderForConnection returns a GitProvider for a specific named connection.
