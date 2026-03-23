@@ -188,9 +188,19 @@ func (a *MigrationAgent) SetMessages(msgs []ai.ChatMessage) {
 // --- Internal ---
 
 func (a *MigrationAgent) buildSystemPrompt(stepNum int) (string, error) {
-	// Read knowledge files
+	// Read core knowledge files
 	guideContent := readKnowledgeFile("docs/agent/migration-guide.md")
 	promptContent := readKnowledgeFile("docs/agent/migration-agent-prompt.md")
+
+	// Load relevant skills based on what the step needs
+	skills := a.getSkillsForStep(stepNum)
+	var skillsContent strings.Builder
+	for _, skill := range skills {
+		content := readKnowledgeFile("docs/agent/skills/" + skill + ".md")
+		if content != "" && !strings.HasPrefix(content, "(Knowledge file") {
+			skillsContent.WriteString(fmt.Sprintf("\n---\n## Skill: %s\n%s\n", skill, content))
+		}
+	}
 
 	// Build step context
 	var stepSummary strings.Builder
@@ -207,7 +217,7 @@ func (a *MigrationAgent) buildSystemPrompt(stepNum int) (string, error) {
 ---
 
 %s
-
+%s
 ---
 
 ## Current Migration Context
@@ -218,11 +228,42 @@ Current Step: %d
 
 ## All Steps Status:
 %s`,
-		promptContent, guideContent,
+		promptContent, guideContent, skillsContent.String(),
 		a.addonName, a.clusterName, stepNum,
 		stepSummary.String())
 
 	return context, nil
+}
+
+// getSkillsForStep returns which skill files are relevant for a given step.
+func (a *MigrationAgent) getSkillsForStep(stepNum int) []string {
+	// Always load core skills
+	skills := []string{"argocd", "gitops", "yaml"}
+
+	switch stepNum {
+	case 1: // Verify catalog
+		// yaml for reading catalog
+	case 2: // Compare values
+		skills = append(skills, "helm")
+	case 3: // Enable addon in NEW repo (PR)
+		skills = append(skills, "github")
+	case 4: // Verify app in NEW ArgoCD
+		skills = append(skills, "kubernetes")
+	case 5: // Disable addon in OLD repo (PR)
+		skills = append(skills, "azure-devops", "github") // could be either
+	case 6: // Sync OLD ArgoCD
+		// argocd already loaded
+	case 7: // Verify removal
+		skills = append(skills, "kubernetes")
+	case 8: // Refresh NEW ArgoCD
+		// argocd already loaded
+	case 9: // Verify healthy
+		skills = append(skills, "kubernetes", "helm")
+	case 10: // Finalize
+		skills = append(skills, "github")
+	}
+
+	return skills
 }
 
 func (a *MigrationAgent) buildStepInstruction(stepNum int) string {
