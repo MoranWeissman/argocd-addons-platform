@@ -10,6 +10,7 @@ import (
 
 	"github.com/moran/argocd-addons-platform/internal/gitops"
 	"github.com/moran/argocd-addons-platform/internal/gitprovider"
+	"gopkg.in/yaml.v3"
 )
 
 // executeStep dispatches to the appropriate step handler.
@@ -52,18 +53,14 @@ func (e *Executor) stepVerifyCatalog(ctx context.Context, m *Migration) error {
 		return fmt.Errorf("reading catalog from NEW repo: %w", err)
 	}
 
-	content := string(data)
-
 	e.addLog(m, 1, e.newRepoLabel(), "verifying", fmt.Sprintf("Checking if addon %q exists with inMigration: true", m.AddonName))
 
-	// Check that the addon is present.
-	if !strings.Contains(content, "appName: "+m.AddonName) {
+	found, inMigration := isAddonInCatalog(data, m.AddonName)
+	if !found {
 		return fmt.Errorf("addon %q not found in addons-catalog.yaml", m.AddonName)
 	}
-
-	// Check inMigration flag.
-	if !strings.Contains(content, "inMigration: true") {
-		slog.Warn("migration: inMigration flag not found globally, checking addon block", "addon", m.AddonName)
+	if !inMigration {
+		slog.Warn("migration: inMigration flag is false for addon", "addon", m.AddonName)
 	}
 
 	// Check if addon is already enabled for this cluster in NEW repo
@@ -611,40 +608,48 @@ func sanitize(s string) string {
 
 // isAddonAlreadySet checks if the addon label already has the given value
 // (enabled/disabled) for the specified cluster in a cluster-addons.yaml file.
-func isAddonAlreadySet(data []byte, clusterName, addonName, value string) bool {
-	lines := strings.Split(string(data), "\n")
+// addonsCatalog represents the YAML structure of addons-catalog.yaml.
+type addonsCatalog struct {
+	ApplicationSets []struct {
+		AppName     string `yaml:"appName"`
+		InMigration bool   `yaml:"inMigration"`
+	} `yaml:"applicationsets"`
+}
 
-	// Find the cluster block
-	inCluster := false
-	inLabels := false
-	clusterIndent := 0
-	for _, line := range lines {
-		trimmed := strings.TrimSpace(line)
-		if trimmed == "- name: "+clusterName {
-			inCluster = true
-			clusterIndent = len(line) - len(strings.TrimLeft(line, " "))
-			continue
+// isAddonInCatalog checks if an addon exists in the catalog and whether inMigration is true.
+func isAddonInCatalog(data []byte, addonName string) (found bool, inMigration bool) {
+	var c addonsCatalog
+	if err := yaml.Unmarshal(data, &c); err != nil {
+		slog.Warn("failed to parse addons-catalog.yaml", "error", err)
+		return false, false
+	}
+	for _, a := range c.ApplicationSets {
+		if a.AppName == addonName {
+			return true, a.InMigration
 		}
-		if inCluster && !inLabels {
-			if strings.HasPrefix(trimmed, "- name:") && len(line)-len(strings.TrimLeft(line, " ")) <= clusterIndent {
-				return false // next cluster, addon not found
-			}
-			if strings.HasPrefix(trimmed, "labels:") {
-				inLabels = true
-				continue
-			}
-		}
-		if inCluster && inLabels {
-			if trimmed == "" || (strings.HasPrefix(trimmed, "- name:") && len(line)-len(strings.TrimLeft(line, " ")) <= clusterIndent) {
-				return false // left labels block
-			}
-			if strings.HasPrefix(trimmed, "#") {
-				continue
-			}
-			// Check for "addonName: value"
-			if strings.TrimSpace(line) == addonName+": "+value {
-				return true
-			}
+	}
+	return false, false
+}
+
+// clusterAddonsFile represents the YAML structure of cluster-addons.yaml.
+type clusterAddonsFile struct {
+	Clusters []struct {
+		Name   string            `yaml:"name"`
+		Labels map[string]string `yaml:"labels"`
+	} `yaml:"clusters"`
+}
+
+// isAddonAlreadySet checks if the addon label has the given value for a cluster
+// using proper YAML parsing instead of line-by-line string scanning.
+func isAddonAlreadySet(data []byte, clusterName, addonName, value string) bool {
+	var f clusterAddonsFile
+	if err := yaml.Unmarshal(data, &f); err != nil {
+		slog.Warn("failed to parse cluster-addons.yaml", "error", err)
+		return false
+	}
+	for _, c := range f.Clusters {
+		if c.Name == clusterName {
+			return c.Labels[addonName] == value
 		}
 	}
 	return false
