@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.40.0](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.39.2...v1.40.0) (2026-03-23)
+
+
+### Features
+
+* batch migration UI + migration rollback ([#191](https://github.com/MoranWeissman/argocd-addons-platform/issues/191)) ([440915d](https://github.com/MoranWeissman/argocd-addons-platform/commit/440915d6adb1ce80f9f34cdc7c74f3a56b4de63c))
+
+
+### Bug Fixes
+
+* bust Docker layer cache with CACHE_BUST build arg ([#192](https://github.com/MoranWeissman/argocd-addons-platform/issues/192)) ([eac9ffd](https://github.com/MoranWeissman/argocd-addons-platform/commit/eac9ffd3c8c87aea2972be4bbf5dac19af8e0b00))
+* session cleanup, body size limit, YAML parsing ([#189](https://github.com/MoranWeissman/argocd-addons-platform/issues/189)) ([54ab830](https://github.com/MoranWeissman/argocd-addons-platform/commit/54ab830581d4d505ac060d76490fcc4b8bbad7e3))
+
 ## [1.39.2](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.39.1...v1.39.2) (2026-03-23)
 
 
