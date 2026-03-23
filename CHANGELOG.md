@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.35.4](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.35.3...v1.35.4) (2026-03-23)
+
+
+### Bug Fixes
+
+* compress agent prompts to reduce token usage ([f419d30](https://github.com/MoranWeissman/argocd-addons-platform/commit/f419d301486f470ed7683f0af2b7bb5b12795e21))
+
 ## [1.35.3](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.35.2...v1.35.3) (2026-03-23)
 
 
