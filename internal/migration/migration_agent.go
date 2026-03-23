@@ -368,17 +368,38 @@ When done, you MUST respond with EXACTLY one of these prefixes:
 func (a *MigrationAgent) parseResult(content string) (StepResult, string, error) {
 	content = strings.TrimSpace(content)
 
+	// Check for prefixes at the start
 	if strings.HasPrefix(content, "SUCCESS:") {
-		return StepResultSuccess, strings.TrimPrefix(content, "SUCCESS:"), nil
+		return StepResultSuccess, strings.TrimSpace(strings.TrimPrefix(content, "SUCCESS:")), nil
 	}
 	if strings.HasPrefix(content, "FAILED:") {
-		return StepResultFailed, strings.TrimPrefix(content, "FAILED:"), nil
+		return StepResultFailed, strings.TrimSpace(strings.TrimPrefix(content, "FAILED:")), nil
 	}
 	if strings.HasPrefix(content, "NEEDS_USER_ACTION:") {
-		return StepResultNeedsUser, strings.TrimPrefix(content, "NEEDS_USER_ACTION:"), nil
+		return StepResultNeedsUser, strings.TrimSpace(strings.TrimPrefix(content, "NEEDS_USER_ACTION:")), nil
 	}
 
-	// If the agent didn't use the exact format, default to FAILED (safer than assuming success)
+	// Agent may put text before the prefix — search for it anywhere
+	for _, prefix := range []string{"SUCCESS:", "FAILED:", "NEEDS_USER_ACTION:"} {
+		if idx := strings.Index(content, prefix); idx >= 0 {
+			after := strings.TrimSpace(content[idx+len(prefix):])
+			switch prefix {
+			case "SUCCESS:":
+				return StepResultSuccess, after, nil
+			case "FAILED:":
+				return StepResultFailed, after, nil
+			case "NEEDS_USER_ACTION:":
+				return StepResultNeedsUser, after, nil
+			}
+		}
+	}
+
+	// Last resort: check for clear success/failure signals
+	lower := strings.ToLower(content)
+	if strings.Contains(lower, "successfully") || strings.Contains(lower, "verified") || strings.Contains(lower, "confirmed") || strings.Contains(lower, "found") {
+		return StepResultSuccess, content, nil
+	}
+
 	return StepResultFailed, "Agent did not return a clear result. Response: " + content, nil
 }
 
