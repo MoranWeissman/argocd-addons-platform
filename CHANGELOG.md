@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.40.2](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.40.1...v1.40.2) (2026-03-23)
+
+
+### Bug Fixes
+
+* remove batch-info/{id} route that conflicted with {id}/explain ([#195](https://github.com/MoranWeissman/argocd-addons-platform/issues/195)) ([e9a5890](https://github.com/MoranWeissman/argocd-addons-platform/commit/e9a5890594c0b924350c9669bc573334713362c4))
+
 ## [1.40.1](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.40.0...v1.40.1) (2026-03-23)
 
 
