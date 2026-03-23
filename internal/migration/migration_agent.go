@@ -231,16 +231,98 @@ func (a *MigrationAgent) buildStepInstruction(stepNum int) string {
 	}
 
 	step := a.steps[stepNum-1]
+
+	// Add step-specific instructions for critical steps
+	specific := ""
+	switch stepNum {
+	case 1:
+		specific = fmt.Sprintf(`
+REQUIRED ACTIONS:
+1. Use git_read_file to read "configuration/addons-catalog.yaml" from the "new" repo
+2. Check that addon "%s" exists with inMigration: true
+3. If found, respond SUCCESS. If not found, respond FAILED.`, a.addonName)
+	case 2:
+		specific = fmt.Sprintf(`
+REQUIRED ACTIONS:
+1. Read global values for "%s" from both "new" and "old" repos
+2. Read cluster values for "%s" from both repos
+3. Compare and report differences
+4. This step is advisory — differences don't block migration. Respond SUCCESS with your comparison.`, a.addonName, a.clusterName)
+	case 3:
+		specific = fmt.Sprintf(`
+REQUIRED ACTIONS — YOU MUST CREATE A PULL REQUEST:
+1. Use git_read_file to read "configuration/cluster-addons.yaml" from the "new" repo
+2. Modify the file to set the label "%s: enabled" for cluster "%s"
+3. Use git_create_pr to create a PR with the modified file in the "new" repo
+4. Use git_merge_pr to merge the PR
+5. You MUST use the git_create_pr tool. Do NOT respond SUCCESS without creating a PR.
+6. Respond SUCCESS only after the PR is created (and merged if YOLO mode).`, a.addonName, a.clusterName)
+	case 5:
+		specific = fmt.Sprintf(`
+REQUIRED ACTIONS — YOU MUST CREATE A PULL REQUEST:
+1. Use git_read_file to read the cluster config from the "old" repo (try "configuration/cluster-addons.yaml" first, then "values/clusters.yaml")
+2. Modify the file to set "%s: disabled" for cluster "%s"
+3. Use git_create_pr to create a PR with the modified file in the "old" repo
+4. Use git_merge_pr to merge the PR
+5. You MUST use the git_create_pr tool. Do NOT respond SUCCESS without creating a PR.
+6. Respond SUCCESS only after the PR is created (and merged if YOLO mode).`, a.addonName, a.clusterName)
+	case 4:
+		specific = fmt.Sprintf(`
+REQUIRED ACTIONS:
+1. Use argocd_get_app to check if application "%s-%s" exists in the "new" ArgoCD
+2. If not found, wait 10 seconds and try again (up to 3 attempts)
+3. If found, respond SUCCESS with the sync and health status
+4. If not found after 3 attempts, respond FAILED`, a.addonName, a.clusterName)
+	case 6:
+		specific = `
+REQUIRED ACTIONS:
+1. Use argocd_list_apps on the "old" ArgoCD to find the clusters/bootstrap application
+2. Use argocd_sync_app to trigger a sync on that application
+3. Respond SUCCESS after sync is triggered`
+	case 7:
+		specific = fmt.Sprintf(`
+REQUIRED ACTIONS:
+1. Use argocd_get_app to check if "%s-%s" still exists in the "old" ArgoCD
+2. If NOT found (error/404), that's the desired state — respond SUCCESS
+3. If still found, wait and retry (up to 3 attempts)
+4. If still present after retries, respond FAILED`, a.addonName, a.clusterName)
+	case 8:
+		specific = fmt.Sprintf(`
+REQUIRED ACTIONS:
+1. Use argocd_refresh_app on "%s-%s" in the "new" ArgoCD
+2. Respond SUCCESS with the resulting sync and health status`, a.addonName, a.clusterName)
+	case 9:
+		specific = fmt.Sprintf(`
+REQUIRED ACTIONS:
+1. Use argocd_get_app to check "%s-%s" health in the "new" ArgoCD
+2. If HealthStatus is "Healthy", respond SUCCESS (OutOfSync is OK)
+3. If not healthy, respond FAILED with the status`, a.addonName, a.clusterName)
+	case 10:
+		specific = fmt.Sprintf(`
+REQUIRED ACTIONS:
+1. First check if ALL clusters have been migrated for addon "%s":
+   - Read cluster config from "old" repo to find which clusters had this addon
+   - Read cluster config from "new" repo to find which clusters have it enabled
+2. If clusters remain unmigrated in the old repo, respond NEEDS_USER_ACTION listing them
+3. If all migrated, create a PR to set inMigration: false in addons-catalog.yaml
+4. Respond SUCCESS only after the PR is created`, a.addonName)
+	}
+
 	return fmt.Sprintf(`Execute migration step %d: "%s"
 
 Description: %s
+%s
 
-Follow the migration guide to complete this step. Use tools to verify state before and after each action. Log your reasoning for the user to see.
+IMPORTANT RULES:
+- Use the log tool to explain what you are doing BEFORE each action
+- Use tools to verify state before and after each action
+- Do NOT claim success without actually performing the required actions
+- Do NOT skip tool calls — every action must go through the tools
 
-When done, respond with exactly one of:
+When done, you MUST respond with EXACTLY one of these prefixes:
 - SUCCESS: <brief summary of what was accomplished>
 - FAILED: <what went wrong and your diagnosis>
-- NEEDS_USER_ACTION: <what the user needs to do>`, stepNum, step.Title, step.Description)
+- NEEDS_USER_ACTION: <what the user needs to do>`, stepNum, step.Title, step.Description, specific)
 }
 
 func (a *MigrationAgent) parseResult(content string) (StepResult, string, error) {
@@ -256,13 +338,8 @@ func (a *MigrationAgent) parseResult(content string) (StepResult, string, error)
 		return StepResultNeedsUser, strings.TrimPrefix(content, "NEEDS_USER_ACTION:"), nil
 	}
 
-	// If the agent didn't use the exact format, treat as success if no error indicators
-	lower := strings.ToLower(content)
-	if strings.Contains(lower, "error") || strings.Contains(lower, "failed") || strings.Contains(lower, "cannot") {
-		return StepResultFailed, content, nil
-	}
-
-	return StepResultSuccess, content, nil
+	// If the agent didn't use the exact format, default to FAILED (safer than assuming success)
+	return StepResultFailed, "Agent did not return a clear result. Response: " + content, nil
 }
 
 func readKnowledgeFile(relativePath string) string {
