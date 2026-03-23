@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.36.0](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.35.4...v1.36.0) (2026-03-23)
+
+
+### Features
+
+* model dropdown per AI provider instead of free text input ([b3b9863](https://github.com/MoranWeissman/argocd-addons-platform/commit/b3b9863e05c98f3141c1e50da2a2c6fbc46d5dd3))
+
 ## [1.35.4](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.35.3...v1.35.4) (2026-03-23)
 
 
