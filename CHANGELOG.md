@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.39.2](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.39.1...v1.39.2) (2026-03-23)
+
+
+### Bug Fixes
+
+* force rebuild to clear cached image ([#187](https://github.com/MoranWeissman/argocd-addons-platform/issues/187)) ([297d6e9](https://github.com/MoranWeissman/argocd-addons-platform/commit/297d6e9dc979c852fe557087451c50b16d204f9a))
+
 ## [1.39.1](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.39.0...v1.39.1) (2026-03-23)
 
 
