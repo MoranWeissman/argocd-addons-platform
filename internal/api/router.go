@@ -153,7 +153,6 @@ func NewRouter(srv *Server, staticFS fs.FS) http.Handler {
 	mux.HandleFunc("POST /api/v1/migration/start", srv.handleStartMigration)
 	mux.HandleFunc("POST /api/v1/migration/start-batch", srv.handleStartBatch)
 	mux.HandleFunc("GET /api/v1/migration/batch-active", srv.handleGetBatch)
-	mux.HandleFunc("GET /api/v1/migration/batch-info/{id}", srv.handleGetBatch)
 	mux.HandleFunc("GET /api/v1/migration/azure/projects", srv.handleAzureListProjects)
 	mux.HandleFunc("GET /api/v1/migration/azure/repos", srv.handleAzureListRepos)
 	mux.HandleFunc("GET /api/v1/migration/old-repo/addons", srv.handleOldRepoAddons)
