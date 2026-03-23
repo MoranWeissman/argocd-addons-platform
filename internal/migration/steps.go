@@ -66,13 +66,10 @@ func (e *Executor) stepVerifyCatalog(ctx context.Context, m *Migration) error {
 		slog.Warn("migration: inMigration flag not found globally, checking addon block", "addon", m.AddonName)
 	}
 
-	assessment, _ := e.aiEvaluate(ctx, m.Steps[0].Title,
-		fmt.Sprintf("Addon catalog content for %q:\n%s", m.AddonName, truncate(content, 2000)))
-
-	e.addLog(m, 1, e.newRepoLabel(), "completed", fmt.Sprintf("Addon %q found in catalog", m.AddonName))
+	e.addLog(m, 1, e.newRepoLabel(), "completed", fmt.Sprintf("Addon %q found in catalog with inMigration: true", m.AddonName))
 
 	step := &m.Steps[0]
-	step.Message = fmt.Sprintf("Addon %q found in catalog. %s", m.AddonName, assessment)
+	step.Message = fmt.Sprintf("Addon %q found in catalog with inMigration: true", m.AddonName)
 	_ = e.store.SaveMigration(m)
 	return nil
 }
@@ -85,16 +82,13 @@ func (e *Executor) stepConfigureValues(ctx context.Context, m *Migration) error 
 	newGlobalPath := fmt.Sprintf("configuration/addons-global-values/%s.yaml", m.AddonName)
 	e.addLog(m, 2, e.newRepoLabel(), "reading", fmt.Sprintf("Reading global values for %s from NEW repo...", m.AddonName))
 	newGlobalValues, newGlobalErr := e.newGP.GetFileContent(ctx, newGlobalPath, "main")
-	newGlobalStr := "(not available)"
 	if newGlobalErr != nil {
 		e.addLog(m, 2, e.newRepoLabel(), "warning", fmt.Sprintf("No global values file found for %s in NEW repo — may need to create one", m.AddonName))
 	} else {
-		newGlobalStr = truncate(string(newGlobalValues), 1500)
 		e.addLog(m, 2, e.newRepoLabel(), "completed", fmt.Sprintf("Read global values for %s (%d bytes)", m.AddonName, len(newGlobalValues)))
 	}
 
 	// 2. Read addon global values from OLD repo (try V1 then V2).
-	oldGlobalStr := "(old git provider not configured)"
 	if e.oldGP != nil {
 		// Try V2 path first.
 		oldGlobalPath := fmt.Sprintf("configuration/addons-global-values/%s.yaml", m.AddonName)
@@ -108,11 +102,9 @@ func (e *Executor) stepConfigureValues(ctx context.Context, m *Migration) error 
 			if err != nil {
 				e.addLog(m, 2, e.oldRepoLabel(), "warning", "No global values found in OLD repo (tried V2 and V1 paths)")
 			} else {
-				oldGlobalStr = truncate(string(oldGlobalValues), 1500)
 				e.addLog(m, 2, e.oldRepoLabel(), "completed", fmt.Sprintf("Read global values for %s (%d bytes)", m.AddonName, len(oldGlobalValues)))
 			}
 		} else {
-			oldGlobalStr = truncate(string(oldGlobalValues), 1500)
 			e.addLog(m, 2, e.oldRepoLabel(), "completed", fmt.Sprintf("Read global values for %s (%d bytes)", m.AddonName, len(oldGlobalValues)))
 		}
 	}
@@ -121,16 +113,13 @@ func (e *Executor) stepConfigureValues(ctx context.Context, m *Migration) error 
 	newClusterPath := fmt.Sprintf("configuration/addons-clusters-values/%s.yaml", m.ClusterName)
 	e.addLog(m, 2, e.newRepoLabel(), "reading", fmt.Sprintf("Reading cluster values for %s from NEW repo...", m.ClusterName))
 	newClusterValues, newClusterErr := e.newGP.GetFileContent(ctx, newClusterPath, "main")
-	newClusterStr := "(not available)"
 	if newClusterErr != nil {
 		e.addLog(m, 2, e.newRepoLabel(), "warning", fmt.Sprintf("No cluster values file found for %s in NEW repo", m.ClusterName))
 	} else {
-		newClusterStr = truncate(string(newClusterValues), 1500)
 		e.addLog(m, 2, e.newRepoLabel(), "completed", fmt.Sprintf("Read cluster values for %s (%d bytes)", m.ClusterName, len(newClusterValues)))
 	}
 
 	// 4. Read cluster values from OLD repo.
-	oldClusterStr := "(old git provider not configured)"
 	if e.oldGP != nil {
 		// Try V2 path first.
 		oldClusterPath := fmt.Sprintf("configuration/addons-clusters-values/%s.yaml", m.ClusterName)
@@ -144,24 +133,18 @@ func (e *Executor) stepConfigureValues(ctx context.Context, m *Migration) error 
 			if err != nil {
 				e.addLog(m, 2, e.oldRepoLabel(), "warning", "No cluster values found in OLD repo (tried V2 and V1 paths)")
 			} else {
-				oldClusterStr = truncate(string(oldClusterValues), 1500)
 				e.addLog(m, 2, e.oldRepoLabel(), "completed", fmt.Sprintf("Read cluster values for %s/%s (%d bytes)", m.ClusterName, m.AddonName, len(oldClusterValues)))
 			}
 		} else {
-			oldClusterStr = truncate(string(oldClusterValues), 1500)
 			e.addLog(m, 2, e.oldRepoLabel(), "completed", fmt.Sprintf("Read cluster values for %s (%d bytes)", m.ClusterName, len(oldClusterValues)))
 		}
 	}
 
-	// 5. AI comparison or summary.
+	// 5. Log comparison summary.
 	e.addLog(m, 2, e.newRepoLabel(), "comparing", "Comparing values between OLD and NEW repos...")
-	assessment, _ := e.aiEvaluate(ctx, step.Title,
-		fmt.Sprintf("Comparing values for addon %q on cluster %q.\n\nNEW repo global values:\n%s\n\nOLD repo global values:\n%s\n\nNEW repo cluster values:\n%s\n\nOLD repo cluster values:\n%s",
-			m.AddonName, m.ClusterName, newGlobalStr, oldGlobalStr, newClusterStr, oldClusterStr))
+	e.addLog(m, 2, e.newRepoLabel(), "completed", "Values comparison complete (advisory — review logs for details)")
 
-	e.addLog(m, 2, e.newRepoLabel(), "completed", "Values comparison complete")
-
-	step.Message = fmt.Sprintf("Values comparison complete (advisory). %s", assessment)
+	step.Message = "Values comparison complete (advisory — differences do not block migration)"
 	_ = e.store.SaveMigration(m)
 	return nil
 }
@@ -224,12 +207,8 @@ func (e *Executor) stepVerifyAppCreated(ctx context.Context, m *Migration) error
 
 		e.addLog(m, 4, "NEW ArgoCD", "completed", fmt.Sprintf("Application found: sync=%s, health=%s", app.SyncStatus, app.HealthStatus))
 
-		assessment, _ := e.aiEvaluate(ctx, step.Title,
-			fmt.Sprintf("Application %q found in NEW ArgoCD. Sync: %s, Health: %s",
-				appName, app.SyncStatus, app.HealthStatus))
-
-		step.Message = fmt.Sprintf("Application %q found (sync=%s, health=%s). %s",
-			appName, app.SyncStatus, app.HealthStatus, assessment)
+		step.Message = fmt.Sprintf("Application %q found (sync=%s, health=%s)",
+			appName, app.SyncStatus, app.HealthStatus)
 		_ = e.store.SaveMigration(m)
 		return nil
 	}
@@ -323,9 +302,7 @@ func (e *Executor) stepVerifyAppRemoved(ctx context.Context, m *Migration) error
 			// Application not found — this is the desired state.
 			e.addLog(m, 7, "OLD ArgoCD", "completed", fmt.Sprintf("Application %s is no longer present in OLD ArgoCD", appName))
 
-			assessment, _ := e.aiEvaluate(ctx, step.Title,
-				fmt.Sprintf("Application %q is no longer present in OLD ArgoCD (attempt %d).", appName, attempt+1))
-			step.Message = fmt.Sprintf("Application %q removed from OLD ArgoCD. %s", appName, assessment)
+			step.Message = fmt.Sprintf("Application %q removed from OLD ArgoCD", appName)
 			_ = e.store.SaveMigration(m)
 			return nil
 		}
@@ -383,13 +360,11 @@ func (e *Executor) stepVerifyHealthy(ctx context.Context, m *Migration) error {
 		if app.HealthStatus == "Healthy" {
 			syncNote := ""
 			if app.SyncStatus != "Synced" {
-				syncNote = fmt.Sprintf(" (sync status: %s — this is normal after migration, ArgoCD will sync on next cycle)", app.SyncStatus)
+				syncNote = fmt.Sprintf(" (sync status: %s — normal after migration, ArgoCD will sync on next cycle)", app.SyncStatus)
 			}
 			e.addLog(m, 9, "NEW ArgoCD", "completed", fmt.Sprintf("Application %s is Healthy%s", appName, syncNote))
 
-			assessment, _ := e.aiEvaluate(ctx, step.Title,
-				fmt.Sprintf("Application %q is %s.", appName, lastStatus))
-			step.Message = fmt.Sprintf("Application %q is Healthy (sync=%s). %s", appName, app.SyncStatus, assessment)
+			step.Message = fmt.Sprintf("Application %q is Healthy (sync=%s)%s", appName, app.SyncStatus, syncNote)
 			_ = e.store.SaveMigration(m)
 			return nil
 		}
@@ -503,27 +478,10 @@ func (e *Executor) createPRWithLog(
 		step.PRRepo = "old"
 	}
 
-	// In YOLO mode, try to auto-merge
-	if m.Mode == "yolo" {
-		e.addLog(m, stepNum, repoLabel, "merging", fmt.Sprintf("YOLO mode — auto-merging PR #%d...", pr.ID))
-		if mergeErr := gp.MergePullRequest(ctx, pr.ID); mergeErr != nil {
-			e.addLog(m, stepNum, repoLabel, "warning", fmt.Sprintf("Auto-merge failed: %s. Waiting for manual merge.", mergeErr.Error()))
-			step.PRStatus = "open"
-			step.Status = StepWaiting
-			step.Message = fmt.Sprintf("PR #%d created but auto-merge failed — please merge manually: %s", pr.ID, pr.URL)
-		} else {
-			e.addLog(m, stepNum, repoLabel, "completed", fmt.Sprintf("PR #%d auto-merged", pr.ID))
-			step.PRStatus = "merged"
-			step.Status = StepCompleted
-			step.CompletedAt = now()
-			step.Message = fmt.Sprintf("PR #%d auto-merged: %s", pr.ID, pr.URL)
-		}
-	} else {
-		e.addLog(m, stepNum, repoLabel, "waiting", fmt.Sprintf("PR #%d created: %s", pr.ID, pr.URL))
-		step.PRStatus = "open"
-		step.Status = StepWaiting
-		step.Message = fmt.Sprintf("PR #%d created — waiting for merge: %s", pr.ID, pr.URL)
-	}
+	e.addLog(m, stepNum, repoLabel, "waiting", fmt.Sprintf("PR #%d created — please review and merge: %s", pr.ID, pr.URL))
+	step.PRStatus = "open"
+	step.Status = StepWaiting
+	step.Message = fmt.Sprintf("PR #%d created — please review and merge: %s", pr.ID, pr.URL)
 
 	_ = e.store.SaveMigration(m)
 	return nil

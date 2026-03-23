@@ -396,20 +396,16 @@ func (s *Server) handleMigrationChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	agent := s.migrationExecutor.GetAgent(id)
-	if agent == nil {
-		// Agent not in memory (pod restart or step already finished) — create one from stored state
-		m, mErr := s.migrationExecutor.GetStore().GetMigration(id)
-		if mErr != nil || m == nil {
-			writeError(w, http.StatusNotFound, "migration not found")
-			return
-		}
-		if err := s.resolveExecutorProviders(); err != nil {
-			writeError(w, http.StatusServiceUnavailable, err.Error())
-			return
-		}
-		agent = s.migrationExecutor.CreateAgentForMigration(m)
+	m, mErr := s.migrationExecutor.GetStore().GetMigration(id)
+	if mErr != nil || m == nil {
+		writeError(w, http.StatusNotFound, "migration not found")
+		return
 	}
+	if err := s.resolveExecutorProviders(); err != nil {
+		writeError(w, http.StatusServiceUnavailable, err.Error())
+		return
+	}
+	agent := s.migrationExecutor.CreateTroubleshootAgent(m)
 
 	response, err := agent.Chat(r.Context(), req.Message)
 	if err != nil {

@@ -24,7 +24,6 @@ type Executor struct {
 
 	mu      sync.Mutex
 	running map[string]context.CancelFunc // active goroutines keyed by migration ID
-	agents  map[string]*MigrationAgent    // active agents by migration ID
 }
 
 // NewExecutor creates a migration executor wired to the given providers.
@@ -42,8 +41,7 @@ func NewExecutor(
 		newArgoCD: newAC,
 		oldArgoCD: oldAC,
 		aiClient:  aiClient,
-		running:   make(map[string]context.CancelFunc),
-		agents:    make(map[string]*MigrationAgent),
+		running: make(map[string]context.CancelFunc),
 	}
 }
 
@@ -170,64 +168,31 @@ func (e *Executor) RunSteps(ctx context.Context, migrationID string) {
 		// Emit step description as the first log entry
 		e.addLog(m, m.CurrentStep, "SYSTEM", "starting", step.Description)
 
-		// Execute step with timeout (5 minutes per step to allow for agent execution)
-		stepCtx, stepCancel := context.WithTimeout(ctx, 5*time.Minute)
-		var stepErr error
-		if e.aiClient != nil && e.aiClient.IsEnabled() {
-			agent := e.getOrCreateAgent(m)
-			result, msg, agentErr := agent.ExecuteStep(stepCtx, m.CurrentStep)
-			if agentErr != nil {
-				stepErr = agentErr
-			} else {
-				switch result {
-				case StepResultSuccess:
-					stepErr = nil
-				case StepResultFailed:
-					stepErr = fmt.Errorf("%s", msg)
-				case StepResultNeedsUser:
-					// Set step to waiting, don't treat as error
-					step.Status = StepWaiting
-					step.Message = msg
-					m.Status = StatusWaiting
-					m.UpdatedAt = now()
-					_ = e.store.SaveMigration(m)
-					stepCancel()
-					slog.Info("migration: step needs user action", "id", migrationID, "step", m.CurrentStep)
-					return // pause execution
-				}
-			}
-		} else {
-			stepErr = e.executeStep(stepCtx, m, m.CurrentStep)
-		}
+		// Execute step with timeout — deterministic pipeline, no AI agent per step
+		stepCtx, stepCancel := context.WithTimeout(ctx, 2*time.Minute)
+		stepErr := e.executeStep(stepCtx, m, m.CurrentStep)
 		stepCancel()
 
-		// Re-read state only for non-agent execution (old hardcoded steps modify migration directly).
-		// Agent steps return results without modifying migration state.
-		if !(e.aiClient != nil && e.aiClient.IsEnabled()) {
-			m, err = e.store.GetMigration(migrationID)
-			if err != nil {
-				slog.Error("migration: failed to re-read state", "id", migrationID, "error", err)
-				return
-			}
-			step = &m.Steps[m.CurrentStep-1]
+		// Re-read state (steps modify migration directly via store)
+		m, err = e.store.GetMigration(migrationID)
+		if err != nil {
+			slog.Error("migration: failed to re-read state", "id", migrationID, "error", err)
+			return
 		}
+		step = &m.Steps[m.CurrentStep-1]
 
 		if stepErr != nil {
 			rawErr := stepErr.Error()
 			slog.Error("migration: step failed", "id", migrationID, "step", m.CurrentStep, "error", rawErr)
 
-			// Ask the agent to diagnose the error in human-friendly language
+			// Ask AI to diagnose the error in human-friendly language
 			diagnosis := rawErr
 			if e.aiClient != nil && e.aiClient.IsEnabled() {
-				agent := e.getOrCreateAgent(m)
-				diagCtx, diagCancel := context.WithTimeout(context.Background(), 30*time.Second)
-				diagResult, diagErr := agent.Chat(diagCtx, fmt.Sprintf(
-					"Step %d failed with this error:\n%s\n\nExplain what went wrong in 2-3 sentences that a user can understand. Then suggest what they should do to fix it.",
-					m.CurrentStep, rawErr))
-				diagCancel()
+				diagResult, diagErr := e.aiEvaluate(ctx, m.Steps[m.CurrentStep-1].Title,
+					fmt.Sprintf("Step %d failed with error: %s\n\nExplain what went wrong and suggest a fix.", m.CurrentStep, rawErr))
 				if diagErr == nil && diagResult != "" {
 					diagnosis = diagResult
-					e.addLog(m, m.CurrentStep, "AGENT", "diagnosis", diagnosis)
+					e.addLog(m, m.CurrentStep, "AI", "diagnosis", diagnosis)
 				}
 			}
 
@@ -441,17 +406,9 @@ func (e *Executor) CancelMigration(migrationID string) error {
 	return e.store.SaveMigration(m)
 }
 
-// getOrCreateAgent returns an existing MigrationAgent for the migration or
-// creates a new one. Agents are cached per migration ID so that conversation
-// history is preserved across steps and troubleshooting chat.
-func (e *Executor) getOrCreateAgent(m *Migration) *MigrationAgent {
-	if e.agents == nil {
-		e.agents = make(map[string]*MigrationAgent)
-	}
-	if agent, ok := e.agents[m.ID]; ok {
-		return agent
-	}
-	agent := NewMigrationAgent(
+// CreateTroubleshootAgent creates a read-only agent for troubleshooting chat.
+func (e *Executor) CreateTroubleshootAgent(m *Migration) *MigrationAgent {
+	return NewMigrationAgent(
 		e.aiClient,
 		e.newGP, e.oldGP,
 		e.newArgoCD, e.oldArgoCD,
@@ -461,21 +418,6 @@ func (e *Executor) getOrCreateAgent(m *Migration) *MigrationAgent {
 			e.addLog(m, step, repo, action, detail)
 		},
 	)
-	e.agents[m.ID] = agent
-	return agent
-}
-
-// GetAgent returns the active MigrationAgent for a migration, or nil if none exists.
-func (e *Executor) GetAgent(migrationID string) *MigrationAgent {
-	if e.agents == nil {
-		return nil
-	}
-	return e.agents[migrationID]
-}
-
-// CreateAgentForMigration creates a new agent for an existing migration (e.g., for troubleshooting chat).
-func (e *Executor) CreateAgentForMigration(m *Migration) *MigrationAgent {
-	return e.getOrCreateAgent(m)
 }
 
 // aiEvaluate asks the AI provider for a brief assessment of a migration step.
