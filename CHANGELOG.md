@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.35.2](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.35.1...v1.35.2) (2026-03-23)
+
+
+### Bug Fixes
+
+* flexible SUCCESS prefix parsing + larger font for errors/chat ([b6bc08c](https://github.com/MoranWeissman/argocd-addons-platform/commit/b6bc08c2917b505a59b6c752c470bcb7a730cca9))
+
 ## [1.35.1](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.35.0...v1.35.1) (2026-03-23)
 
 
