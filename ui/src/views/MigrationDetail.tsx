@@ -318,9 +318,11 @@ export default function MigrationDetail() {
                   <div className="mt-3 ml-7 space-y-2">
                     {/* Error + retry button */}
                     {activeStep.error && (
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-red-600 dark:text-red-400">{activeStep.error}</span>
-                        <Button size="sm" variant="destructive" onClick={handleRetry} className="h-6 px-2 text-xs">
+                      <div className="space-y-2">
+                        <div className="rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-700 dark:border-red-700 dark:bg-red-900/20 dark:text-red-300">
+                          {activeStep.error}
+                        </div>
+                        <Button size="sm" variant="destructive" onClick={handleRetry} className="h-7 px-3 text-xs">
                           Retry
                         </Button>
                       </div>
@@ -328,9 +330,9 @@ export default function MigrationDetail() {
 
                     {/* Chat messages */}
                     {chatMessages.length > 0 && (
-                      <div className="rounded-md border border-gray-700 bg-gray-900 p-2 space-y-2 max-h-60 overflow-y-auto">
+                      <div className="rounded-md border border-gray-700 bg-gray-900 p-3 space-y-3 max-h-80 overflow-y-auto">
                         {chatMessages.map((msg, i) => (
-                          <div key={i} className={cn('text-xs', msg.role === 'user' ? 'text-blue-400' : 'text-violet-400')}>
+                          <div key={i} className={cn('text-sm leading-relaxed', msg.role === 'user' ? 'text-blue-400' : 'text-violet-300')}>
                             <span className="font-bold">{msg.role === 'user' ? 'You' : 'Agent'}:</span> {msg.content}
                           </div>
                         ))}
