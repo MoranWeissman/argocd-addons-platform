@@ -236,34 +236,32 @@ Current Step: %d
 }
 
 // getSkillsForStep returns which skill files are relevant for a given step.
+// Keep it minimal — only 1-2 most relevant skills to avoid overloading the prompt.
 func (a *MigrationAgent) getSkillsForStep(stepNum int) []string {
-	// Always load core skills
-	skills := []string{"argocd", "gitops", "yaml"}
-
 	switch stepNum {
 	case 1: // Verify catalog
-		// yaml for reading catalog
+		return []string{"yaml"}
 	case 2: // Compare values
-		skills = append(skills, "helm")
+		return []string{"helm"}
 	case 3: // Enable addon in NEW repo (PR)
-		skills = append(skills, "github")
+		return []string{"github"}
 	case 4: // Verify app in NEW ArgoCD
-		skills = append(skills, "kubernetes")
+		return []string{"argocd"}
 	case 5: // Disable addon in OLD repo (PR)
-		skills = append(skills, "azure-devops", "github") // could be either
+		return []string{"azure-devops"}
 	case 6: // Sync OLD ArgoCD
-		// argocd already loaded
+		return []string{"argocd"}
 	case 7: // Verify removal
-		skills = append(skills, "kubernetes")
+		return []string{"argocd"}
 	case 8: // Refresh NEW ArgoCD
-		// argocd already loaded
+		return []string{"argocd"}
 	case 9: // Verify healthy
-		skills = append(skills, "kubernetes", "helm")
+		return []string{"kubernetes"}
 	case 10: // Finalize
-		skills = append(skills, "github")
+		return []string{"gitops"}
+	default:
+		return nil
 	}
-
-	return skills
 }
 
 func (a *MigrationAgent) buildStepInstruction(stepNum int) string {
