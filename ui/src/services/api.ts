@@ -170,6 +170,10 @@ export const api = {
   deleteMigration: (id: string) => deleteJSON<void>(`/migration/${id}`),
   azureListProjects: (org: string, pat: string) => fetchJSON<string[]>(`/migration/azure/projects?org=${encodeURIComponent(org)}&pat=${encodeURIComponent(pat)}`),
   azureListRepos: (org: string, project: string, pat: string) => fetchJSON<string[]>(`/migration/azure/repos?org=${encodeURIComponent(org)}&project=${encodeURIComponent(project)}&pat=${encodeURIComponent(pat)}`),
+  // Docs
+  docsList: () => fetchJSON<{ slug: string; title: string; order: number }[]>('/docs/list'),
+  docsGet: (slug: string) => fetchJSON<{ slug: string; content: string }>(`/docs/${encodeURIComponent(slug)}`),
+
   oldRepoAddons: () => fetchJSON<string[]>('/migration/old-repo/addons'),
   oldRepoClusters: () => fetchJSON<string[]>('/migration/old-repo/clusters'),
   oldRepoClusterAddons: (cluster: string) => fetchJSON<ClusterAddonInfo[]>(`/migration/old-repo/cluster-addons?cluster=${encodeURIComponent(cluster)}`),

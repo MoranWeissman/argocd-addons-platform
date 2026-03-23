@@ -1,474 +1,100 @@
-import { useState } from 'react'
-import {
-  BookOpen,
-  Package,
-  FileText,
-  Bug,
-  Info,
-  Monitor,
-} from 'lucide-react'
-import type { ReactNode } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import { BookOpen, Search } from 'lucide-react'
+import Markdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
+import { api } from '@/services/api'
 
-interface DocPage {
-  id: string
+interface DocEntry {
+  slug: string
   title: string
-  icon: typeof BookOpen
-  content: ReactNode
+  order: number
 }
 
-/* ------------------------------------------------------------------ */
-/*  Doc page content components                                        */
-/* ------------------------------------------------------------------ */
-
-function OverviewContent() {
-  return (
-    <div className="doc-content">
-      <h1 className="mb-6 text-3xl font-bold text-gray-900 dark:text-white">
-        Overview
-      </h1>
-
-      <p className="mb-4 text-gray-700 dark:text-gray-300">
-        The ArgoCD Addons Platform (AAP) is a web interface for monitoring and
-        managing Kubernetes add-ons across your cluster fleet. It provides a
-        centralized view of addon health, version status, and configuration
-        differences between clusters.
-      </p>
-
-      <h2 className="mb-3 mt-8 text-2xl font-semibold text-gray-900 dark:text-white">
-        What It Shows
-      </h2>
-      <ul className="mb-4 list-disc space-y-2 pl-6 text-gray-700 dark:text-gray-300">
-        <li>
-          <strong>Cluster health</strong> -- connection status and addon
-          deployment state for every cluster in your fleet.
-        </li>
-        <li>
-          <strong>Addon catalog</strong> -- all available addons, their versions,
-          and how many clusters have them deployed.
-        </li>
-        <li>
-          <strong>Version matrix</strong> -- a cross-cluster view showing which
-          version of each addon is running where, highlighting version drift.
-        </li>
-        <li>
-          <strong>Configuration differences</strong> -- per-cluster overrides
-          compared against global defaults.
-        </li>
-      </ul>
-
-      <h2 className="mb-3 mt-8 text-2xl font-semibold text-gray-900 dark:text-white">
-        AI-Powered Operations
-      </h2>
-      <p className="mb-4 text-gray-700 dark:text-gray-300">
-        The platform includes an AI assistant that can answer natural-language
-        questions about your clusters, addons, and configurations. It has
-        access to 17 specialized tools for querying cluster data, analyzing
-        upgrade impacts, and providing actionable recommendations -- all
-        without leaving the UI.
-      </p>
-
-      <h2 className="mb-3 mt-8 text-2xl font-semibold text-gray-900 dark:text-white">
-        Who It's For
-      </h2>
-      <p className="mb-4 text-gray-700 dark:text-gray-300">
-        Platform engineers and SREs who manage Kubernetes add-ons at scale.
-        The UI gives you a read-only operational view -- all changes are made
-        through Git (GitOps workflow) and applied by ArgoCD.
-      </p>
-    </div>
-  )
+interface DocContent {
+  slug: string
+  content: string
 }
-
-function FeaturesContent() {
-  return (
-    <div className="doc-content">
-      <h1 className="mb-6 text-3xl font-bold text-gray-900 dark:text-white">
-        Features
-      </h1>
-
-      <p className="mb-4 text-gray-700 dark:text-gray-300">
-        A quick tour of every page in the platform.
-      </p>
-
-      <h2 className="mb-3 mt-8 text-2xl font-semibold text-gray-900 dark:text-white">
-        Dashboard
-      </h2>
-      <p className="mb-4 text-gray-700 dark:text-gray-300">
-        The landing page shows a high-level summary: total clusters, addon
-        health distribution, and recent issues. Use it as a starting point to
-        spot problems at a glance.
-      </p>
-
-      <h2 className="mb-3 mt-8 text-2xl font-semibold text-gray-900 dark:text-white">
-        Clusters
-      </h2>
-      <p className="mb-4 text-gray-700 dark:text-gray-300">
-        Lists every cluster with its connection status and Kubernetes version.
-        Click a cluster to see a detailed comparison of Git-configured addons
-        versus live ArgoCD state. The detail page also includes a Config
-        Overrides tab showing per-cluster value differences.
-      </p>
-
-      <h2 className="mb-3 mt-8 text-2xl font-semibold text-gray-900 dark:text-white">
-        Addon Catalog
-      </h2>
-      <p className="mb-4 text-gray-700 dark:text-gray-300">
-        A searchable, filterable catalog of all addons defined in your
-        repository. Each card shows deployment count, health breakdown, and
-        version. Click an addon to see per-cluster deployment details.
-      </p>
-
-      <h2 className="mb-3 mt-8 text-2xl font-semibold text-gray-900 dark:text-white">
-        Version Matrix
-      </h2>
-      <p className="mb-4 text-gray-700 dark:text-gray-300">
-        A matrix view with addons as rows and clusters as columns. Each cell
-        shows the deployed version and a health indicator dot. Cells with
-        version drift (different from the catalog version) are highlighted in
-        amber. By default, addons with no deployments are hidden -- use the
-        "Show all addons" toggle to reveal them.
-      </p>
-
-      <h2 className="mb-3 mt-8 text-2xl font-semibold text-gray-900 dark:text-white">
-        Config Diff
-      </h2>
-      <p className="mb-4 text-gray-700 dark:text-gray-300">
-        Available on each cluster detail page under the "Config Overrides" tab.
-        Shows a side-by-side comparison of global default values versus
-        cluster-specific overrides for each addon.
-      </p>
-
-      <h2 className="mb-3 mt-8 text-2xl font-semibold text-gray-900 dark:text-white">
-        Upgrade Impact Checker
-      </h2>
-      <p className="mb-4 text-gray-700 dark:text-gray-300">
-        Analyze the impact of addon upgrades before applying them. The checker
-        compares values.yaml between chart versions, detects conflicts with
-        your configured overrides, fetches release notes from GitHub, and
-        provides AI-powered analysis summarizing breaking changes and
-        recommended actions.
-      </p>
-
-      <h2 className="mb-3 mt-8 text-2xl font-semibold text-gray-900 dark:text-white">
-        AI Assistant
-      </h2>
-      <p className="mb-4 text-gray-700 dark:text-gray-300">
-        A conversational agent accessible from any page via the chat panel.
-        It has 17 specialized tools for querying cluster status, addon health,
-        version information, configuration data, and more. Ask questions in
-        natural language and get structured, actionable answers.
-      </p>
-
-      <h2 className="mb-3 mt-8 text-2xl font-semibold text-gray-900 dark:text-white">
-        External Dashboards
-      </h2>
-      <p className="mb-4 text-gray-700 dark:text-gray-300">
-        Embed external monitoring dashboards (Datadog, Grafana, or custom URLs)
-        directly into the platform. Configure dashboard links per addon or
-        cluster to get one-click access to relevant observability data without
-        switching tools.
-      </p>
-
-      <h2 className="mb-3 mt-8 text-2xl font-semibold text-gray-900 dark:text-white">
-        Observability
-      </h2>
-      <p className="mb-4 text-gray-700 dark:text-gray-300">
-        Track ArgoCD sync operations over time with the sync timeline view.
-        Addon health cards provide at-a-glance status for each deployment.
-        The control plane information panel shows ArgoCD server version,
-        cluster connectivity, and API health metrics.
-      </p>
-    </div>
-  )
-}
-
-function ManagingAddonsContent() {
-  return (
-    <div className="doc-content">
-      <h1 className="mb-6 text-3xl font-bold text-gray-900 dark:text-white">
-        Managing Addons
-      </h1>
-
-      <h2 className="mb-3 mt-6 text-2xl font-semibold text-gray-900 dark:text-white">
-        Reading Addon Status
-      </h2>
-      <p className="mb-4 text-gray-700 dark:text-gray-300">
-        Each addon can have one of these statuses:
-      </p>
-      <ul className="mb-4 list-disc space-y-2 pl-6 text-gray-700 dark:text-gray-300">
-        <li>
-          <strong>Healthy</strong> -- The addon is deployed and ArgoCD reports
-          it as healthy and synced.
-        </li>
-        <li>
-          <strong>Degraded</strong> -- The addon is deployed but ArgoCD reports
-          health issues (pods crashing, resources unavailable).
-        </li>
-        <li>
-          <strong>Not Deployed</strong> -- The addon is enabled in Git but no
-          matching ArgoCD Application exists. This may indicate a sync issue.
-        </li>
-        <li>
-          <strong>Unmanaged</strong> -- An ArgoCD Application exists but the
-          addon is not defined in the Git repository.
-        </li>
-        <li>
-          <strong>Not Enabled</strong> -- The addon exists in the catalog but is
-          not enabled for this cluster.
-        </li>
-      </ul>
-
-      <h2 className="mb-3 mt-8 text-2xl font-semibold text-gray-900 dark:text-white">
-        Understanding Health
-      </h2>
-      <p className="mb-4 text-gray-700 dark:text-gray-300">
-        Health information comes from ArgoCD, which checks the actual Kubernetes
-        resources. A green dot means all resources are running. A red dot means
-        at least one resource is unhealthy. The Version Matrix page is the
-        fastest way to see health across all clusters at once.
-      </p>
-
-      <h2 className="mb-3 mt-8 text-2xl font-semibold text-gray-900 dark:text-white">
-        Using the Version Matrix
-      </h2>
-      <p className="mb-4 text-gray-700 dark:text-gray-300">
-        The matrix highlights version drift in amber. Filter by health status
-        or drift to focus on clusters that need attention. The catalog version
-        shown under each addon name is the default version from the addon
-        catalog -- clusters running a different version will be flagged.
-      </p>
-
-      <h2 className="mb-3 mt-8 text-2xl font-semibold text-gray-900 dark:text-white">
-        Version Overrides
-      </h2>
-      <p className="mb-2 text-gray-700 dark:text-gray-300">
-        Override the default chart version for a specific cluster by adding a
-        version label in{' '}
-        <code className="rounded bg-gray-100 px-1.5 py-0.5 text-sm dark:bg-gray-800">
-          cluster-addons.yaml
-        </code>:
-      </p>
-      <pre className="mb-6 overflow-x-auto rounded-lg bg-gray-900 p-4 text-sm text-gray-100">
-        <code>{`clusters:
-  - name: my-cluster
-    labels:
-      datadog: enabled
-      datadog-version: "3.70.7"   # Override default version`}</code>
-      </pre>
-    </div>
-  )
-}
-
-function ValuesGuideContent() {
-  return (
-    <div className="doc-content">
-      <h1 className="mb-6 text-3xl font-bold text-gray-900 dark:text-white">
-        Values Guide
-      </h1>
-
-      <h2 className="mb-3 mt-6 text-2xl font-semibold text-gray-900 dark:text-white">
-        Understanding Config Overrides
-      </h2>
-      <p className="mb-4 text-gray-700 dark:text-gray-300">
-        Addon values follow a layered architecture. Each layer can override
-        the one above it:
-      </p>
-      <pre className="mb-6 overflow-x-auto rounded-lg bg-gray-900 p-4 text-sm text-gray-100">
-        <code>{`1. Helm Chart Defaults        (from chart repository)
-       |  overridden by
-2. global-values.yaml          (shared defaults for all clusters)
-       |  overridden by
-3. Cluster-specific values     (per-cluster overrides file)
-       |  overridden by
-4. ApplicationSet Parameters   (highest precedence)`}</code>
-      </pre>
-
-      <h2 className="mb-3 mt-8 text-2xl font-semibold text-gray-900 dark:text-white">
-        What the Diff Viewer Shows
-      </h2>
-      <p className="mb-4 text-gray-700 dark:text-gray-300">
-        The Config Overrides tab on each cluster detail page shows a
-        side-by-side comparison for every addon. On the left you see the
-        global default values, on the right the cluster-specific overrides.
-        Addons marked "Uses defaults" have no per-cluster customization.
-        Addons marked "Custom overrides" have cluster-specific values that
-        differ from or extend the global configuration.
-      </p>
-
-      <h2 className="mb-3 mt-8 text-2xl font-semibold text-gray-900 dark:text-white">
-        Per-Cluster Values
-      </h2>
-      <p className="mb-2 text-gray-700 dark:text-gray-300">
-        Each cluster has a single values file at{' '}
-        <code className="rounded bg-gray-100 px-1.5 py-0.5 text-sm dark:bg-gray-800">
-          configuration/addons-clusters-values/&lt;cluster&gt;.yaml
-        </code>
-        . Each root key corresponds to an addon:
-      </p>
-      <pre className="mb-6 overflow-x-auto rounded-lg bg-gray-900 p-4 text-sm text-gray-100">
-        <code>{`clusterGlobalValues:
-  env: &env dev
-  clusterName: &clusterName my-cluster
-
-datadog:
-  clusterAgent:
-    resources:
-      limits:
-        memory: 1Gi
-
-external-secrets:
-  serviceAccount:
-    annotations:
-      eks.amazonaws.com/role-arn: "arn:aws:iam::12345:role/ESO-Role"`}</code>
-      </pre>
-
-      <h2 className="mb-3 mt-8 text-2xl font-semibold text-gray-900 dark:text-white">
-        YAML Anchors
-      </h2>
-      <p className="mb-2 text-gray-700 dark:text-gray-300">
-        Use YAML anchors in{' '}
-        <code className="rounded bg-gray-100 px-1.5 py-0.5 text-sm dark:bg-gray-800">
-          clusterGlobalValues
-        </code>{' '}
-        to avoid duplication across addon sections:
-      </p>
-      <pre className="mb-6 overflow-x-auto rounded-lg bg-gray-900 p-4 text-sm text-gray-100">
-        <code>{`clusterGlobalValues:
-  clusterName: &clusterName my-cluster
-  region: &region eu-west-1
-
-datadog:
-  clusterName: *clusterName     # Resolves to: my-cluster
-
-anodot:
-  config:
-    clusterRegion: *region      # Resolves to: eu-west-1`}</code>
-      </pre>
-    </div>
-  )
-}
-
-function TroubleshootingContent() {
-  return (
-    <div className="doc-content">
-      <h1 className="mb-6 text-3xl font-bold text-gray-900 dark:text-white">
-        Troubleshooting
-      </h1>
-
-      <h2 className="mb-3 mt-6 text-2xl font-semibold text-gray-900 dark:text-white">
-        Dashboard Shows No Data
-      </h2>
-      <ul className="mb-4 list-disc space-y-2 pl-6 text-gray-700 dark:text-gray-300">
-        <li>
-          Check the Settings page to verify your connection is active and the
-          API Health indicator is green.
-        </li>
-        <li>
-          Make sure the Git repository and ArgoCD server URLs are correct in
-          your active connection.
-        </li>
-        <li>
-          If the API Health shows "Unreachable", the backend server may not be
-          running.
-        </li>
-      </ul>
-
-      <h2 className="mb-3 mt-8 text-2xl font-semibold text-gray-900 dark:text-white">
-        Addon Shows "Not Deployed"
-      </h2>
-      <ul className="mb-4 list-disc space-y-2 pl-6 text-gray-700 dark:text-gray-300">
-        <li>
-          The addon is enabled in Git but no ArgoCD Application was found.
-          Check that ArgoCD has synced the ApplicationSet.
-        </li>
-        <li>
-          Verify the cluster has the correct label (e.g.,{' '}
-          <code className="rounded bg-gray-100 px-1.5 py-0.5 text-sm dark:bg-gray-800">
-            datadog: enabled
-          </code>
-          ) in{' '}
-          <code className="rounded bg-gray-100 px-1.5 py-0.5 text-sm dark:bg-gray-800">
-            cluster-addons.yaml
-          </code>.
-        </li>
-        <li>
-          Ensure the cluster values file exists at{' '}
-          <code className="rounded bg-gray-100 px-1.5 py-0.5 text-sm dark:bg-gray-800">
-            configuration/addons-clusters-values/&lt;cluster&gt;.yaml
-          </code>.
-        </li>
-      </ul>
-
-      <h2 className="mb-3 mt-8 text-2xl font-semibold text-gray-900 dark:text-white">
-        Version Drift Detected
-      </h2>
-      <ul className="mb-4 list-disc space-y-2 pl-6 text-gray-700 dark:text-gray-300">
-        <li>
-          The Version Matrix highlights cells in amber when the deployed version
-          differs from the catalog version.
-        </li>
-        <li>
-          Check whether the cluster has a version override label (e.g.,{' '}
-          <code className="rounded bg-gray-100 px-1.5 py-0.5 text-sm dark:bg-gray-800">
-            datadog-version: "3.70.7"
-          </code>
-          ). Intentional overrides are expected drift.
-        </li>
-        <li>
-          If the drift is unintentional, check the ArgoCD Application sync
-          status for the affected cluster.
-        </li>
-      </ul>
-
-      <h2 className="mb-3 mt-8 text-2xl font-semibold text-gray-900 dark:text-white">
-        Cluster Shows "Failed" Connection
-      </h2>
-      <ul className="mb-4 list-disc space-y-2 pl-6 text-gray-700 dark:text-gray-300">
-        <li>
-          This status comes from ArgoCD. The cluster may be unreachable due to
-          network issues or expired credentials.
-        </li>
-        <li>
-          Check the ArgoCD UI or CLI for more details on the connection failure.
-        </li>
-      </ul>
-
-      <h2 className="mb-3 mt-8 text-2xl font-semibold text-gray-900 dark:text-white">
-        Config Overrides Not Loading
-      </h2>
-      <ul className="mb-4 list-disc space-y-2 pl-6 text-gray-700 dark:text-gray-300">
-        <li>
-          The Config Overrides tab loads data separately. If it shows an error,
-          the backend may not have access to the Git repository.
-        </li>
-        <li>
-          Check that the Git token in your connection settings has read access
-          to the configuration directory.
-        </li>
-      </ul>
-    </div>
-  )
-}
-
-/* ------------------------------------------------------------------ */
-/*  Doc pages registry                                                 */
-/* ------------------------------------------------------------------ */
-
-const docPages: DocPage[] = [
-  { id: 'overview', title: 'Overview', icon: Info, content: <OverviewContent /> },
-  { id: 'features', title: 'Features', icon: Monitor, content: <FeaturesContent /> },
-  { id: 'managing-addons', title: 'Managing Addons', icon: Package, content: <ManagingAddonsContent /> },
-  { id: 'values-guide', title: 'Values Guide', icon: FileText, content: <ValuesGuideContent /> },
-  { id: 'troubleshooting', title: 'Troubleshooting', icon: Bug, content: <TroubleshootingContent /> },
-]
-
-/* ------------------------------------------------------------------ */
-/*  Main Docs view                                                     */
-/* ------------------------------------------------------------------ */
 
 export function Docs() {
-  const [activePageId, setActivePageId] = useState(docPages[0].id)
-  const activePage = docPages.find((p) => p.id === activePageId) ?? docPages[0]
+  const [pages, setPages] = useState<DocEntry[]>([])
+  const [activeSlug, setActiveSlug] = useState<string>('')
+  const [content, setContent] = useState<string>('')
+  const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
+  const [allContent, setAllContent] = useState<Map<string, string>>(new Map())
+
+  // Load page list
+  useEffect(() => {
+    api.docsList().then((list) => {
+      setPages(list)
+      if (list.length > 0 && !activeSlug) {
+        setActiveSlug(list[0].slug)
+      }
+    }).catch(() => {}).finally(() => setLoading(false))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Load content when page changes
+  const loadContent = useCallback(async (slug: string) => {
+    if (allContent.has(slug)) {
+      setContent(allContent.get(slug) || '')
+      return
+    }
+    try {
+      const doc: DocContent = await api.docsGet(slug)
+      setContent(doc.content)
+      setAllContent(prev => new Map(prev).set(slug, doc.content))
+    } catch {
+      setContent('# Not Found\n\nThis document could not be loaded.')
+    }
+  }, [allContent])
+
+  useEffect(() => {
+    if (activeSlug) {
+      void loadContent(activeSlug)
+    }
+  }, [activeSlug, loadContent])
+
+  // Pre-load all docs for search
+  useEffect(() => {
+    if (pages.length === 0) return
+    pages.forEach(p => {
+      if (!allContent.has(p.slug)) {
+        api.docsGet(p.slug).then((doc: DocContent) => {
+          setAllContent(prev => new Map(prev).set(p.slug, doc.content))
+        }).catch(() => {})
+      }
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pages])
+
+  // Search results
+  const searchResults = useMemo(() => {
+    if (!search.trim()) return null
+    const term = search.toLowerCase()
+    const results: { slug: string; title: string; snippet: string }[] = []
+    for (const page of pages) {
+      const text = allContent.get(page.slug) || ''
+      const idx = text.toLowerCase().indexOf(term)
+      if (idx >= 0) {
+        const start = Math.max(0, idx - 40)
+        const end = Math.min(text.length, idx + term.length + 80)
+        let snippet = text.slice(start, end).replace(/\n/g, ' ')
+        if (start > 0) snippet = '...' + snippet
+        if (end < text.length) snippet = snippet + '...'
+        results.push({ slug: page.slug, title: page.title, snippet })
+      }
+    }
+    return results
+  }, [search, pages, allContent])
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20 text-gray-500">
+        Loading documentation...
+      </div>
+    )
+  }
 
   return (
     <div>
@@ -480,23 +106,60 @@ export function Docs() {
       </div>
 
       <div className="flex gap-6">
-        {/* Left sidebar navigation */}
-        <nav className="w-56 shrink-0">
+        {/* Left sidebar */}
+        <nav className="w-56 shrink-0 space-y-4">
+          {/* Search */}
+          <div className="relative">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search docs..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full rounded-lg border border-gray-200 bg-white py-2 pl-9 pr-3 text-sm text-gray-900 placeholder-gray-400 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+            />
+          </div>
+
+          {/* Search results */}
+          {searchResults && (
+            <div className="rounded-lg border border-cyan-200 bg-cyan-50 p-3 dark:border-cyan-800 dark:bg-cyan-900/20">
+              <p className="mb-2 text-xs font-medium text-cyan-700 dark:text-cyan-400">
+                {searchResults.length} result{searchResults.length !== 1 ? 's' : ''}
+              </p>
+              {searchResults.length === 0 ? (
+                <p className="text-xs text-gray-500">No matches found.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {searchResults.map((r) => (
+                    <li key={r.slug}>
+                      <button
+                        onClick={() => { setActiveSlug(r.slug); setSearch('') }}
+                        className="block w-full text-left"
+                      >
+                        <span className="text-xs font-medium text-cyan-700 dark:text-cyan-400">{r.title}</span>
+                        <span className="block truncate text-xs text-gray-500">{r.snippet}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+
+          {/* Page navigation */}
           <ul className="space-y-1">
-            {docPages.map((page) => {
-              const isActive = page.id === activePageId
+            {pages.map((page) => {
+              const isActive = page.slug === activeSlug
               return (
-                <li key={page.id}>
+                <li key={page.slug}>
                   <button
-                    onClick={() => setActivePageId(page.id)}
+                    onClick={() => { setActiveSlug(page.slug); setSearch('') }}
                     className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors ${
                       isActive
                         ? 'bg-cyan-50 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400'
                         : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200'
                     }`}
-                    data-testid={`doc-nav-${page.id}`}
                   >
-                    <page.icon className="h-4 w-4 shrink-0" />
                     <span>{page.title}</span>
                   </button>
                 </li>
@@ -507,7 +170,9 @@ export function Docs() {
 
         {/* Right content area */}
         <div className="min-w-0 flex-1 rounded-xl border border-gray-200 bg-white p-8 shadow-sm dark:border-gray-700 dark:bg-gray-900">
-          <div className="max-w-none">{activePage.content}</div>
+          <article className="prose prose-gray max-w-none dark:prose-invert prose-headings:text-gray-900 dark:prose-headings:text-white prose-a:text-cyan-600 dark:prose-a:text-cyan-400 prose-code:rounded prose-code:bg-gray-100 prose-code:px-1.5 prose-code:py-0.5 prose-code:text-sm dark:prose-code:bg-gray-800 prose-pre:bg-gray-900 prose-pre:text-gray-100">
+            <Markdown remarkPlugins={[remarkGfm]}>{content}</Markdown>
+          </article>
         </div>
       </div>
     </div>

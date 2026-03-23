@@ -170,6 +170,10 @@ func NewRouter(srv *Server, staticFS fs.FS) http.Handler {
 	mux.HandleFunc("GET /api/v1/migration/{id}/explain", srv.handleMigrationExplain)
 	mux.HandleFunc("DELETE /api/v1/migration/{id}", srv.handleDeleteMigration)
 
+	// Documentation
+	mux.HandleFunc("GET /api/v1/docs/list", srv.handleDocsList)
+	mux.HandleFunc("GET /api/v1/docs/{slug}", srv.handleDocsGet)
+
 	// Cluster info
 	mux.HandleFunc("GET /api/v1/cluster/nodes", srv.handleGetNodeInfo)
 
