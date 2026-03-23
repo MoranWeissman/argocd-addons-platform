@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.38.0](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.37.1...v1.38.0) (2026-03-23)
+
+
+### Features
+
+* detect already-migrated addons, skip migration early ([#179](https://github.com/MoranWeissman/argocd-addons-platform/issues/179)) ([54a1cb0](https://github.com/MoranWeissman/argocd-addons-platform/commit/54a1cb0923fd39f3c0781f6934e25f7842453a92))
+
 ## [1.37.1](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.37.0...v1.37.1) (2026-03-23)
 
 
