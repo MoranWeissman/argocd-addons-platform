@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.35.3](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.35.2...v1.35.3) (2026-03-23)
+
+
+### Bug Fixes
+
+* reduce file content truncation from 4000 to 2000 chars to lower token usage ([141f94d](https://github.com/MoranWeissman/argocd-addons-platform/commit/141f94d05f4e650ac70014044e1140f069e72804))
+
 ## [1.35.2](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.35.1...v1.35.2) (2026-03-23)
 
 
