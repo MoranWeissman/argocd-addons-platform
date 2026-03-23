@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.37.0](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.36.4...v1.37.0) (2026-03-23)
+
+
+### Features
+
+* explain blocked steps + Ask AI button ([#175](https://github.com/MoranWeissman/argocd-addons-platform/issues/175)) ([4b7c651](https://github.com/MoranWeissman/argocd-addons-platform/commit/4b7c651edd0f4bb4c74a9f642b8172607c02e207))
+
 ## [1.36.4](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.36.3...v1.36.4) (2026-03-23)
 
 
