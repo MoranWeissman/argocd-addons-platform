@@ -172,11 +172,26 @@ export const api = {
   oldRepoAddons: () => fetchJSON<string[]>('/migration/old-repo/addons'),
   oldRepoClusters: () => fetchJSON<string[]>('/migration/old-repo/clusters'),
   oldRepoClusterAddons: (cluster: string) => fetchJSON<ClusterAddonInfo[]>(`/migration/old-repo/cluster-addons?cluster=${encodeURIComponent(cluster)}`),
+  startBatch: (data: { addons: string[]; cluster_name: string; mode: string }) =>
+    postJSON<MigrationBatch>('/migration/start-batch', data),
+  getActiveBatch: () => fetchJSON<MigrationBatch | null>('/migration/batch'),
 }
 
 export interface ClusterAddonInfo {
   name: string
   already_migrated: boolean
+}
+
+export interface MigrationBatch {
+  id: string
+  cluster_name: string
+  mode: string
+  addons: string[]
+  migration_ids: string[]
+  current_index: number
+  status: string
+  created_at: string
+  updated_at: string
 }
 
 // Migration types

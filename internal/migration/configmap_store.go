@@ -150,6 +150,60 @@ func (cs *ConfigMapStore) HasActiveMigration(ctx context.Context) (bool, string,
 	return false, "", nil
 }
 
+const batchCMPrefix = "aap-batch-"
+const batchLabel = "migration-batch"
+
+// SaveBatch stores a migration batch in a ConfigMap.
+func (cs *ConfigMapStore) SaveBatch(ctx context.Context, b *MigrationBatch) error {
+	data, err := json.Marshal(b)
+	if err != nil {
+		return err
+	}
+	cm := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      batchCMPrefix + b.ID,
+			Namespace: cs.namespace,
+			Labels: map[string]string{
+				"app.kubernetes.io/managed-by": "aap",
+				cmLabel:                        batchLabel,
+			},
+		},
+		Data: map[string]string{"batch.json": string(data)},
+	}
+	_, err = cs.client.CoreV1().ConfigMaps(cs.namespace).Update(ctx, cm, metav1.UpdateOptions{})
+	if err != nil {
+		_, err = cs.client.CoreV1().ConfigMaps(cs.namespace).Create(ctx, cm, metav1.CreateOptions{})
+	}
+	return err
+}
+
+// GetBatch loads a batch by ID.
+func (cs *ConfigMapStore) GetBatch(ctx context.Context, id string) (*MigrationBatch, error) {
+	cm, err := cs.client.CoreV1().ConfigMaps(cs.namespace).Get(ctx, batchCMPrefix+id, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+	var b MigrationBatch
+	return &b, json.Unmarshal([]byte(cm.Data["batch.json"]), &b)
+}
+
+// GetActiveBatch returns the running batch, if any.
+func (cs *ConfigMapStore) GetActiveBatch(ctx context.Context) (*MigrationBatch, error) {
+	cmList, err := cs.client.CoreV1().ConfigMaps(cs.namespace).List(ctx, metav1.ListOptions{
+		LabelSelector: cmLabel + "=" + batchLabel,
+	})
+	if err != nil {
+		return nil, nil
+	}
+	for _, cm := range cmList.Items {
+		var b MigrationBatch
+		if json.Unmarshal([]byte(cm.Data["batch.json"]), &b) == nil && b.Status == "running" {
+			return &b, nil
+		}
+	}
+	return nil, nil
+}
+
 // isK8sAvailable checks if this store was initialized.
 func isK8sConfigMapAvailable(cs *ConfigMapStore) bool {
 	return cs != nil
