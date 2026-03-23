@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.39.0](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.38.1...v1.39.0) (2026-03-23)
+
+
+### Features
+
+* sequential batch migration for entire cluster ([#183](https://github.com/MoranWeissman/argocd-addons-platform/issues/183)) ([ef9c4e9](https://github.com/MoranWeissman/argocd-addons-platform/commit/ef9c4e9db0acf01e595b266c1830cbda0621cc00))
+
 ## [1.38.1](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.38.0...v1.38.1) (2026-03-23)
 
 
