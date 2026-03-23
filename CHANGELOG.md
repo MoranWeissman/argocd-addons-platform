@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.40.1](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.40.0...v1.40.1) (2026-03-23)
+
+
+### Bug Fixes
+
+* move fixed migration routes before wildcard {id} routes ([#193](https://github.com/MoranWeissman/argocd-addons-platform/issues/193)) ([f95c71d](https://github.com/MoranWeissman/argocd-addons-platform/commit/f95c71def7b4f524a50f70c0cae4913ab0f81ff7))
+
 ## [1.40.0](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.39.2...v1.40.0) (2026-03-23)
 
 
