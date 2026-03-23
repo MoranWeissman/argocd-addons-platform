@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.34.0](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.33.2...v1.34.0) (2026-03-23)
+
+
+### Features
+
+* add Delete button to migration detail page ([b15951f](https://github.com/MoranWeissman/argocd-addons-platform/commit/b15951fa727a3497803291cdee19b06f28bcf147))
+
 ## [1.33.2](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.33.1...v1.33.2) (2026-03-23)
 
 
