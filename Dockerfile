@@ -11,6 +11,8 @@ FROM golang:1.25.8-alpine AS go-build
 WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
+# CACHE_BUST invalidates the layer cache when source changes (set to git SHA in CI)
+ARG CACHE_BUST=dev
 COPY cmd/ cmd/
 COPY internal/ internal/
 RUN CGO_ENABLED=0 go build -o aap-server ./cmd/aap-server
