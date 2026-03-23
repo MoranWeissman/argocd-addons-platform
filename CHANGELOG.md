@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.34.1](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.34.0...v1.34.1) (2026-03-23)
+
+
+### Bug Fixes
+
+* increase agent max output tokens from 1024 to 4096 ([2bfce69](https://github.com/MoranWeissman/argocd-addons-platform/commit/2bfce697b3aad62cbfbb05eb91f80b76b89fc5ac))
+
 ## [1.34.0](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.33.2...v1.34.0) (2026-03-23)
 
 
