@@ -174,7 +174,7 @@ export const api = {
   oldRepoClusterAddons: (cluster: string) => fetchJSON<ClusterAddonInfo[]>(`/migration/old-repo/cluster-addons?cluster=${encodeURIComponent(cluster)}`),
   startBatch: (data: { addons: string[]; cluster_name: string; mode: string }) =>
     postJSON<MigrationBatch>('/migration/start-batch', data),
-  getActiveBatch: () => fetchJSON<MigrationBatch | null>('/migration/batch'),
+  getActiveBatch: () => fetchJSON<MigrationBatch | null>('/migration/batch-active'),
 }
 
 export interface ClusterAddonInfo {
