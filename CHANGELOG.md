@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.36.4](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.36.3...v1.36.4) (2026-03-23)
+
+
+### Bug Fixes
+
+* skip PR creation when addon already enabled/disabled ([#173](https://github.com/MoranWeissman/argocd-addons-platform/issues/173)) ([36dba2f](https://github.com/MoranWeissman/argocd-addons-platform/commit/36dba2f906fd29b7ba182cd769ab1b04ea95e65d))
+
 ## [1.36.3](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.36.2...v1.36.3) (2026-03-23)
 
 
