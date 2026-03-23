@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.36.2](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.36.1...v1.36.2) (2026-03-23)
+
+
+### Bug Fixes
+
+* safe find/replace for PR file edits, prevent file truncation overwrites ([#169](https://github.com/MoranWeissman/argocd-addons-platform/issues/169)) ([959b04c](https://github.com/MoranWeissman/argocd-addons-platform/commit/959b04caf2f53fff4a3ca156d6de32e1add5ab25))
+
 ## [1.36.1](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.36.0...v1.36.1) (2026-03-23)
 
 
