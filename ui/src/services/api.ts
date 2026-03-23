@@ -171,7 +171,12 @@ export const api = {
   azureListRepos: (org: string, project: string, pat: string) => fetchJSON<string[]>(`/migration/azure/repos?org=${encodeURIComponent(org)}&project=${encodeURIComponent(project)}&pat=${encodeURIComponent(pat)}`),
   oldRepoAddons: () => fetchJSON<string[]>('/migration/old-repo/addons'),
   oldRepoClusters: () => fetchJSON<string[]>('/migration/old-repo/clusters'),
-  oldRepoClusterAddons: (cluster: string) => fetchJSON<string[]>(`/migration/old-repo/cluster-addons?cluster=${encodeURIComponent(cluster)}`),
+  oldRepoClusterAddons: (cluster: string) => fetchJSON<ClusterAddonInfo[]>(`/migration/old-repo/cluster-addons?cluster=${encodeURIComponent(cluster)}`),
+}
+
+export interface ClusterAddonInfo {
+  name: string
+  already_migrated: boolean
 }
 
 // Migration types

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Loader2 } from 'lucide-react'
 import { api } from '@/services/api'
-import type { Migration } from '@/services/api'
+import type { Migration, ClusterAddonInfo } from '@/services/api'
 import { Button } from '@/components/ui/button'
 import { SearchableSelect } from '@/components/SearchableSelect'
 import {
@@ -32,7 +32,7 @@ export function NewMigrationDialog({ open, onOpenChange, onStarted }: NewMigrati
   // Data from OLD repo
   const [addons, setAddons] = useState<string[]>([])
   const [clusters, setClusters] = useState<string[]>([])
-  const [clusterAddons, setClusterAddons] = useState<string[]>([])
+  const [clusterAddons, setClusterAddons] = useState<ClusterAddonInfo[]>([])
   const [loadingAddons, setLoadingAddons] = useState(false)
   const [loadingClusters, setLoadingClusters] = useState(false)
   const [loadingClusterAddons, setLoadingClusterAddons] = useState(false)
@@ -73,7 +73,8 @@ export function NewMigrationDialog({ open, onOpenChange, onStarted }: NewMigrati
       try {
         const enabled = await api.oldRepoClusterAddons(cluster)
         setClusterAddons(enabled)
-        setSelectedAddons(enabled) // auto-select all for cluster migration
+        // Auto-select only non-migrated addons
+        setSelectedAddons(enabled.filter(a => !a.already_migrated).map(a => a.name))
       } catch {
         // ignore — user can still proceed
       } finally {
@@ -271,7 +272,7 @@ export function NewMigrationDialog({ open, onOpenChange, onStarted }: NewMigrati
           {scope === 'cluster' && clusterName && (
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Enabled Addons on {clusterName} ({clusterAddons.length} total)
+                Addons on {clusterName} ({clusterAddons.filter(a => !a.already_migrated).length} to migrate, {clusterAddons.filter(a => a.already_migrated).length} already migrated)
               </label>
               {loadingClusterAddons ? (
                 <div className="flex items-center gap-2 p-2 text-sm text-gray-500">
@@ -285,11 +286,18 @@ export function NewMigrationDialog({ open, onOpenChange, onStarted }: NewMigrati
                 <div className="max-h-48 overflow-auto rounded-lg border border-gray-200 p-2 dark:border-gray-700">
                   {clusterAddons.map((addon) => (
                     <div
-                      key={addon}
+                      key={addon.name}
                       className="flex items-center gap-2 rounded px-2 py-1.5 text-sm"
                     >
-                      <div className="h-2 w-2 rounded-full bg-green-500" />
-                      <span className="text-gray-700 dark:text-gray-300">{addon}</span>
+                      <div className={`h-2 w-2 rounded-full ${addon.already_migrated ? 'bg-blue-500' : 'bg-green-500'}`} />
+                      <span className={addon.already_migrated ? 'text-gray-400 dark:text-gray-500' : 'text-gray-700 dark:text-gray-300'}>
+                        {addon.name}
+                      </span>
+                      {addon.already_migrated && (
+                        <span className="rounded bg-blue-100 px-1.5 py-0.5 text-xs text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
+                          already migrated
+                        </span>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -305,7 +313,7 @@ export function NewMigrationDialog({ open, onOpenChange, onStarted }: NewMigrati
           <Button onClick={handleStart} disabled={!canStart}>
             {loading && <Loader2 className="h-4 w-4 animate-spin" />}
             {scope === 'cluster'
-              ? `Migrate ${clusterAddons.length} Addons`
+              ? `Migrate ${clusterAddons.filter(a => !a.already_migrated).length} Addons`
               : scope === 'multiple'
                 ? `Migrate ${selectedAddons.length} Addon${selectedAddons.length !== 1 ? 's' : ''}`
                 : 'Start Migration'}
