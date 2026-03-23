@@ -160,6 +160,15 @@ func (e *Executor) stepEnableAddon(ctx context.Context, m *Migration) error {
 		return fmt.Errorf("reading cluster-addons.yaml from NEW repo: %w", err)
 	}
 
+	// Check if addon is already enabled — skip PR creation if so
+	if isAddonAlreadySet(data, m.ClusterName, m.AddonName, "enabled") {
+		e.addLog(m, 3, e.newRepoLabel(), "completed", fmt.Sprintf("Addon %s is already enabled for cluster %s — skipping PR", m.AddonName, m.ClusterName))
+		step := &m.Steps[2]
+		step.Message = fmt.Sprintf("Addon %s already enabled on %s — no changes needed", m.AddonName, m.ClusterName)
+		_ = e.store.SaveMigration(m)
+		return nil
+	}
+
 	e.addLog(m, 3, e.newRepoLabel(), "modifying", fmt.Sprintf("Setting %s: enabled for cluster %s", m.AddonName, m.ClusterName))
 
 	updated, err := gitops.EnableAddonLabel(data, m.ClusterName, m.AddonName)
@@ -234,6 +243,15 @@ func (e *Executor) stepDisableAddonOld(ctx context.Context, m *Migration) error 
 		if err != nil {
 			return fmt.Errorf("reading cluster file from OLD repo (tried V2 and V1 paths): %w", err)
 		}
+	}
+
+	// Check if addon is already disabled — skip PR creation if so
+	if isAddonAlreadySet(data, m.ClusterName, m.AddonName, "disabled") {
+		e.addLog(m, 5, e.oldRepoLabel(), "completed", fmt.Sprintf("Addon %s is already disabled for cluster %s in OLD repo — skipping PR", m.AddonName, m.ClusterName))
+		step := &m.Steps[4]
+		step.Message = fmt.Sprintf("Addon %s already disabled on %s in OLD repo — no changes needed", m.AddonName, m.ClusterName)
+		_ = e.store.SaveMigration(m)
+		return nil
 	}
 
 	e.addLog(m, 5, e.oldRepoLabel(), "modifying", fmt.Sprintf("Setting %s: disabled for cluster %s", m.AddonName, m.ClusterName))
@@ -536,6 +554,47 @@ func leadingSpaces(s string) int {
 func sanitize(s string) string {
 	re := regexp.MustCompile(`[^a-zA-Z0-9-]`)
 	return re.ReplaceAllString(s, "-")
+}
+
+// isAddonAlreadySet checks if the addon label already has the given value
+// (enabled/disabled) for the specified cluster in a cluster-addons.yaml file.
+func isAddonAlreadySet(data []byte, clusterName, addonName, value string) bool {
+	lines := strings.Split(string(data), "\n")
+
+	// Find the cluster block
+	inCluster := false
+	inLabels := false
+	clusterIndent := 0
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "- name: "+clusterName {
+			inCluster = true
+			clusterIndent = len(line) - len(strings.TrimLeft(line, " "))
+			continue
+		}
+		if inCluster && !inLabels {
+			if strings.HasPrefix(trimmed, "- name:") && len(line)-len(strings.TrimLeft(line, " ")) <= clusterIndent {
+				return false // next cluster, addon not found
+			}
+			if strings.HasPrefix(trimmed, "labels:") {
+				inLabels = true
+				continue
+			}
+		}
+		if inCluster && inLabels {
+			if trimmed == "" || (strings.HasPrefix(trimmed, "- name:") && len(line)-len(strings.TrimLeft(line, " ")) <= clusterIndent) {
+				return false // left labels block
+			}
+			if strings.HasPrefix(trimmed, "#") {
+				continue
+			}
+			// Check for "addonName: value"
+			if strings.TrimSpace(line) == addonName+": "+value {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // truncate shortens s to at most maxLen characters, appending an ellipsis
