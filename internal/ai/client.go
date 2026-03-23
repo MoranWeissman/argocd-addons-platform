@@ -443,7 +443,7 @@ func (c *Client) chatClaude(ctx context.Context, messages []ChatMessage, tools [
 
 	reqBody := map[string]interface{}{
 		"model":      c.config.GetAgentModel(),
-		"max_tokens": 1024,
+		"max_tokens": 4096,
 		"system":     sysPrompt,
 		"messages":   claudeMessages,
 		"tools":      claudeTools,
@@ -611,7 +611,7 @@ func (c *Client) chatGemini(ctx context.Context, messages []ChatMessage, tools [
 		},
 		"generationConfig": map[string]interface{}{
 			"temperature":     0.3,
-			"maxOutputTokens": 1024,
+			"maxOutputTokens": 4096,
 		},
 	}
 
