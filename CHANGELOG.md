@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.36.1](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.36.0...v1.36.1) (2026-03-23)
+
+
+### Bug Fixes
+
+* allow 6000 chars for config files (catalog, cluster-addons, clusters) ([1a70c6f](https://github.com/MoranWeissman/argocd-addons-platform/commit/1a70c6f6dac6534293f0d00c73cb23ea83d8a45a))
+
 ## [1.36.0](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.35.4...v1.36.0) (2026-03-23)
 
 
