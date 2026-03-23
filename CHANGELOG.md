@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.33.2](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.33.1...v1.33.2) (2026-03-23)
+
+
+### Bug Fixes
+
+* prevent agent from claiming success without acting ([07a44c4](https://github.com/MoranWeissman/argocd-addons-platform/commit/07a44c4cd387e7738fb2b35cc3d33b8c9089b963))
+
 ## [1.33.1](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.33.0...v1.33.1) (2026-03-22)
 
 
