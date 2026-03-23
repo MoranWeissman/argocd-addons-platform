@@ -166,6 +166,7 @@ export const api = {
   cancelMigration: (id: string) => postJSON<void>(`/migration/${id}/cancel`),
   mergeMigrationPR: (id: string, step: number) => postJSON<{ status: string }>(`/migration/${id}/merge-pr`, { step }),
   migrationChat: (id: string, message: string) => postJSON<{ response: string }>(`/migration/${id}/chat`, { message }),
+  rollbackMigration: (id: string) => postJSON<Migration>(`/migration/${id}/rollback`),
   deleteMigration: (id: string) => deleteJSON<void>(`/migration/${id}`),
   azureListProjects: (org: string, pat: string) => fetchJSON<string[]>(`/migration/azure/projects?org=${encodeURIComponent(org)}&pat=${encodeURIComponent(pat)}`),
   azureListRepos: (org: string, project: string, pat: string) => fetchJSON<string[]>(`/migration/azure/repos?org=${encodeURIComponent(org)}&project=${encodeURIComponent(project)}&pat=${encodeURIComponent(pat)}`),

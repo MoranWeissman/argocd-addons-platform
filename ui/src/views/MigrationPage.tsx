@@ -2,9 +2,10 @@ import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus, GitPullRequest, Play } from 'lucide-react'
 import { api } from '@/services/api'
-import type { Migration } from '@/services/api'
+import type { Migration, MigrationBatch } from '@/services/api'
 import { MigrationSettings } from '@/components/MigrationSettings'
 import { NewMigrationDialog } from '@/components/NewMigrationDialog'
+import { BatchProgress } from '@/components/BatchProgress'
 import { StatusBadge } from '@/components/StatusBadge'
 import { LoadingState } from '@/components/LoadingState'
 import { ErrorState } from '@/components/ErrorState'
@@ -17,12 +18,17 @@ export default function MigrationPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [activeBatch, setActiveBatch] = useState<MigrationBatch | null>(null)
 
   const fetchMigrations = useCallback(async () => {
     try {
       setError(null)
-      const data = await api.listMigrations()
+      const [data, batch] = await Promise.all([
+        api.listMigrations(),
+        api.getActiveBatch().catch(() => null),
+      ])
       setMigrations(data ?? [])
+      setActiveBatch(batch)
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Failed to load migrations')
     } finally {
@@ -85,6 +91,11 @@ export default function MigrationPage() {
 
       {/* Settings */}
       <MigrationSettings onConfigured={() => setConfigured(true)} />
+
+      {/* Batch Progress */}
+      {activeBatch && activeBatch.status === 'running' && (
+        <BatchProgress batch={activeBatch} onUpdate={setActiveBatch} />
+      )}
 
       {/* Migrations List */}
       <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">

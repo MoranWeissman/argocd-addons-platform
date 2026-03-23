@@ -338,6 +338,29 @@ func (s *Server) handleCancelMigration(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, m)
 }
 
+// handleRollbackMigration reverses completed PR steps of a failed migration.
+func (s *Server) handleRollbackMigration(w http.ResponseWriter, r *http.Request) {
+	if s.migrationExecutor == nil {
+		writeError(w, http.StatusServiceUnavailable, "migration service not configured")
+		return
+	}
+	id := r.PathValue("id")
+	if id == "" {
+		writeError(w, http.StatusBadRequest, "migration id is required")
+		return
+	}
+	if err := s.resolveExecutorProviders(); err != nil {
+		writeError(w, http.StatusServiceUnavailable, err.Error())
+		return
+	}
+	if err := s.migrationExecutor.RollbackMigration(r.Context(), id); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	m, _ := s.migrationExecutor.GetStore().GetMigration(id)
+	writeJSON(w, http.StatusOK, m)
+}
+
 // handleDeleteMigration removes a migration session.
 func (s *Server) handleDeleteMigration(w http.ResponseWriter, r *http.Request) {
 	if s.migrationExecutor == nil {

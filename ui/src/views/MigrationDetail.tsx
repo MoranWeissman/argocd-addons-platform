@@ -139,6 +139,10 @@ export default function MigrationDetail() {
     if (!id || !confirm('Delete this migration? This cannot be undone.')) return
     try { await api.deleteMigration(id); navigate('/migration') } catch { /* ignore */ }
   }
+  const handleRollback = async () => {
+    if (!id || !confirm('Rollback this migration? This will create PRs to reverse the changes.')) return
+    try { await api.rollbackMigration(id); void fetchMigration() } catch { /* poll */ }
+  }
 
   if (loading) return <LoadingState message="Loading migration details..." />
   if (error) return <ErrorState message={error} onRetry={fetchMigration} />
@@ -183,6 +187,12 @@ export default function MigrationDetail() {
             <Button size="sm" onClick={handleContinue}
               className="bg-green-600 hover:bg-green-700 text-white">
               Resume
+            </Button>
+          )}
+          {migration.status === 'failed' && (
+            <Button variant="outline" size="sm" onClick={handleRollback}
+              className="border-amber-300 text-amber-600 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400">
+              Rollback
             </Button>
           )}
           {!isRunning && (
