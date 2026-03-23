@@ -179,8 +179,8 @@ func (e *MigrationToolExecutor) execGitReadFile(ctx context.Context, args json.R
 	}
 	// Truncate large files
 	content := string(data)
-	if len(content) > 4000 {
-		content = content[:4000] + "\n... (truncated, file is " + fmt.Sprintf("%d", len(data)) + " bytes)"
+	if len(content) > 2000 {
+		content = content[:2000] + "\n... (truncated, file is " + fmt.Sprintf("%d", len(data)) + " bytes)"
 	}
 	return content, nil
 }
