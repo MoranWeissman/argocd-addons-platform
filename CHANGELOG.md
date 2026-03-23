@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.36.3](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.36.2...v1.36.3) (2026-03-23)
+
+
+### Bug Fixes
+
+* restore deterministic pipeline, AI only for error diagnosis ([#171](https://github.com/MoranWeissman/argocd-addons-platform/issues/171)) ([98e9b1a](https://github.com/MoranWeissman/argocd-addons-platform/commit/98e9b1a9d230cbcf5a92e29cc0c7a59227ed73ab))
+
 ## [1.36.2](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.36.1...v1.36.2) (2026-03-23)
 
 
