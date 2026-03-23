@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.37.1](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.37.0...v1.37.1) (2026-03-23)
+
+
+### Bug Fixes
+
+* restore auto-merge option in YOLO mode ([#177](https://github.com/MoranWeissman/argocd-addons-platform/issues/177)) ([997fadc](https://github.com/MoranWeissman/argocd-addons-platform/commit/997fadc00b9aeef2c68c65d21b85e8eb56eb78ba))
+
 ## [1.37.0](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.36.4...v1.37.0) (2026-03-23)
 
 
