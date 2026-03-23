@@ -496,14 +496,33 @@ func (e *Executor) createPRWithLog(
 		step.PRRepo = "old"
 	}
 
-	e.addLog(m, stepNum, repoLabel, "waiting", fmt.Sprintf("PR #%d created — please review and merge: %s", pr.ID, pr.URL))
-	step.PRStatus = "open"
-	step.Status = StepWaiting
-	step.Message = fmt.Sprintf("PR #%d created — please review and merge: %s", pr.ID, pr.URL)
+	// In YOLO mode, try to auto-merge. In gates mode, wait for user.
+	if m.Mode == "yolo" {
+		e.addLog(m, stepNum, repoLabel, "merging", fmt.Sprintf("YOLO mode — auto-merging PR #%d...", pr.ID))
+		if mergeErr := gp.MergePullRequest(ctx, pr.ID); mergeErr != nil {
+			e.addLog(m, stepNum, repoLabel, "warning", fmt.Sprintf("Auto-merge failed: %s — waiting for manual merge", mergeErr.Error()))
+			step.PRStatus = "open"
+			step.Status = StepWaiting
+			step.Message = fmt.Sprintf("PR #%d created but auto-merge failed — please merge manually: %s", pr.ID, pr.URL)
+		} else {
+			e.addLog(m, stepNum, repoLabel, "completed", fmt.Sprintf("PR #%d auto-merged", pr.ID))
+			step.PRStatus = "merged"
+			step.Status = StepCompleted
+			step.CompletedAt = now()
+			step.Message = fmt.Sprintf("PR #%d auto-merged: %s", pr.ID, pr.URL)
+			_ = e.store.SaveMigration(m)
+			return nil
+		}
+	} else {
+		e.addLog(m, stepNum, repoLabel, "waiting", fmt.Sprintf("PR #%d created — please review and merge: %s", pr.ID, pr.URL))
+		step.PRStatus = "open"
+		step.Status = StepWaiting
+		step.Message = fmt.Sprintf("PR #%d created — please review and merge: %s", pr.ID, pr.URL)
+	}
 
 	// Set a helpful message on the next step explaining why it's blocked
-	if stepNum < len(m.Steps) {
-		nextStep := &m.Steps[stepNum] // stepNum is 1-based, slice is 0-based, so m.Steps[stepNum] = next step
+	if step.Status == StepWaiting && stepNum < len(m.Steps) {
+		nextStep := &m.Steps[stepNum]
 		nextStep.Message = fmt.Sprintf("Waiting for step %d PR to be merged before this step can start", stepNum)
 	}
 
