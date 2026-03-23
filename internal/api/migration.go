@@ -671,7 +671,14 @@ func (s *Server) handleOldRepoClusters(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, clusters)
 }
 
-// handleOldRepoClusterAddons fetches enabled addons for a specific cluster.
+// clusterAddonInfo describes an addon's migration status for a specific cluster.
+type clusterAddonInfo struct {
+	Name            string `json:"name"`
+	AlreadyMigrated bool   `json:"already_migrated"` // true if enabled in NEW repo for this cluster
+}
+
+// handleOldRepoClusterAddons fetches enabled addons for a specific cluster,
+// cross-referencing with the NEW repo to flag already-migrated ones.
 func (s *Server) handleOldRepoClusterAddons(w http.ResponseWriter, r *http.Request) {
 	if s.migrationExecutor == nil {
 		writeError(w, http.StatusServiceUnavailable, "migration service not configured")
@@ -707,7 +714,30 @@ func (s *Server) handleOldRepoClusterAddons(w http.ResponseWriter, r *http.Reque
 	if enabledAddons == nil {
 		enabledAddons = []string{}
 	}
-	writeJSON(w, http.StatusOK, enabledAddons)
+
+	// Cross-reference with NEW repo to find already-migrated addons
+	newEnabledAddons := map[string]bool{}
+	if err := s.resolveExecutorProviders(); err == nil {
+		newGP := s.migrationExecutor.GetNewGP()
+		if newGP != nil {
+			newData, newErr := newGP.GetFileContent(r.Context(), "configuration/cluster-addons.yaml", "main")
+			if newErr == nil {
+				for _, a := range parseEnabledAddonsForCluster(newData, clusterName) {
+					newEnabledAddons[a] = true
+				}
+			}
+		}
+	}
+
+	result := make([]clusterAddonInfo, 0, len(enabledAddons))
+	for _, addon := range enabledAddons {
+		result = append(result, clusterAddonInfo{
+			Name:            addon,
+			AlreadyMigrated: newEnabledAddons[addon],
+		})
+	}
+
+	writeJSON(w, http.StatusOK, result)
 }
 
 // parseAddonNames extracts appName values from V2 addons-catalog.yaml

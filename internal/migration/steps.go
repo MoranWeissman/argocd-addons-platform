@@ -40,8 +40,10 @@ func (e *Executor) executeStep(ctx context.Context, m *Migration, stepNum int) e
 }
 
 // Step 1: Verify addon exists in addons-catalog.yaml with inMigration: true.
+// Also checks if the addon is already enabled on this cluster — if so, stops early.
 func (e *Executor) stepVerifyCatalog(ctx context.Context, m *Migration) error {
 	const catalogPath = "configuration/addons-catalog.yaml"
+	const clusterAddonsPath = "configuration/cluster-addons.yaml"
 
 	e.addLog(m, 1, e.newRepoLabel(), "reading", "Reading addon catalog...")
 
@@ -61,9 +63,35 @@ func (e *Executor) stepVerifyCatalog(ctx context.Context, m *Migration) error {
 
 	// Check inMigration flag.
 	if !strings.Contains(content, "inMigration: true") {
-		// The flag might not be near our addon; do a more targeted check.
-		// For now, a simple heuristic: find the addon block and check nearby lines.
 		slog.Warn("migration: inMigration flag not found globally, checking addon block", "addon", m.AddonName)
+	}
+
+	// Check if addon is already enabled for this cluster in NEW repo
+	e.addLog(m, 1, e.newRepoLabel(), "reading", "Checking if addon is already enabled in NEW repo...")
+	clusterData, clusterErr := e.newGP.GetFileContent(ctx, clusterAddonsPath, "main")
+	if clusterErr == nil && isAddonAlreadySet(clusterData, m.ClusterName, m.AddonName, "enabled") {
+		// Already migrated — check if app exists in NEW ArgoCD too
+		appName := fmt.Sprintf("%s-%s", m.AddonName, m.ClusterName)
+		_, appErr := e.newArgoCD.GetApplication(ctx, appName)
+		if appErr == nil {
+			// Addon is enabled AND app exists in NEW ArgoCD — already migrated
+			e.addLog(m, 1, e.newRepoLabel(), "completed",
+				fmt.Sprintf("Addon %q is already enabled for cluster %q in NEW repo and app exists in NEW ArgoCD — already migrated", m.AddonName, m.ClusterName))
+
+			step := &m.Steps[0]
+			step.Message = fmt.Sprintf("Addon %q is already migrated for cluster %q — enabled in NEW repo and running in NEW ArgoCD", m.AddonName, m.ClusterName)
+			m.Status = StatusCompleted
+			m.CompletedAt = now()
+			m.UpdatedAt = now()
+			for i := range m.Steps {
+				m.Steps[i].Status = StepSkipped
+				m.Steps[i].Message = "Skipped — addon already migrated"
+			}
+			m.Steps[0].Status = StepCompleted
+			m.Steps[0].CompletedAt = now()
+			_ = e.store.SaveMigration(m)
+			return fmt.Errorf("ALREADY_MIGRATED: addon %q is already migrated for cluster %q", m.AddonName, m.ClusterName)
+		}
 	}
 
 	e.addLog(m, 1, e.newRepoLabel(), "completed", fmt.Sprintf("Addon %q found in catalog with inMigration: true", m.AddonName))

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strings"
 	"sync"
 	"time"
 
@@ -61,6 +62,11 @@ func (e *Executor) SetNewProviders(gp gitprovider.GitProvider, ac *argocd.Client
 	defer e.mu.Unlock()
 	e.newGP = gp
 	e.newArgoCD = ac
+}
+
+// GetNewGP returns the new (target) git provider.
+func (e *Executor) GetNewGP() gitprovider.GitProvider {
+	return e.newGP
 }
 
 // GetStore returns the underlying migration store.
@@ -183,6 +189,13 @@ func (e *Executor) RunSteps(ctx context.Context, migrationID string) {
 
 		if stepErr != nil {
 			rawErr := stepErr.Error()
+
+			// Special case: addon already migrated — not a failure
+			if strings.HasPrefix(rawErr, "ALREADY_MIGRATED:") {
+				slog.Info("migration: addon already migrated", "id", migrationID)
+				return // migration already set to completed by the step
+			}
+
 			slog.Error("migration: step failed", "id", migrationID, "step", m.CurrentStep, "error", rawErr)
 
 			// Ask AI to diagnose the error in human-friendly language
