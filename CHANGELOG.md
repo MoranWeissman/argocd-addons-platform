@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.35.1](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.35.0...v1.35.1) (2026-03-23)
+
+
+### Bug Fixes
+
+* load only 1 skill per step to avoid prompt overload ([c4ad5f4](https://github.com/MoranWeissman/argocd-addons-platform/commit/c4ad5f449473a648e395ec33f073c5bcf0f7f8cd))
+
 ## [1.35.0](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.34.1...v1.35.0) (2026-03-23)
 
 
