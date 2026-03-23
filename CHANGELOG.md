@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.35.0](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.34.1...v1.35.0) (2026-03-23)
+
+
+### Features
+
+* add 8 operational skill files for migration agent ([41f6c39](https://github.com/MoranWeissman/argocd-addons-platform/commit/41f6c39b8b6ec2afd8ce726cc97ab76cb787f252))
+
+
+### Bug Fixes
+
+* include agent skills in build ([be25060](https://github.com/MoranWeissman/argocd-addons-platform/commit/be25060364dcbb202806e14bfd745825b897c0e0))
+
 ## [1.34.1](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.34.0...v1.34.1) (2026-03-23)
 
 
