@@ -416,6 +416,76 @@ func (s *Server) handleMigrationChat(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"response": response})
 }
 
+// --- Migration Explain (AI explains current state) ---
+
+func (s *Server) handleMigrationExplain(w http.ResponseWriter, r *http.Request) {
+	if s.migrationExecutor == nil {
+		writeError(w, http.StatusServiceUnavailable, "migration service not configured")
+		return
+	}
+	id := r.PathValue("id")
+	if id == "" {
+		writeError(w, http.StatusBadRequest, "migration id is required")
+		return
+	}
+
+	m, err := s.migrationExecutor.GetStore().GetMigration(id)
+	if err != nil || m == nil {
+		writeError(w, http.StatusNotFound, "migration not found")
+		return
+	}
+
+	// Build a concise state summary for the AI
+	var stepsSummary string
+	for _, s := range m.Steps {
+		line := fmt.Sprintf("Step %d (%s): %s", s.Number, s.Title, string(s.Status))
+		if s.Message != "" {
+			line += " — " + s.Message
+		}
+		if s.Error != "" {
+			line += " [error: " + s.Error + "]"
+		}
+		stepsSummary += line + "\n"
+	}
+
+	prompt := fmt.Sprintf(
+		"Migration for addon %q on cluster %q. Status: %s. Current step: %d.\n\nStep details:\n%s\nExplain in 2-3 sentences what's happening and what the user should do next.",
+		m.AddonName, m.ClusterName, string(m.Status), m.CurrentStep, stepsSummary)
+
+	explanation, aiErr := s.migrationExecutor.AIExplain(r.Context(), prompt)
+	if aiErr != nil {
+		// Fallback: provide a non-AI explanation based on state
+		explanation = buildStateExplanation(m)
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"explanation": explanation})
+}
+
+// buildStateExplanation provides a deterministic explanation when AI is unavailable.
+func buildStateExplanation(m *migration.Migration) string {
+	switch m.Status {
+	case migration.StatusWaiting:
+		for _, s := range m.Steps {
+			if s.Status == migration.StepWaiting && s.PRURL != "" {
+				return fmt.Sprintf("Migration is waiting for you to review and merge the PR from step %d: %s. After merging, click Continue to proceed.", s.Number, s.PRURL)
+			}
+		}
+		return "Migration is waiting for user action. Check the current step for details."
+	case migration.StatusGated:
+		return fmt.Sprintf("Step %d completed. Migration is paused in gates mode — click Approve to continue to the next step.", m.CurrentStep)
+	case migration.StatusFailed:
+		return fmt.Sprintf("Step %d failed: %s. You can click Retry to try again or check the logs for details.", m.CurrentStep, m.Error)
+	case migration.StatusPaused:
+		return fmt.Sprintf("Migration was paused at step %d. Click Resume to continue.", m.CurrentStep)
+	case migration.StatusCompleted:
+		return "Migration completed successfully."
+	case migration.StatusRunning:
+		return fmt.Sprintf("Step %d is currently running.", m.CurrentStep)
+	default:
+		return fmt.Sprintf("Migration status: %s", string(m.Status))
+	}
+}
+
 // --- Azure DevOps Discovery ---
 
 func (s *Server) handleAzureListProjects(w http.ResponseWriter, r *http.Request) {

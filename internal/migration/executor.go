@@ -420,6 +420,11 @@ func (e *Executor) CreateTroubleshootAgent(m *Migration) *MigrationAgent {
 	)
 }
 
+// AIExplain asks the AI provider to explain the current migration state.
+func (e *Executor) AIExplain(ctx context.Context, prompt string) (string, error) {
+	return e.aiEvaluate(ctx, "Migration State", prompt)
+}
+
 // aiEvaluate asks the AI provider for a brief assessment of a migration step.
 // If AI is not configured, it returns a neutral message.
 func (e *Executor) aiEvaluate(ctx context.Context, stepTitle, prompt string) (string, error) {

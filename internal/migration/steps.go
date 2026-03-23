@@ -501,6 +501,12 @@ func (e *Executor) createPRWithLog(
 	step.Status = StepWaiting
 	step.Message = fmt.Sprintf("PR #%d created — please review and merge: %s", pr.ID, pr.URL)
 
+	// Set a helpful message on the next step explaining why it's blocked
+	if stepNum < len(m.Steps) {
+		nextStep := &m.Steps[stepNum] // stepNum is 1-based, slice is 0-based, so m.Steps[stepNum] = next step
+		nextStep.Message = fmt.Sprintf("Waiting for step %d PR to be merged before this step can start", stepNum)
+	}
+
 	_ = e.store.SaveMigration(m)
 	return nil
 }

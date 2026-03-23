@@ -102,6 +102,7 @@ export default function MigrationDetail() {
   const [chatting, setChatting] = useState(false)
   const [mergeError, setMergeError] = useState<string | null>(null)
   const [merging, setMerging] = useState(false)
+  const [explanation, setExplanation] = useState<string | null>(null)
   const handleMergePR = async (step: number) => {
     if (!id) return
     setMerging(true)
@@ -212,7 +213,7 @@ export default function MigrationDetail() {
             return (
               <button
                 key={step.number}
-                onClick={() => setSelectedStep(step.number)}
+                onClick={() => { setSelectedStep(step.number); setExplanation(null); }}
                 className={cn(
                   'flex w-full items-center gap-2.5 border-b border-gray-100 px-3 py-2.5 text-left transition-colors dark:border-gray-800',
                   isSelected
@@ -373,9 +374,28 @@ export default function MigrationDetail() {
               {/* Log entries */}
               <div ref={logEndRef} className="flex-1 overflow-y-auto bg-gray-950 p-3 font-mono text-xs">
                 {stepLogs.length === 0 ? (
-                  <p className="py-8 text-center text-gray-600">
-                    {activeStep.status === 'pending' ? 'Step not started yet' : 'Waiting for activity...'}
-                  </p>
+                  <div className="py-8 text-center">
+                    <p className="text-gray-600">
+                      {activeStep.message || (activeStep.status === 'pending' ? 'Step not started yet' : 'Waiting for activity...')}
+                    </p>
+                    {activeStep.status === 'pending' && activeStep.message && (
+                      <button
+                        onClick={async () => {
+                          try {
+                            const res = await fetch(`/api/v1/migration/${migration.id}/explain`);
+                            const data = await res.json();
+                            setExplanation(data.explanation);
+                          } catch { setExplanation('Could not get explanation'); }
+                        }}
+                        className="mt-3 rounded bg-violet-600 px-3 py-1 text-xs text-white hover:bg-violet-500"
+                      >
+                        Ask AI — Why is this step waiting?
+                      </button>
+                    )}
+                    {explanation && (
+                      <p className="mt-2 rounded bg-violet-900/30 p-2 text-left text-xs text-violet-300">{explanation}</p>
+                    )}
+                  </div>
                 ) : (
                   stepLogs.map((log, i) => (
                     <div key={i} className="flex gap-2 py-0.5 leading-5">
