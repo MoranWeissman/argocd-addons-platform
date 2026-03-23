@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.39.1](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.39.0...v1.39.1) (2026-03-23)
+
+
+### Bug Fixes
+
+* resolve route conflict between batch and explain endpoints ([#185](https://github.com/MoranWeissman/argocd-addons-platform/issues/185)) ([af733ff](https://github.com/MoranWeissman/argocd-addons-platform/commit/af733ff530d68958692a7358cdc82eef3267eb09))
+
 ## [1.39.0](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.38.1...v1.39.0) (2026-03-23)
 
 
