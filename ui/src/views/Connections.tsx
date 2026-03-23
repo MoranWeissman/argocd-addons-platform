@@ -676,6 +676,13 @@ function AIConfigSection() {
   const [formTestMsg, setFormTestMsg] = useState('')
   const [saving, setSaving] = useState(false)
 
+  const providerModels: Record<string, string[]> = {
+    gemini: ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash', 'gemini-1.5-pro'],
+    claude: ['claude-sonnet-4-20250514', 'claude-haiku-4-5-20251001', 'claude-opus-4-20250514'],
+    openai: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'o3-mini'],
+    ollama: ['llama3.2', 'llama3.1:8b', 'qwen2.5', 'mistral', 'llama3.1:70b'],
+    'custom-openai': [],
+  }
   const defaultModels: Record<string, string> = {
     gemini: 'gemini-2.5-flash',
     claude: 'claude-sonnet-4-20250514',
@@ -861,8 +868,16 @@ function AIConfigSection() {
             )}
             <div>
               <label className={labelCls}>Model</label>
-              <input className={inputCls} value={formModel} onChange={(e) => { setFormModel(e.target.value); setFormTestStatus('idle') }}
-                placeholder={defaultModels[formProvider] || 'model name'} />
+              {providerModels[formProvider]?.length > 0 ? (
+                <select className={selectCls} value={formModel} onChange={(e) => { setFormModel(e.target.value); setFormTestStatus('idle') }}>
+                  {providerModels[formProvider].map(m => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+              ) : (
+                <input className={inputCls} value={formModel} onChange={(e) => { setFormModel(e.target.value); setFormTestStatus('idle') }}
+                  placeholder="model name" />
+              )}
             </div>
             {formProvider === 'ollama' && (
               <div>
