@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.41.0](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.40.2...v1.41.0) (2026-03-23)
+
+
+### Features
+
+* documentation overhaul — markdown files, rendered in UI, readable on GitHub ([#197](https://github.com/MoranWeissman/argocd-addons-platform/issues/197)) ([4e1df5b](https://github.com/MoranWeissman/argocd-addons-platform/commit/4e1df5b7b3f1158c52172064be0c078a99be9b6a))
+
 ## [1.40.2](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.40.1...v1.40.2) (2026-03-23)
 
 
