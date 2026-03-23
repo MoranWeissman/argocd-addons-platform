@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/moran/argocd-addons-platform/internal/ai"
 	"github.com/moran/argocd-addons-platform/internal/argocd"
@@ -179,8 +180,13 @@ func (e *MigrationToolExecutor) execGitReadFile(ctx context.Context, args json.R
 	}
 	// Truncate large files
 	content := string(data)
-	if len(content) > 2000 {
-		content = content[:2000] + "\n... (truncated, file is " + fmt.Sprintf("%d", len(data)) + " bytes)"
+	// Truncate large files, but allow more for config files the agent needs to search
+	maxLen := 2000
+	if strings.Contains(p.Path, "catalog") || strings.Contains(p.Path, "cluster-addons") || strings.Contains(p.Path, "clusters.yaml") {
+		maxLen = 6000 // config files need full content for searching
+	}
+	if len(content) > maxLen {
+		content = content[:maxLen] + "\n... (truncated, file is " + fmt.Sprintf("%d", len(data)) + " bytes)"
 	}
 	return content, nil
 }
