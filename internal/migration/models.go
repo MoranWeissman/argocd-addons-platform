@@ -74,6 +74,19 @@ type Migration struct {
 	Error       string          `json:"error,omitempty"`
 }
 
+// MigrationBatch represents a sequential queue of addon migrations for a cluster.
+type MigrationBatch struct {
+	ID          string   `json:"id"`
+	ClusterName string   `json:"cluster_name"`
+	Mode        string   `json:"mode"`
+	Addons      []string `json:"addons"`       // all addons in order
+	MigrationIDs []string `json:"migration_ids"` // corresponding migration IDs
+	CurrentIndex int      `json:"current_index"` // which addon is currently running (0-based)
+	Status      string   `json:"status"`        // "running", "completed", "failed", "cancelled"
+	CreatedAt   string   `json:"created_at"`
+	UpdatedAt   string   `json:"updated_at"`
+}
+
 // MigrationSettings holds the configuration for connecting to the old
 // (source) Git repository and ArgoCD instance during migration.
 type MigrationSettings struct {

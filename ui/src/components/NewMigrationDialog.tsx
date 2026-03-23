@@ -103,14 +103,25 @@ export function NewMigrationDialog({ open, onOpenChange, onStarted }: NewMigrati
     setError(null)
 
     try {
-      // Start migration for each selected addon
-      // For now, start one at a time — first addon
-      const migration = await api.startMigration({
-        addon_name: selectedAddons[0],
-        cluster_name: clusterName,
-        mode: mode,
-      })
-      onStarted(migration)
+      if (scope === 'cluster' && selectedAddons.length > 1) {
+        // Batch mode: sequential queue for all selected addons
+        const batch = await api.startBatch({
+          addons: selectedAddons,
+          cluster_name: clusterName,
+          mode: mode,
+        })
+        // Navigate to the first migration in the batch
+        const firstMigration = await api.getMigration(batch.migration_ids[0])
+        onStarted(firstMigration)
+      } else {
+        // Single addon
+        const migration = await api.startMigration({
+          addon_name: selectedAddons[0],
+          cluster_name: clusterName,
+          mode: mode,
+        })
+        onStarted(migration)
+      }
       // Reset state
       setScope('single')
       setMode('gates')

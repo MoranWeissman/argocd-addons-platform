@@ -182,6 +182,77 @@ func (s *Server) handleStartMigration(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, m)
 }
 
+// handleStartBatch starts a sequential batch migration for multiple addons.
+func (s *Server) handleStartBatch(w http.ResponseWriter, r *http.Request) {
+	if s.migrationExecutor == nil {
+		writeError(w, http.StatusServiceUnavailable, "migration service not configured")
+		return
+	}
+	var req struct {
+		Addons      []string `json:"addons"`
+		ClusterName string   `json:"cluster_name"`
+		Mode        string   `json:"mode"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if len(req.Addons) == 0 || req.ClusterName == "" {
+		writeError(w, http.StatusBadRequest, "addons and cluster_name are required")
+		return
+	}
+	if req.Mode == "" {
+		req.Mode = "gates"
+	}
+
+	hasActive, activeID, err := s.migrationExecutor.GetStore().HasActiveMigration()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if hasActive {
+		writeError(w, http.StatusConflict, fmt.Sprintf("an active migration already exists: %s", activeID))
+		return
+	}
+
+	if err := s.resolveExecutorProviders(); err != nil {
+		writeError(w, http.StatusServiceUnavailable, err.Error())
+		return
+	}
+
+	batch, err := s.migrationExecutor.StartBatch(context.Background(), req.Addons, req.ClusterName, req.Mode)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, batch)
+}
+
+// handleGetBatch returns the active batch status.
+func (s *Server) handleGetBatch(w http.ResponseWriter, r *http.Request) {
+	if s.migrationExecutor == nil {
+		writeError(w, http.StatusServiceUnavailable, "migration service not configured")
+		return
+	}
+	id := r.PathValue("id")
+	if id != "" {
+		batch, err := s.migrationExecutor.GetBatch(id)
+		if err != nil {
+			writeError(w, http.StatusNotFound, "batch not found")
+			return
+		}
+		writeJSON(w, http.StatusOK, batch)
+		return
+	}
+	// No ID — return active batch
+	batch, _ := s.migrationExecutor.GetActiveBatch()
+	if batch == nil {
+		writeJSON(w, http.StatusOK, nil)
+		return
+	}
+	writeJSON(w, http.StatusOK, batch)
+}
+
 // --- Migration actions ---
 
 func (s *Server) handleContinueMigration(w http.ResponseWriter, r *http.Request) {

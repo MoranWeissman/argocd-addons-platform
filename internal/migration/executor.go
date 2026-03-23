@@ -419,6 +419,151 @@ func (e *Executor) CancelMigration(migrationID string) error {
 	return e.store.SaveMigration(m)
 }
 
+// StartBatch creates a sequential queue of migrations for multiple addons.
+// Only the first addon starts running; the rest are created as pending.
+func (e *Executor) StartBatch(ctx context.Context, addons []string, clusterName, mode string) (*MigrationBatch, error) {
+	batch := &MigrationBatch{
+		ID:          fmt.Sprintf("batch-%d", time.Now().Unix()),
+		ClusterName: clusterName,
+		Mode:        mode,
+		Addons:      addons,
+		MigrationIDs: make([]string, len(addons)),
+		CurrentIndex: 0,
+		Status:      "running",
+		CreatedAt:   now(),
+		UpdatedAt:   now(),
+	}
+
+	// Create all migrations as pending
+	for i, addon := range addons {
+		m := NewMigration(addon, clusterName, mode)
+		if i == 0 {
+			m.Status = StatusRunning
+		}
+		if err := e.store.SaveMigration(m); err != nil {
+			return nil, fmt.Errorf("saving migration for %s: %w", addon, err)
+		}
+		batch.MigrationIDs[i] = m.ID
+	}
+
+	if err := e.store.SaveBatch(batch); err != nil {
+		return nil, fmt.Errorf("saving batch: %w", err)
+	}
+
+	// Start the first migration
+	first, _ := e.store.GetMigration(batch.MigrationIDs[0])
+	if first != nil {
+		runCtx, cancel := context.WithCancel(ctx)
+		e.mu.Lock()
+		e.running[first.ID] = cancel
+		e.mu.Unlock()
+
+		go func() {
+			defer cancel()
+			defer func() {
+				e.mu.Lock()
+				delete(e.running, first.ID)
+				e.mu.Unlock()
+			}()
+			defer func() {
+				if r := recover(); r != nil {
+					slog.Error("migration: panic in batch step execution", "id", first.ID, "panic", r)
+				}
+			}()
+			e.RunSteps(runCtx, first.ID)
+			// After first migration completes, advance the batch
+			e.advanceBatch(ctx, batch.ID)
+		}()
+	}
+
+	return batch, nil
+}
+
+// advanceBatch checks if the current migration in the batch is done and starts the next one.
+func (e *Executor) advanceBatch(ctx context.Context, batchID string) {
+	for {
+		batch, err := e.store.GetBatch(batchID)
+		if err != nil || batch == nil || batch.Status != "running" {
+			return
+		}
+
+		// Check current migration status
+		currentID := batch.MigrationIDs[batch.CurrentIndex]
+		m, err := e.store.GetMigration(currentID)
+		if err != nil {
+			return
+		}
+
+		// If current migration is still active, stop — it will call advanceBatch when done
+		if m.Status == StatusRunning || m.Status == StatusWaiting || m.Status == StatusPaused || m.Status == StatusGated {
+			return
+		}
+
+		// Current migration finished (completed, failed, or cancelled)
+		slog.Info("batch: migration finished", "batch", batchID, "addon", m.AddonName, "status", m.Status)
+
+		// Move to next addon
+		batch.CurrentIndex++
+		batch.UpdatedAt = now()
+
+		if batch.CurrentIndex >= len(batch.Addons) {
+			// All addons done
+			batch.Status = "completed"
+			_ = e.store.SaveBatch(batch)
+			slog.Info("batch: all migrations completed", "batch", batchID)
+			return
+		}
+
+		_ = e.store.SaveBatch(batch)
+
+		// Start next migration
+		nextID := batch.MigrationIDs[batch.CurrentIndex]
+		next, err := e.store.GetMigration(nextID)
+		if err != nil || next == nil {
+			batch.Status = "failed"
+			_ = e.store.SaveBatch(batch)
+			return
+		}
+
+		next.Status = StatusRunning
+		next.UpdatedAt = now()
+		_ = e.store.SaveMigration(next)
+
+		slog.Info("batch: starting next migration", "batch", batchID, "addon", next.AddonName, "index", batch.CurrentIndex)
+
+		runCtx, cancel := context.WithCancel(ctx)
+		e.mu.Lock()
+		e.running[next.ID] = cancel
+		e.mu.Unlock()
+
+		func() {
+			defer cancel()
+			defer func() {
+				e.mu.Lock()
+				delete(e.running, next.ID)
+				e.mu.Unlock()
+			}()
+			defer func() {
+				if r := recover(); r != nil {
+					slog.Error("migration: panic in batch step", "id", next.ID, "panic", r)
+				}
+			}()
+			e.RunSteps(runCtx, next.ID)
+		}()
+		// Loop back to check if this one also completed (e.g., already migrated)
+	}
+}
+
+// GetBatch returns a batch by ID.
+func (e *Executor) GetBatch(batchID string) (*MigrationBatch, error) {
+	return e.store.GetBatch(batchID)
+}
+
+// GetActiveBatch returns the currently running batch, if any.
+func (e *Executor) GetActiveBatch() (*MigrationBatch, error) {
+	return e.store.GetActiveBatch()
+}
+
 // CreateTroubleshootAgent creates a read-only agent for troubleshooting chat.
 func (e *Executor) CreateTroubleshootAgent(m *Migration) *MigrationAgent {
 	return NewMigrationAgent(

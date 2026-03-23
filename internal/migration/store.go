@@ -119,6 +119,57 @@ func (s *Store) HasActiveMigration() (bool, string, error) {
 	return false, "", nil
 }
 
+// SaveBatch persists a migration batch.
+func (s *Store) SaveBatch(b *MigrationBatch) error {
+	if s.cmStore != nil {
+		return s.cmStore.SaveBatch(context.Background(), b)
+	}
+	data, err := json.MarshalIndent(b, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(s.dataDir, "batch-"+b.ID+".json"), data, 0o644)
+}
+
+// GetBatch loads a batch by ID.
+func (s *Store) GetBatch(id string) (*MigrationBatch, error) {
+	if s.cmStore != nil {
+		return s.cmStore.GetBatch(context.Background(), id)
+	}
+	data, err := os.ReadFile(filepath.Join(s.dataDir, "batch-"+id+".json"))
+	if err != nil {
+		return nil, err
+	}
+	var b MigrationBatch
+	return &b, json.Unmarshal(data, &b)
+}
+
+// GetActiveBatch returns the currently running batch, if any.
+func (s *Store) GetActiveBatch() (*MigrationBatch, error) {
+	// Simple: scan all batches for one that's running
+	if s.cmStore != nil {
+		return s.cmStore.GetActiveBatch(context.Background())
+	}
+	entries, err := os.ReadDir(s.dataDir)
+	if err != nil {
+		return nil, nil
+	}
+	for _, e := range entries {
+		if !strings.HasPrefix(e.Name(), "batch-") || !strings.HasSuffix(e.Name(), ".json") {
+			continue
+		}
+		data, err := os.ReadFile(filepath.Join(s.dataDir, e.Name()))
+		if err != nil {
+			continue
+		}
+		var b MigrationBatch
+		if json.Unmarshal(data, &b) == nil && b.Status == "running" {
+			return &b, nil
+		}
+	}
+	return nil, nil
+}
+
 // SaveSettings persists credentials. Uses K8s Secret in-cluster, file locally.
 func (s *Store) SaveSettings(settings *MigrationSettings) error {
 	if s.secretStore != nil {
