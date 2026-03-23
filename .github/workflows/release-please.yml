@@ -60,6 +60,8 @@ jobs:
           context: .
           push: true
           platforms: linux/amd64
+          build-args: |
+            CACHE_BUST=${{ github.sha }}
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.release-please.outputs.version }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
