@@ -246,8 +246,9 @@ REQUIRED ACTIONS:
 REQUIRED ACTIONS:
 1. Read global values for "%s" from both "new" and "old" repos
 2. Read cluster values for "%s" from both repos
-3. Compare and report differences
-4. This step is advisory — differences don't block migration. Respond SUCCESS with your comparison.`, a.addonName, a.clusterName)
+3. Use the log tool to write your comparison findings (do NOT put everything in the final response)
+4. Keep your final SUCCESS response SHORT (1-2 sentences). The details should already be in the logs.
+5. This step is advisory — differences don't block migration.`, a.addonName, a.clusterName)
 	case 3:
 		specific = fmt.Sprintf(`
 REQUIRED ACTIONS — YOU MUST CREATE A PULL REQUEST:
