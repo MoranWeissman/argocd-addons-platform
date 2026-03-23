@@ -85,6 +85,7 @@ func (s *Server) SetAIConfigStore(store *config.AIConfigStore) {
 // NewRouter builds the HTTP router with all API routes and static file serving.
 // staticFS can be nil if no static files are available (e.g., dev mode).
 func NewRouter(srv *Server, staticFS fs.FS) http.Handler {
+	startSessionCleanup()
 	mux := http.NewServeMux()
 
 	// Health
@@ -201,11 +202,22 @@ func NewRouter(srv *Server, staticFS fs.FS) http.Handler {
 
 	// Wrap with middleware
 	var handler http.Handler = mux
+	handler = maxBodySize(handler, 1<<20) // 1MB request body limit
 	handler = srv.basicAuthMiddleware(handler)
 	handler = corsMiddleware(handler)
 	handler = loggingMiddleware(handler)
 
 	return handler
+}
+
+// maxBodySize limits request body size to prevent OOM from large payloads.
+func maxBodySize(next http.Handler, maxBytes int64) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Body != nil {
+			r.Body = http.MaxBytesReader(w, r.Body, maxBytes)
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 // --- Login rate limiter ---
@@ -279,7 +291,27 @@ var (
 	activeSessions   = make(map[string]time.Time) // token -> expiry
 	sessionsMu       sync.RWMutex
 	sessionLifetime  = 24 * time.Hour
+	sessionCleanOnce sync.Once
 )
+
+func startSessionCleanup() {
+	sessionCleanOnce.Do(func() {
+		go func() {
+			ticker := time.NewTicker(1 * time.Hour)
+			defer ticker.Stop()
+			for range ticker.C {
+				sessionsMu.Lock()
+				now := time.Now()
+				for token, expiry := range activeSessions {
+					if now.After(expiry) {
+						delete(activeSessions, token)
+					}
+				}
+				sessionsMu.Unlock()
+			}
+		}()
+	})
+}
 
 func generateToken() string {
 	b := make([]byte, 32)
@@ -507,4 +539,4 @@ func writeJSON(w http.ResponseWriter, status int, data interface{}) {
 func writeError(w http.ResponseWriter, status int, message string) {
 	writeJSON(w, status, map[string]string{"error": message})
 }
-// force rebuild
+// v1.39.3 route fix
