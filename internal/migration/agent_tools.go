@@ -47,8 +47,8 @@ func GetMigrationToolDefinitions() []ai.ToolDefinition {
 			`{"type":"object","properties":{"repo":{"type":"string","enum":["new","old"],"description":"Which repo"},"pr_number":{"type":"integer","description":"Pull request number"}},"required":["repo","pr_number"]}`),
 
 		// Git — Write
-		toolDef("git_create_pr", "Create a branch, modify a file, and open a pull request",
-			`{"type":"object","properties":{"repo":{"type":"string","enum":["new","old"],"description":"Which repo"},"file_path":{"type":"string","description":"Path to the file to modify"},"content":{"type":"string","description":"New file content"},"branch_name":{"type":"string","description":"Branch name to create"},"commit_message":{"type":"string","description":"Commit message"},"pr_title":{"type":"string","description":"PR title"},"pr_body":{"type":"string","description":"PR description"}},"required":["repo","file_path","content","branch_name","commit_message","pr_title","pr_body"]}`),
+		toolDef("git_create_pr", "Create a branch, apply a find/replace edit to a file, and open a pull request. The backend reads the FULL file, applies your edit, and commits — so the rest of the file is preserved safely.",
+			`{"type":"object","properties":{"repo":{"type":"string","enum":["new","old"],"description":"Which repo"},"file_path":{"type":"string","description":"Path to the file to modify"},"find":{"type":"string","description":"Exact text to find in the file (must match uniquely)"},"replace":{"type":"string","description":"Text to replace it with"},"branch_name":{"type":"string","description":"Branch name to create"},"commit_message":{"type":"string","description":"Commit message"},"pr_title":{"type":"string","description":"PR title"},"pr_body":{"type":"string","description":"PR description"}},"required":["repo","file_path","find","replace","branch_name","commit_message","pr_title","pr_body"]}`),
 		toolDef("git_merge_pr", "Approve and merge a pull request",
 			`{"type":"object","properties":{"repo":{"type":"string","enum":["new","old"],"description":"Which repo"},"pr_number":{"type":"integer","description":"Pull request number"}},"required":["repo","pr_number"]}`),
 
@@ -270,7 +270,9 @@ func (e *MigrationToolExecutor) execGitCreatePR(ctx context.Context, args json.R
 	var p struct {
 		Repo          string `json:"repo"`
 		FilePath      string `json:"file_path"`
-		Content       string `json:"content"`
+		Find          string `json:"find"`
+		Replace       string `json:"replace"`
+		Content       string `json:"content"` // legacy: full file content (deprecated, unsafe)
 		BranchName    string `json:"branch_name"`
 		CommitMessage string `json:"commit_message"`
 		PRTitle       string `json:"pr_title"`
@@ -284,12 +286,41 @@ func (e *MigrationToolExecutor) execGitCreatePR(ctx context.Context, args json.R
 		return "", err
 	}
 
+	// Determine final file content using find/replace (safe) or legacy full content
+	var finalContent []byte
+	if p.Find != "" {
+		// SAFE PATH: Read the full file from repo, apply find/replace
+		e.logFn(repoLabel(p.Repo), "reading", fmt.Sprintf("Reading full file %s for editing...", p.FilePath))
+		fullFile, err := gp.GetFileContent(ctx, p.FilePath, "main")
+		if err != nil {
+			return "", fmt.Errorf("reading file for edit: %w", err)
+		}
+		original := string(fullFile)
+		if !strings.Contains(original, p.Find) {
+			return "", fmt.Errorf("find/replace failed: the exact text to find was not found in %s — the file may have changed, please re-read it", p.FilePath)
+		}
+		count := strings.Count(original, p.Find)
+		if count > 1 {
+			return "", fmt.Errorf("find/replace failed: found %d matches for the search text in %s — provide a more specific/unique search string", count, p.FilePath)
+		}
+		modified := strings.Replace(original, p.Find, p.Replace, 1)
+		finalContent = []byte(modified)
+		e.logFn(repoLabel(p.Repo), "editing", fmt.Sprintf("Applied find/replace edit to %s (%d bytes → %d bytes)", p.FilePath, len(original), len(modified)))
+	} else if p.Content != "" {
+		// LEGACY PATH: Full file content from agent (unsafe — may be truncated)
+		// Log a warning so we can track usage
+		e.logFn(repoLabel(p.Repo), "warning", "Using legacy full-content mode — file may be truncated. Prefer find/replace.")
+		finalContent = []byte(p.Content)
+	} else {
+		return "", fmt.Errorf("either 'find'+'replace' or 'content' must be provided")
+	}
+
 	e.logFn(repoLabel(p.Repo), "creating", "Creating branch and pushing changes...")
 
 	if err := gp.CreateBranch(ctx, p.BranchName, "main"); err != nil {
 		return "", fmt.Errorf("creating branch: %w", err)
 	}
-	if err := gp.CreateOrUpdateFile(ctx, p.FilePath, []byte(p.Content), p.BranchName, p.CommitMessage); err != nil {
+	if err := gp.CreateOrUpdateFile(ctx, p.FilePath, finalContent, p.BranchName, p.CommitMessage); err != nil {
 		return "", fmt.Errorf("pushing file: %w", err)
 	}
 

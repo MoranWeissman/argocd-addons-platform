@@ -292,20 +292,26 @@ REQUIRED ACTIONS:
 		specific = fmt.Sprintf(`
 REQUIRED ACTIONS — YOU MUST CREATE A PULL REQUEST:
 1. Use git_read_file to read "configuration/cluster-addons.yaml" from the "new" repo
-2. Modify the file to set the label "%s: enabled" for cluster "%s"
-3. Use git_create_pr to create a PR with the modified file in the "new" repo
-4. Use git_merge_pr to merge the PR
+2. Find the exact YAML block for cluster "%s" that contains the addon label
+3. Use git_create_pr with "find" and "replace" parameters to make a SURGICAL edit:
+   - "find": the exact text snippet containing "%s: disabled" (or missing) for cluster "%s"
+   - "replace": the same snippet with "%s: enabled"
+   CRITICAL: Do NOT pass the entire file as "content". Use find/replace to safely edit without losing data.
+4. Do NOT merge the PR. Respond NEEDS_USER_ACTION asking the user to review and merge.
 5. You MUST use the git_create_pr tool. Do NOT respond SUCCESS without creating a PR.
-6. Respond SUCCESS only after the PR is created (and merged if YOLO mode).`, a.addonName, a.clusterName)
+6. After creating the PR, respond NEEDS_USER_ACTION with the PR URL and ask user to review and merge it.`, a.clusterName, a.addonName, a.clusterName, a.addonName)
 	case 5:
 		specific = fmt.Sprintf(`
 REQUIRED ACTIONS — YOU MUST CREATE A PULL REQUEST:
 1. Use git_read_file to read the cluster config from the "old" repo (try "configuration/cluster-addons.yaml" first, then "values/clusters.yaml")
-2. Modify the file to set "%s: disabled" for cluster "%s"
-3. Use git_create_pr to create a PR with the modified file in the "old" repo
-4. Use git_merge_pr to merge the PR
+2. Find the exact YAML block for cluster "%s" that contains the addon label
+3. Use git_create_pr with "find" and "replace" parameters to make a SURGICAL edit:
+   - "find": the exact text snippet containing "%s: enabled" for cluster "%s"
+   - "replace": the same snippet with "%s: disabled"
+   CRITICAL: Do NOT pass the entire file as "content". Use find/replace to safely edit without losing data.
+4. Do NOT merge the PR. Respond NEEDS_USER_ACTION asking the user to review and merge.
 5. You MUST use the git_create_pr tool. Do NOT respond SUCCESS without creating a PR.
-6. Respond SUCCESS only after the PR is created (and merged if YOLO mode).`, a.addonName, a.clusterName)
+6. After creating the PR, respond NEEDS_USER_ACTION with the PR URL and ask user to review and merge it.`, a.clusterName, a.addonName, a.clusterName, a.addonName)
 	case 4:
 		specific = fmt.Sprintf(`
 REQUIRED ACTIONS:
@@ -344,8 +350,11 @@ REQUIRED ACTIONS:
    - Read cluster config from "old" repo to find which clusters had this addon
    - Read cluster config from "new" repo to find which clusters have it enabled
 2. If clusters remain unmigrated in the old repo, respond NEEDS_USER_ACTION listing them
-3. If all migrated, create a PR to set inMigration: false in addons-catalog.yaml
-4. Respond SUCCESS only after the PR is created`, a.addonName)
+3. If all migrated, use git_create_pr with find/replace to set inMigration: false in addons-catalog.yaml:
+   - "find": "inMigration: true" (for this addon's block)
+   - "replace": "inMigration: false"
+   CRITICAL: Do NOT pass the entire file as "content". Use find/replace to safely edit.
+4. Do NOT merge the PR. Respond NEEDS_USER_ACTION with the PR URL and ask user to review and merge it.`, a.addonName)
 	}
 
 	return fmt.Sprintf(`Execute migration step %d: "%s"
