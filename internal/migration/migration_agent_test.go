@@ -71,7 +71,7 @@ func TestParseResult(t *testing.T) {
 		{"SUCCESS: Step completed", StepResultSuccess},
 		{"FAILED: Something went wrong", StepResultFailed},
 		{"NEEDS_USER_ACTION: Please merge the PR", StepResultNeedsUser},
-		{"The addon was enabled successfully", StepResultSuccess},
+		{"The addon was enabled successfully", StepResultFailed}, // no prefix = default to FAILED (safe)
 		{"An error occurred while reading", StepResultFailed},
 	}
 
