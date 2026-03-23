@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.38.1](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.38.0...v1.38.1) (2026-03-23)
+
+
+### Bug Fixes
+
+* cluster addon list crash — handle new response format ([#181](https://github.com/MoranWeissman/argocd-addons-platform/issues/181)) ([9c9664f](https://github.com/MoranWeissman/argocd-addons-platform/commit/9c9664ffbed0520ff6efb84d050eef991afccaf2))
+
 ## [1.38.0](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.37.1...v1.38.0) (2026-03-23)
 
 
