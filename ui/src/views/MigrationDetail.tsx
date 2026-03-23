@@ -134,6 +134,10 @@ export default function MigrationDetail() {
     if (!id) return
     try { await api.pauseMigration(id); void fetchMigration() } catch { /* poll */ }
   }
+  const handleDelete = async () => {
+    if (!id || !confirm('Delete this migration? This cannot be undone.')) return
+    try { await api.deleteMigration(id); navigate('/migration') } catch { /* ignore */ }
+  }
 
   if (loading) return <LoadingState message="Loading migration details..." />
   if (error) return <ErrorState message={error} onRetry={fetchMigration} />
@@ -178,6 +182,12 @@ export default function MigrationDetail() {
             <Button size="sm" onClick={handleContinue}
               className="bg-green-600 hover:bg-green-700 text-white">
               Resume
+            </Button>
+          )}
+          {!isRunning && (
+            <Button variant="outline" size="sm" onClick={handleDelete}
+              className="border-red-300 text-red-600 hover:bg-red-50 dark:border-red-700 dark:text-red-400">
+              Delete
             </Button>
           )}
         </div>
