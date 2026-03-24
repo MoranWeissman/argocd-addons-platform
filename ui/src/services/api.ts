@@ -94,6 +94,24 @@ async function deleteJSON<T>(path: string): Promise<T> {
   return res.json()
 }
 
+async function fetchJSONMethod<T>(path: string, method: string, body?: unknown): Promise<T> {
+  const res = await fetch(`${BASE_URL}${path}`, {
+    method,
+    headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+    body: body ? JSON.stringify(body) : undefined,
+  })
+  if (res.status === 401) {
+    sessionStorage.removeItem(TOKEN_KEY)
+    window.location.reload()
+    throw new Error('Session expired')
+  }
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }))
+    throw new Error(err.error || res.statusText)
+  }
+  return res.json()
+}
+
 export const api = {
   // Health
   health: () => fetchJSON<{ status: string }>('/health'),
@@ -170,6 +188,14 @@ export const api = {
   deleteMigration: (id: string) => deleteJSON<void>(`/migration/${id}`),
   azureListProjects: (org: string, pat: string) => fetchJSON<string[]>(`/migration/azure/projects?org=${encodeURIComponent(org)}&pat=${encodeURIComponent(pat)}`),
   azureListRepos: (org: string, project: string, pat: string) => fetchJSON<string[]>(`/migration/azure/repos?org=${encodeURIComponent(org)}&project=${encodeURIComponent(project)}&pat=${encodeURIComponent(pat)}`),
+  // Users
+  listUsers: () => fetchJSON<{ username: string; enabled: boolean; role: string }[]>('/users'),
+  createUser: (data: { username: string; role: string }) => postJSON<{ username: string; temp_password: string; message: string }>('/users', data),
+  updateUser: (username: string, data: { enabled?: boolean; role?: string }) =>
+    fetchJSONMethod<{ username: string; enabled: boolean; role: string }>(`/users/${encodeURIComponent(username)}`, 'PUT', data),
+  deleteUser: (username: string) => deleteJSON<void>(`/users/${encodeURIComponent(username)}`),
+  resetPassword: (username: string) => postJSON<{ username: string; temp_password: string }>(`/users/${encodeURIComponent(username)}/reset-password`),
+
   // Docs
   docsList: () => fetchJSON<{ slug: string; title: string; order: number }[]>('/docs/list'),
   docsGet: (slug: string) => fetchJSON<{ slug: string; content: string }>(`/docs/${encodeURIComponent(slug)}`),
