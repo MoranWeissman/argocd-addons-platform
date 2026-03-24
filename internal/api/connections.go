@@ -18,6 +18,7 @@ func (s *Server) handleListConnections(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleCreateConnection(w http.ResponseWriter, r *http.Request) {
+	if !s.requireAdmin(w, r) { return }
 	var req models.CreateConnectionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
@@ -33,6 +34,7 @@ func (s *Server) handleCreateConnection(w http.ResponseWriter, r *http.Request) 
 }
 
 func (s *Server) handleUpdateConnection(w http.ResponseWriter, r *http.Request) {
+	if !s.requireAdmin(w, r) { return }
 	name := r.PathValue("name")
 	if name == "" {
 		writeError(w, http.StatusBadRequest, "connection name is required")
@@ -68,6 +70,7 @@ func (s *Server) handleUpdateConnection(w http.ResponseWriter, r *http.Request) 
 }
 
 func (s *Server) handleDeleteConnection(w http.ResponseWriter, r *http.Request) {
+	if !s.requireAdmin(w, r) { return }
 	name := r.PathValue("name")
 	if name == "" {
 		writeError(w, http.StatusBadRequest, "connection name is required")

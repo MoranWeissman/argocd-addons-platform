@@ -37,6 +37,7 @@ interface NavItem {
 interface NavSection {
   label: string
   items: NavItem[]
+  adminOnly?: boolean
 }
 
 const navSections: NavSection[] = [
@@ -60,6 +61,7 @@ const navSections: NavSection[] = [
   },
   {
     label: 'Configure',
+    adminOnly: true,
     items: [
       { to: '/settings', label: 'Settings', icon: Settings },
       { to: '/users', label: 'User Management', icon: User },
@@ -125,7 +127,7 @@ export function Layout() {
   const navigate = useNavigate()
   const [collapsed, setCollapsed] = useState(false)
   const { theme, toggleTheme } = useTheme()
-  const { logout } = useAuth()
+  const { logout, isAdmin } = useAuth()
 
   const [appVersion, setAppVersion] = useState('')
   const [userMenuOpen, setUserMenuOpen] = useState(false)
@@ -170,7 +172,7 @@ export function Layout() {
 
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto px-2 py-3">
-          {navSections.map((section, si) => (
+          {navSections.filter(s => !s.adminOnly || isAdmin).map((section, si) => (
             <div key={section.label} className={si > 0 ? 'mt-4 border-t border-slate-700 pt-3' : ''}>
               {!collapsed && (
                 <span className="mb-1 block px-3 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
