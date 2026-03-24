@@ -20,6 +20,7 @@ import {
   User,
   Menu,
   Search,
+  MessageSquare,
 } from 'lucide-react'
 import { useConnections } from '@/hooks/useConnections'
 import { FloatingAssistant } from '@/components/FloatingAssistant'
@@ -54,6 +55,7 @@ const navSections: NavSection[] = [
     items: [
       { to: '/upgrade', label: 'Add-on Upgrade Checker', icon: ArrowUpCircle },
       { to: '/migration', label: 'Migration', icon: GitPullRequest },
+      { to: '/assistant', label: 'AI Assistant', icon: MessageSquare },
       { to: '/dashboards', label: 'Dashboards', icon: BarChart3 },
     ],
   },
