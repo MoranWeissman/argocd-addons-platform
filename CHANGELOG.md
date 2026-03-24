@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.42.2](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.42.1...v1.42.2) (2026-03-24)
+
+
+### Bug Fixes
+
+* restore AI Assistant to sidebar nav under Operate section ([#204](https://github.com/MoranWeissman/argocd-addons-platform/issues/204)) ([8aa6319](https://github.com/MoranWeissman/argocd-addons-platform/commit/8aa6319d5952d523c5a3124a1f7e0ef7ba8ddd60))
+
 ## [1.42.1](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.42.0...v1.42.1) (2026-03-24)
 
 
