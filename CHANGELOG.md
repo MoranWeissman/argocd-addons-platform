@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.45.2](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.45.1...v1.45.2) (2026-03-24)
+
+
+### Bug Fixes
+
+* preserve users ConfigMap across Helm upgrades ([#216](https://github.com/MoranWeissman/argocd-addons-platform/issues/216)) ([e3ad20e](https://github.com/MoranWeissman/argocd-addons-platform/commit/e3ad20e0f3a55704d0c54af1b343355edba563f0))
+
 ## [1.45.1](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.45.0...v1.45.1) (2026-03-24)
 
 
