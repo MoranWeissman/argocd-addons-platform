@@ -55,7 +55,6 @@ const navSections: NavSection[] = [
     items: [
       { to: '/upgrade', label: 'Add-on Upgrade Checker', icon: ArrowUpCircle },
       { to: '/migration', label: 'Migration', icon: GitPullRequest },
-      { to: '/assistant', label: 'AI Assistant', icon: MessageSquare },
       { to: '/dashboards', label: 'Dashboards', icon: BarChart3 },
     ],
   },
@@ -68,6 +67,7 @@ const navSections: NavSection[] = [
   {
     label: 'Help',
     items: [
+      { to: '/assistant', label: 'AI Assistant', icon: MessageSquare },
       { to: '/docs', label: 'Docs', icon: BookOpen },
     ],
   },
@@ -91,13 +91,14 @@ const routeLabels: Record<string, string> = {
 function Breadcrumbs() {
   const location = useLocation()
   const segments = location.pathname.split('/').filter(Boolean)
-  if (segments.length === 0) return null
+  // Only show breadcrumbs on detail pages (2+ segments like /clusters/name)
+  if (segments.length <= 1) return null
 
   const crumbs: { label: string; path: string }[] = []
   let path = ''
   for (const seg of segments) {
     path += '/' + seg
-    crumbs.push({ label: routeLabels[seg] || seg, path })
+    crumbs.push({ label: routeLabels[seg] || decodeURIComponent(seg), path })
   }
 
   return (
@@ -299,7 +300,7 @@ export function Layout() {
 
         {/* Content */}
         <main className="flex-1 overflow-auto">
-          <div className="mx-auto max-w-7xl p-8">
+          <div className="p-6 lg:p-8">
             <Outlet />
           </div>
         </main>
