@@ -32,6 +32,7 @@ func (s *Server) handleGetMigrationSettings(w http.ResponseWriter, r *http.Reque
 }
 
 func (s *Server) handleSaveMigrationSettings(w http.ResponseWriter, r *http.Request) {
+	if !s.requireAdmin(w, r) { return }
 	if s.migrationExecutor == nil {
 		writeError(w, http.StatusServiceUnavailable, "migration service not configured")
 		return

@@ -86,6 +86,7 @@ type saveAIConfigRequest struct {
 }
 
 func (s *Server) handleSaveAIConfig(w http.ResponseWriter, r *http.Request) {
+	if !s.requireAdmin(w, r) { return }
 	var req saveAIConfigRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
