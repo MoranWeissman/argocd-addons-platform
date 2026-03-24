@@ -255,6 +255,9 @@ func (s *Store) CreateUser(username, role string) (string, error) {
 			Enabled bool   `yaml:"enabled"`
 			Role    string `yaml:"role"`
 		})
+		if cm.Data == nil {
+			cm.Data = make(map[string]string)
+		}
 		if existing, ok := cm.Data["accounts"]; ok {
 			yaml.Unmarshal([]byte(existing), &accounts)
 		}
@@ -317,6 +320,9 @@ func (s *Store) UpdateUser(username string, enabled bool, role string) error {
 			return fmt.Errorf("reading ConfigMap: %w", err)
 		}
 
+		if cm.Data == nil {
+			cm.Data = make(map[string]string)
+		}
 		accounts := make(map[string]struct {
 			Enabled bool   `yaml:"enabled"`
 			Role    string `yaml:"role"`
@@ -360,6 +366,9 @@ func (s *Store) DeleteUser(username string) error {
 		cmName := s.secretName + "-users"
 		cm, err := s.clientset.CoreV1().ConfigMaps(s.namespace).Get(ctx, cmName, metav1.GetOptions{})
 		if err == nil {
+			if cm.Data == nil {
+				cm.Data = make(map[string]string)
+			}
 			accounts := make(map[string]interface{})
 			if existing, ok := cm.Data["accounts"]; ok {
 				yaml.Unmarshal([]byte(existing), &accounts)
