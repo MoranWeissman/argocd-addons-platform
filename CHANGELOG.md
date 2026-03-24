@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.44.0](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.43.0...v1.44.0) (2026-03-24)
+
+
+### Features
+
+* user management — create, update, disable, delete users via UI ([#210](https://github.com/MoranWeissman/argocd-addons-platform/issues/210)) ([5c106b8](https://github.com/MoranWeissman/argocd-addons-platform/commit/5c106b807ae184f085fa74d48b777ef79f2aba7f))
+
 ## [1.43.0](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.42.3...v1.43.0) (2026-03-24)
 
 
