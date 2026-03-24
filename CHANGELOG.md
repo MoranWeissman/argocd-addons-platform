@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.42.3](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.42.2...v1.42.3) (2026-03-24)
+
+
+### Bug Fixes
+
+* full-width content, breadcrumbs only on detail pages, AI in Help ([#206](https://github.com/MoranWeissman/argocd-addons-platform/issues/206)) ([a3ee980](https://github.com/MoranWeissman/argocd-addons-platform/commit/a3ee980dc581f2aa15bf560cbd9b0476cfc8c1db))
+
 ## [1.42.2](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.42.1...v1.42.2) (2026-03-24)
 
 
