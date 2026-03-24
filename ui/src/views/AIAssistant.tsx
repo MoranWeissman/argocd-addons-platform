@@ -282,7 +282,7 @@ function ThinkingProcess() {
 // Main component
 // ---------------------------------------------------------------------------
 
-export function AIAssistant() {
+export function AIAssistant({ embedded = false }: { embedded?: boolean } = {}) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -412,66 +412,74 @@ export function AIAssistant() {
   // AI not configured state
   if (aiEnabled === false) {
     return (
-      <div className="flex h-[calc(100vh-7rem)] flex-col items-center justify-center gap-4 text-center">
+      <div className={`flex flex-col items-center justify-center gap-4 text-center ${embedded ? 'h-full p-6' : 'h-[calc(100vh-7rem)]'}`}>
         <Sparkles className="h-12 w-12 text-gray-400" />
         <h2 className="text-xl font-semibold text-gray-700 dark:text-gray-300">
           AI not configured
         </h2>
         <p className="max-w-md text-gray-500 dark:text-gray-400">
-          The AI assistant requires an AI provider (Gemini, Claude, OpenAI, or Ollama). Go to{' '}
-          <a
-            href="/settings"
-            className="font-medium text-cyan-600 underline hover:text-cyan-700 dark:text-cyan-400 dark:hover:text-cyan-300"
-          >
+          Go to{' '}
+          <a href="/settings" className="font-medium text-cyan-600 underline hover:text-cyan-700 dark:text-cyan-400 dark:hover:text-cyan-300">
             Settings
           </a>{' '}
-          for setup instructions.
+          to configure an AI provider.
         </p>
       </div>
     )
   }
 
   return (
-    <div className="flex h-[calc(100vh-7rem)] flex-col">
+    <div className={`flex flex-col ${embedded ? 'h-full' : 'h-[calc(100vh-7rem)]'}`}>
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-gray-200 pb-4 dark:border-gray-700">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-violet-100 dark:bg-violet-900/40">
-            <Sparkles className="h-5 w-5 text-violet-600 dark:text-violet-400" />
+      {/* Header — hidden when embedded (floating panel has its own header) */}
+      {!embedded && (
+        <div className="flex items-center justify-between border-b border-gray-200 pb-4 dark:border-gray-700">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-violet-100 dark:bg-violet-900/40">
+              <Sparkles className="h-5 w-5 text-violet-600 dark:text-violet-400" />
+            </div>
+            <div>
+              <h1 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                AI Assistant
+              </h1>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Ask questions about your add-on deployments
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-              AI Assistant
-            </h1>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              Ask questions about your addon deployments
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-3">
-          {messages.length > 0 && (
-            <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] text-gray-500 dark:bg-gray-800 dark:text-gray-400">
-              {messages.length} messages
-            </span>
-          )}
-          {messages.length > 0 && (
+          <div className="flex items-center gap-3">
+            {messages.length > 0 && (
+              <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] text-gray-500 dark:bg-gray-800 dark:text-gray-400">
+                {messages.length} messages
+              </span>
+            )}
+            {messages.length > 0 && (
+              <button
+                onClick={handleExport}
+                className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
+              >
+                <Download className="h-3.5 w-3.5" />
+                Export
+              </button>
+            )}
             <button
-              onClick={handleExport}
+              onClick={handleNewConversation}
               className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
             >
-              <Download className="h-3.5 w-3.5" />
-              Export
+              <RotateCcw className="h-3.5 w-3.5" />
+              New
             </button>
-          )}
-          <button
-            onClick={handleNewConversation}
-            className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
-          >
-            <RotateCcw className="h-3.5 w-3.5" />
-            New Conversation
+          </div>
+        </div>
+      )}
+      {/* Embedded mini toolbar */}
+      {embedded && messages.length > 0 && (
+        <div className="flex items-center justify-end gap-2 border-b border-gray-200 px-3 py-1.5 dark:border-gray-700">
+          <button onClick={handleNewConversation} className="text-[10px] text-gray-500 hover:text-gray-700 dark:text-gray-400">
+            <RotateCcw className="inline h-3 w-3" /> New
           </button>
         </div>
-      </div>
+      )}
 
       {/* Messages area */}
       <div className="flex-1 overflow-y-auto py-4 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600">

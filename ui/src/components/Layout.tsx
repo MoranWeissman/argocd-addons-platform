@@ -19,8 +19,11 @@ import {
   GitPullRequest,
   User,
   Menu,
+  Search,
 } from 'lucide-react'
 import { useConnections } from '@/hooks/useConnections'
+import { FloatingAssistant } from '@/components/FloatingAssistant'
+import { CommandPalette } from '@/components/CommandPalette'
 import { useTheme } from '@/hooks/useTheme'
 import { useAuth } from '@/hooks/useAuth'
 
@@ -230,8 +233,19 @@ export function Layout() {
             <Breadcrumbs />
           </div>
 
-          {/* Right: connection + user dropdown */}
+          {/* Right: search + connection + user dropdown */}
           <div className="flex items-center gap-3">
+            {/* Search trigger */}
+            <button
+              onClick={() => { const e = new KeyboardEvent('keydown', { key: 'k', metaKey: true }); window.dispatchEvent(e) }}
+              className="hidden items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs text-gray-400 transition-colors hover:bg-gray-100 sm:flex dark:border-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700"
+            >
+              <Search className="h-3.5 w-3.5" />
+              <span>Search...</span>
+              <kbd className="ml-2 rounded border border-gray-300 bg-white px-1 py-0.5 text-[9px] font-medium dark:border-gray-600 dark:bg-gray-700">
+                {navigator.platform?.includes('Mac') ? '⌘' : 'Ctrl'}K
+              </kbd>
+            </button>
             {!loading && activeConnection && (
               <div className="hidden items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs text-gray-500 sm:flex dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400">
                 <Plug className="h-3.5 w-3.5" />
@@ -288,6 +302,12 @@ export function Layout() {
           </div>
         </main>
       </div>
+
+      {/* Floating AI Assistant */}
+      <FloatingAssistant />
+
+      {/* Command Palette (Cmd+K) */}
+      <CommandPalette />
     </div>
   )
 }
