@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.45.1](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.45.0...v1.45.1) (2026-03-24)
+
+
+### Bug Fixes
+
+* password update uses session username, hide migration settings from non-admins ([#214](https://github.com/MoranWeissman/argocd-addons-platform/issues/214)) ([ccff867](https://github.com/MoranWeissman/argocd-addons-platform/commit/ccff867ba59273df354fc8f82692e7429a063b37))
+
 ## [1.45.0](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.44.0...v1.45.0) (2026-03-24)
 
 
