@@ -449,7 +449,11 @@ func (s *Server) handleUpdatePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	username := "admin" // Currently single-user; multi-user needs session-to-user binding
+	username := r.Header.Get("X-AAP-User")
+	if username == "" {
+		writeError(w, http.StatusUnauthorized, "not logged in")
+		return
+	}
 
 	if err := s.authStore.UpdatePassword(username, req.CurrentPassword, req.NewPassword); err != nil {
 		if strings.Contains(err.Error(), "incorrect") {

@@ -4,6 +4,7 @@ import { Plus, GitPullRequest, Play } from 'lucide-react'
 import { api } from '@/services/api'
 import type { Migration, MigrationBatch } from '@/services/api'
 import { MigrationSettings } from '@/components/MigrationSettings'
+import { useAuth } from '@/hooks/useAuth'
 import { NewMigrationDialog } from '@/components/NewMigrationDialog'
 import { BatchProgress } from '@/components/BatchProgress'
 import { StatusBadge } from '@/components/StatusBadge'
@@ -13,6 +14,7 @@ import { Button } from '@/components/ui/button'
 
 export default function MigrationPage() {
   const navigate = useNavigate()
+  const { isAdmin } = useAuth()
   const [configured, setConfigured] = useState(false)
   const [migrations, setMigrations] = useState<Migration[]>([])
   const [loading, setLoading] = useState(true)
@@ -37,7 +39,8 @@ export default function MigrationPage() {
   }, [])
 
   useEffect(() => {
-    if (configured) {
+    if (configured || !isAdmin) {
+      // Non-admins always try to load (they can't see settings to configure)
       void fetchMigrations()
     } else {
       setLoading(false)
@@ -89,8 +92,8 @@ export default function MigrationPage() {
         </p>
       </div>
 
-      {/* Settings */}
-      <MigrationSettings onConfigured={() => setConfigured(true)} />
+      {/* Settings — admin only */}
+      {isAdmin && <MigrationSettings onConfigured={() => setConfigured(true)} />}
 
       {/* Batch Progress */}
       {activeBatch && activeBatch.status === 'running' && (
