@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	cryptoRand "crypto/rand"
 	"fmt"
 	"log/slog"
 	"os"
@@ -210,6 +211,230 @@ func (s *Store) ListUsers() []UserAccount {
 		result = append(result, *u)
 	}
 	return result
+}
+
+// CreateUser adds a new user account with a temporary password.
+// Returns the generated password so the admin can share it.
+func (s *Store) CreateUser(username, role string) (string, error) {
+	if username == "" {
+		return "", fmt.Errorf("username is required")
+	}
+	if role == "" {
+		role = "viewer"
+	}
+	if role != "admin" && role != "operator" && role != "viewer" {
+		return "", fmt.Errorf("role must be admin, operator, or viewer")
+	}
+
+	// Check if user already exists
+	s.mu.RLock()
+	if _, exists := s.users[username]; exists {
+		s.mu.RUnlock()
+		return "", fmt.Errorf("user %q already exists", username)
+	}
+	s.mu.RUnlock()
+
+	// Generate a temporary password
+	tempPass := generateTempPassword()
+	hash, err := bcrypt.GenerateFromPassword([]byte(tempPass), bcrypt.DefaultCost)
+	if err != nil {
+		return "", fmt.Errorf("hashing password: %w", err)
+	}
+
+	if s.mode == ModeK8s {
+		ctx := context.Background()
+
+		// Update ConfigMap with new user
+		cmName := s.secretName + "-users"
+		cm, err := s.clientset.CoreV1().ConfigMaps(s.namespace).Get(ctx, cmName, metav1.GetOptions{})
+		if err != nil {
+			return "", fmt.Errorf("reading ConfigMap: %w", err)
+		}
+
+		accounts := make(map[string]struct {
+			Enabled bool   `yaml:"enabled"`
+			Role    string `yaml:"role"`
+		})
+		if existing, ok := cm.Data["accounts"]; ok {
+			yaml.Unmarshal([]byte(existing), &accounts)
+		}
+		accounts[username] = struct {
+			Enabled bool   `yaml:"enabled"`
+			Role    string `yaml:"role"`
+		}{Enabled: true, Role: role}
+
+		data, _ := yaml.Marshal(accounts)
+		cm.Data["accounts"] = string(data)
+		if _, err := s.clientset.CoreV1().ConfigMaps(s.namespace).Update(ctx, cm, metav1.UpdateOptions{}); err != nil {
+			return "", fmt.Errorf("updating ConfigMap: %w", err)
+		}
+
+		// Update Secret with password hash
+		secret, err := s.clientset.CoreV1().Secrets(s.namespace).Get(ctx, s.secretName, metav1.GetOptions{})
+		if err != nil {
+			return "", fmt.Errorf("reading Secret: %w", err)
+		}
+		if secret.Data == nil {
+			secret.Data = make(map[string][]byte)
+		}
+		secret.Data[username+".password"] = hash
+		if _, err := s.clientset.CoreV1().Secrets(s.namespace).Update(ctx, secret, metav1.UpdateOptions{}); err != nil {
+			return "", fmt.Errorf("updating Secret: %w", err)
+		}
+	}
+
+	// Update in-memory
+	s.mu.Lock()
+	s.users[username] = &UserAccount{Username: username, Enabled: true, Role: role}
+	s.passHash[username] = string(hash)
+	s.mu.Unlock()
+
+	slog.Info("user created", "username", username, "role", role)
+	return tempPass, nil
+}
+
+// UpdateUser updates a user's role and enabled status.
+func (s *Store) UpdateUser(username string, enabled bool, role string) error {
+	s.mu.RLock()
+	user, exists := s.users[username]
+	s.mu.RUnlock()
+	if !exists {
+		return fmt.Errorf("user %q not found", username)
+	}
+
+	if role != "" && role != "admin" && role != "operator" && role != "viewer" {
+		return fmt.Errorf("role must be admin, operator, or viewer")
+	}
+	if role == "" {
+		role = user.Role
+	}
+
+	if s.mode == ModeK8s {
+		ctx := context.Background()
+		cmName := s.secretName + "-users"
+		cm, err := s.clientset.CoreV1().ConfigMaps(s.namespace).Get(ctx, cmName, metav1.GetOptions{})
+		if err != nil {
+			return fmt.Errorf("reading ConfigMap: %w", err)
+		}
+
+		accounts := make(map[string]struct {
+			Enabled bool   `yaml:"enabled"`
+			Role    string `yaml:"role"`
+		})
+		if existing, ok := cm.Data["accounts"]; ok {
+			yaml.Unmarshal([]byte(existing), &accounts)
+		}
+		accounts[username] = struct {
+			Enabled bool   `yaml:"enabled"`
+			Role    string `yaml:"role"`
+		}{Enabled: enabled, Role: role}
+
+		data, _ := yaml.Marshal(accounts)
+		cm.Data["accounts"] = string(data)
+		if _, err := s.clientset.CoreV1().ConfigMaps(s.namespace).Update(ctx, cm, metav1.UpdateOptions{}); err != nil {
+			return fmt.Errorf("updating ConfigMap: %w", err)
+		}
+	}
+
+	s.mu.Lock()
+	s.users[username] = &UserAccount{Username: username, Enabled: enabled, Role: role}
+	s.mu.Unlock()
+
+	slog.Info("user updated", "username", username, "role", role, "enabled", enabled)
+	return nil
+}
+
+// DeleteUser removes a user account.
+func (s *Store) DeleteUser(username string) error {
+	s.mu.RLock()
+	_, exists := s.users[username]
+	s.mu.RUnlock()
+	if !exists {
+		return fmt.Errorf("user %q not found", username)
+	}
+
+	if s.mode == ModeK8s {
+		ctx := context.Background()
+
+		// Remove from ConfigMap
+		cmName := s.secretName + "-users"
+		cm, err := s.clientset.CoreV1().ConfigMaps(s.namespace).Get(ctx, cmName, metav1.GetOptions{})
+		if err == nil {
+			accounts := make(map[string]interface{})
+			if existing, ok := cm.Data["accounts"]; ok {
+				yaml.Unmarshal([]byte(existing), &accounts)
+			}
+			delete(accounts, username)
+			data, _ := yaml.Marshal(accounts)
+			cm.Data["accounts"] = string(data)
+			s.clientset.CoreV1().ConfigMaps(s.namespace).Update(ctx, cm, metav1.UpdateOptions{})
+		}
+
+		// Remove from Secret
+		secret, err := s.clientset.CoreV1().Secrets(s.namespace).Get(ctx, s.secretName, metav1.GetOptions{})
+		if err == nil {
+			delete(secret.Data, username+".password")
+			delete(secret.Data, username+".initialPassword")
+			s.clientset.CoreV1().Secrets(s.namespace).Update(ctx, secret, metav1.UpdateOptions{})
+		}
+	}
+
+	s.mu.Lock()
+	delete(s.users, username)
+	delete(s.passHash, username)
+	s.mu.Unlock()
+
+	slog.Info("user deleted", "username", username)
+	return nil
+}
+
+// ResetPassword generates a new temporary password for a user.
+func (s *Store) ResetPassword(username string) (string, error) {
+	s.mu.RLock()
+	_, exists := s.users[username]
+	s.mu.RUnlock()
+	if !exists {
+		return "", fmt.Errorf("user %q not found", username)
+	}
+
+	tempPass := generateTempPassword()
+	hash, err := bcrypt.GenerateFromPassword([]byte(tempPass), bcrypt.DefaultCost)
+	if err != nil {
+		return "", fmt.Errorf("hashing password: %w", err)
+	}
+
+	if s.mode == ModeK8s {
+		ctx := context.Background()
+		secret, err := s.clientset.CoreV1().Secrets(s.namespace).Get(ctx, s.secretName, metav1.GetOptions{})
+		if err != nil {
+			return "", fmt.Errorf("reading Secret: %w", err)
+		}
+		if secret.Data == nil {
+			secret.Data = make(map[string][]byte)
+		}
+		secret.Data[username+".password"] = hash
+		if _, err := s.clientset.CoreV1().Secrets(s.namespace).Update(ctx, secret, metav1.UpdateOptions{}); err != nil {
+			return "", fmt.Errorf("updating Secret: %w", err)
+		}
+	}
+
+	s.mu.Lock()
+	s.passHash[username] = string(hash)
+	s.mu.Unlock()
+
+	slog.Info("password reset", "username", username)
+	return tempPass, nil
+}
+
+func generateTempPassword() string {
+	const chars = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+	b := make([]byte, 12)
+	randBytes := make([]byte, 12)
+	cryptoRand.Read(randBytes)
+	for i := range b {
+		b[i] = chars[int(randBytes[i])%len(chars)]
+	}
+	return string(b)
 }
 
 // reload reads user accounts from ConfigMap and password hashes from Secret.

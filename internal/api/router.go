@@ -189,6 +189,13 @@ func NewRouter(srv *Server, staticFS fs.FS) http.Handler {
 	mux.HandleFunc("POST /api/v1/auth/update-password", srv.handleUpdatePassword)
 	mux.HandleFunc("POST /api/v1/auth/hash", srv.handleHashPassword)
 
+	// User management (admin only)
+	mux.HandleFunc("GET /api/v1/users", srv.handleListUsers)
+	mux.HandleFunc("POST /api/v1/users", srv.handleCreateUser)
+	mux.HandleFunc("PUT /api/v1/users/{username}", srv.handleUpdateUser)
+	mux.HandleFunc("DELETE /api/v1/users/{username}", srv.handleDeleteUser)
+	mux.HandleFunc("POST /api/v1/users/{username}/reset-password", srv.handleResetPassword)
+
 	// Static files (SPA)
 	if staticFS != nil {
 		fileServer := http.FileServer(http.FS(staticFS))
@@ -293,8 +300,13 @@ func clientIP(r *http.Request) string {
 
 // --- Session token auth ---
 
+type sessionInfo struct {
+	Username string
+	Expiry   time.Time
+}
+
 var (
-	activeSessions   = make(map[string]time.Time) // token -> expiry
+	activeSessions   = make(map[string]*sessionInfo) // token -> session
 	sessionsMu       sync.RWMutex
 	sessionLifetime  = 24 * time.Hour
 	sessionCleanOnce sync.Once
@@ -308,8 +320,8 @@ func startSessionCleanup() {
 			for range ticker.C {
 				sessionsMu.Lock()
 				now := time.Now()
-				for token, expiry := range activeSessions {
-					if now.After(expiry) {
+				for token, sess := range activeSessions {
+					if now.After(sess.Expiry) {
 						delete(activeSessions, token)
 					}
 				}
@@ -328,8 +340,18 @@ func generateToken() string {
 func isValidSession(token string) bool {
 	sessionsMu.RLock()
 	defer sessionsMu.RUnlock()
-	expiry, ok := activeSessions[token]
-	return ok && time.Now().Before(expiry)
+	sess, ok := activeSessions[token]
+	return ok && time.Now().Before(sess.Expiry)
+}
+
+func getSessionUser(token string) string {
+	sessionsMu.RLock()
+	defer sessionsMu.RUnlock()
+	sess, ok := activeSessions[token]
+	if !ok {
+		return ""
+	}
+	return sess.Username
 }
 
 // handleLogin validates credentials and returns a session token.
@@ -347,7 +369,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	if !s.authStore.HasUsers() {
 		token := generateToken()
 		sessionsMu.Lock()
-		activeSessions[token] = time.Now().Add(sessionLifetime)
+		activeSessions[token] = &sessionInfo{Username: "anonymous", Expiry: time.Now().Add(sessionLifetime)}
 		sessionsMu.Unlock()
 		writeJSON(w, http.StatusOK, map[string]string{"token": token})
 		return
@@ -360,11 +382,17 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 
 	token := generateToken()
 	sessionsMu.Lock()
-	activeSessions[token] = time.Now().Add(sessionLifetime)
+	activeSessions[token] = &sessionInfo{Username: req.Username, Expiry: time.Now().Add(sessionLifetime)}
 	sessionsMu.Unlock()
 
-	slog.Info("user logged in", "username", req.Username)
-	writeJSON(w, http.StatusOK, map[string]string{"token": token})
+	user := s.authStore.GetUser(req.Username)
+	role := "admin"
+	if user != nil {
+		role = user.Role
+	}
+
+	slog.Info("user logged in", "username", req.Username, "role", role)
+	writeJSON(w, http.StatusOK, map[string]string{"token": token, "username": req.Username, "role": role})
 }
 
 // basicAuthMiddleware enforces token-based auth on all API routes.
@@ -390,6 +418,8 @@ func (s *Server) basicAuthMiddleware(next http.Handler) http.Handler {
 		if strings.HasPrefix(authHeader, "Bearer ") {
 			token := strings.TrimPrefix(authHeader, "Bearer ")
 			if isValidSession(token) {
+				// Inject username into request for downstream handlers
+				r.Header.Set("X-AAP-User", getSessionUser(token))
 				next.ServeHTTP(w, r)
 				return
 			}

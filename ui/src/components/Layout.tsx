@@ -62,6 +62,7 @@ const navSections: NavSection[] = [
     label: 'Configure',
     items: [
       { to: '/settings', label: 'Settings', icon: Settings },
+      { to: '/users', label: 'User Management', icon: User },
     ],
   },
   {
@@ -85,6 +86,7 @@ const routeLabels: Record<string, string> = {
   dashboards: 'Dashboards',
   docs: 'Docs',
   settings: 'Settings',
+  users: 'User Management',
   user: 'Account',
 }
 

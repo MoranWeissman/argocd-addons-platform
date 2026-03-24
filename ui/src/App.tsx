@@ -19,6 +19,7 @@ import { AIAssistant } from '@/views/AIAssistant'
 import { UserInfo } from '@/views/UserInfo'
 import MigrationPage from '@/views/MigrationPage'
 import MigrationDetail from '@/views/MigrationDetail'
+import UserManagement from '@/views/UserManagement'
 
 function AppRoutes() {
   const { isAuthenticated, loading } = useAuth()
@@ -52,6 +53,7 @@ function AppRoutes() {
           <Route path="dashboards" element={<Dashboards />} />
           <Route path="docs" element={<Docs />} />
           <Route path="settings" element={<Connections />} />
+          <Route path="users" element={<UserManagement />} />
           <Route path="user" element={<UserInfo />} />
           <Route path="migration" element={<MigrationPage />} />
           <Route path="migration/:id" element={<MigrationDetail />} />
