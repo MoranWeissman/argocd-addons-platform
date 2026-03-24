@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.43.0](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.42.3...v1.43.0) (2026-03-24)
+
+
+### Features
+
+* dashboard widgets, N/N health context, full-width layout ([#208](https://github.com/MoranWeissman/argocd-addons-platform/issues/208)) ([dc12fd2](https://github.com/MoranWeissman/argocd-addons-platform/commit/dc12fd243013fad2dc2928287b1bf8d4afa4da48))
+
 ## [1.42.3](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.42.2...v1.42.3) (2026-03-24)
 
 
