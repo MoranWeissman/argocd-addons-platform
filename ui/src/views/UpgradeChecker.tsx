@@ -392,9 +392,9 @@ export function UpgradeChecker() {
         <div className="flex items-center gap-3">
           <ArrowUpCircle className="h-8 w-8 text-cyan-500" />
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Upgrade Impact Checker</h1>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Add-on Upgrade Checker</h1>
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              Analyze the impact of upgrading an addon to a new version
+              Analyze the impact of upgrading an add-on to a new version
             </p>
           </div>
         </div>
