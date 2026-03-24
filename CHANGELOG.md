@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.42.0](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.41.0...v1.42.0) (2026-03-24)
+
+
+### Features
+
+* floating AI assistant bubble + command palette (Cmd+K) ([#201](https://github.com/MoranWeissman/argocd-addons-platform/issues/201)) ([52d8a65](https://github.com/MoranWeissman/argocd-addons-platform/commit/52d8a656b93e60679087006a87e2bf3fc91cbd47))
+* UI/UX overhaul — sidebar sections, dashboard improvements, mobile support ([#199](https://github.com/MoranWeissman/argocd-addons-platform/issues/199)) ([9bf55f1](https://github.com/MoranWeissman/argocd-addons-platform/commit/9bf55f1023ae81cddda183d45442727d2534c143))
+
 ## [1.41.0](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.40.2...v1.41.0) (2026-03-23)
 
 
