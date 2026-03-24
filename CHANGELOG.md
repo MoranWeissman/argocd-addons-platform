@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.45.0](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.44.0...v1.45.0) (2026-03-24)
+
+
+### Features
+
+* role-based access — hide admin sections, protect API endpoints ([#212](https://github.com/MoranWeissman/argocd-addons-platform/issues/212)) ([9546437](https://github.com/MoranWeissman/argocd-addons-platform/commit/9546437b073585e328cb6f0df8c3d0b357bc8c6e))
+
 ## [1.44.0](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.43.0...v1.44.0) (2026-03-24)
 
 
