@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.42.1](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.42.0...v1.42.1) (2026-03-24)
+
+
+### Bug Fixes
+
+* consistent naming — Add-on Upgrade Checker everywhere ([#202](https://github.com/MoranWeissman/argocd-addons-platform/issues/202)) ([6ea812d](https://github.com/MoranWeissman/argocd-addons-platform/commit/6ea812dc48e6211992193a2ae1b0fa0a49d0a679))
+
 ## [1.42.0](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.41.0...v1.42.0) (2026-03-24)
 
 
