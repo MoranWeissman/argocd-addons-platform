@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.45.3](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.45.2...v1.45.3) (2026-03-24)
+
+
+### Bug Fixes
+
+* nil map panic when creating/updating/deleting users ([#218](https://github.com/MoranWeissman/argocd-addons-platform/issues/218)) ([931d510](https://github.com/MoranWeissman/argocd-addons-platform/commit/931d51041b14dec71736d2e481671e186ff01810))
+
 ## [1.45.2](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.45.1...v1.45.2) (2026-03-24)
 
 
