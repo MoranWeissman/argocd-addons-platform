@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Search, ChevronDown, ChevronRight, LayoutGrid, Table2 } from 'lucide-react'
+import { Search, ChevronDown, ChevronRight, LayoutGrid, Table2, Grid3X3 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '@/services/api'
 import type { VersionMatrixResponse, VersionMatrixRow, VersionMatrixCell } from '@/services/models'
@@ -7,7 +7,7 @@ import { LoadingState } from '@/components/LoadingState'
 import { ErrorState } from '@/components/ErrorState'
 
 type HealthFilter = 'all' | 'healthy' | 'issues' | 'not_deployed'
-type ViewMode = 'table' | 'cards'
+type ViewMode = 'heatmap' | 'table' | 'cards'
 
 /* ------------------------------------------------------------------ */
 /* Health helpers                                                       */
@@ -270,6 +270,108 @@ function AddonRow({ row, clusters }: { row: VersionMatrixRow; clusters: string[]
 }
 
 /* ------------------------------------------------------------------ */
+/* Heatmap view — compact grid, click to expand                        */
+/* ------------------------------------------------------------------ */
+
+function HeatmapView({ addons, clusters }: { addons: VersionMatrixRow[]; clusters: string[] }) {
+  const navigate = useNavigate()
+  const [expanded, setExpanded] = useState<string | null>(null)
+
+  const activeAddons = addons.filter((row) =>
+    Object.values(row.cells).some((c) => c.health !== 'not_enabled'),
+  )
+
+  return (
+    <div className="space-y-2">
+      {activeAddons.map((row) => {
+        const activeCells = clusters
+          .map(c => ({ cluster: c, cell: row.cells[c] }))
+          .filter(e => e.cell && e.cell.health !== 'not_enabled')
+        const healthyCount = activeCells.filter(e => e.cell.health.toLowerCase() === 'healthy').length
+        const driftCount = activeCells.filter(e => e.cell.drift_from_catalog).length
+        const isExpanded = expanded === row.addon_name
+
+        return (
+          <div key={row.addon_name} className="rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800/50">
+            {/* Compact row: addon name + dot grid */}
+            <button
+              type="button"
+              onClick={() => setExpanded(isExpanded ? null : row.addon_name)}
+              className="flex w-full items-center gap-4 px-4 py-2.5 text-left hover:bg-gray-50 dark:hover:bg-gray-800"
+            >
+              {isExpanded
+                ? <ChevronDown className="h-3.5 w-3.5 shrink-0 text-gray-400" />
+                : <ChevronRight className="h-3.5 w-3.5 shrink-0 text-gray-400" />
+              }
+              <div className="w-36 shrink-0">
+                <span className="text-sm font-medium text-gray-900 dark:text-white">{row.addon_name}</span>
+                <span className="ml-1.5 text-[10px] text-gray-400">v{row.catalog_version}</span>
+              </div>
+
+              {/* Dot grid */}
+              <div className="flex flex-wrap gap-1">
+                {activeCells.map(({ cluster, cell }) => (
+                  <div
+                    key={cluster}
+                    title={`${cluster}: ${cell.version} (${healthLabel(cell.health)})${cell.drift_from_catalog ? ' - DRIFT' : ''}`}
+                    className={`h-3.5 w-3.5 rounded-sm ${healthColor(cell.health)} ${cell.drift_from_catalog ? 'ring-2 ring-amber-400' : ''}`}
+                  />
+                ))}
+              </div>
+
+              {/* Summary badges */}
+              <div className="ml-auto flex shrink-0 items-center gap-2 text-[10px]">
+                <span className="text-gray-400">{healthyCount}/{activeCells.length}</span>
+                {driftCount > 0 && (
+                  <span className="rounded bg-amber-100 px-1.5 py-0.5 font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                    {driftCount} drift
+                  </span>
+                )}
+              </div>
+            </button>
+
+            {/* Expanded: cluster detail table */}
+            {isExpanded && (
+              <div className="border-t border-gray-100 p-3 dark:border-gray-700">
+                <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
+                  {activeCells.map(({ cluster, cell }) => (
+                    <button
+                      key={cluster}
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); navigate(`/clusters/${cluster}`) }}
+                      className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-left text-xs transition-colors hover:shadow-sm ${
+                        cell.drift_from_catalog
+                          ? 'border-amber-200 bg-amber-50/50 dark:border-amber-800 dark:bg-amber-900/10'
+                          : 'border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800'
+                      }`}
+                    >
+                      <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${healthColor(cell.health)}`} />
+                      <span className="min-w-0 flex-1 truncate font-medium text-gray-700 dark:text-gray-300">
+                        {cluster.replace(/-eks$/, '')}
+                      </span>
+                      <span className={`shrink-0 font-mono text-[10px] ${
+                        cell.drift_from_catalog ? 'font-bold text-amber-600 dark:text-amber-400' : 'text-gray-400'
+                      }`}>
+                        {cell.version}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )
+      })}
+      {activeAddons.length === 0 && (
+        <div className="rounded-lg border border-gray-200 bg-white p-8 text-center text-sm text-gray-500 dark:border-gray-700 dark:bg-gray-800">
+          No addons match the current filters.
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
 /* Main component                                                      */
 /* ------------------------------------------------------------------ */
 
@@ -280,7 +382,7 @@ export function VersionMatrix() {
   const [search, setSearch] = useState('')
   const [healthFilter, setHealthFilter] = useState<HealthFilter>('all')
   const [showDriftOnly, setShowDriftOnly] = useState(false)
-  const [viewMode, setViewMode] = useState<ViewMode>('table')
+  const [viewMode, setViewMode] = useState<ViewMode>('heatmap')
 
   const fetchData = () => {
     setLoading(true)
@@ -324,7 +426,7 @@ export function VersionMatrix() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Addon Version Matrix</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Add-on Version Matrix</h1>
         <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
           Version and health status of every addon across all clusters
         </p>
@@ -375,37 +477,28 @@ export function VersionMatrix() {
 
         {/* View mode toggle */}
         <div className="ml-auto flex items-center rounded-lg border border-gray-300 dark:border-gray-600">
-          <button
-            type="button"
-            onClick={() => setViewMode('table')}
-            className={`rounded-l-lg p-2 ${
-              viewMode === 'table'
-                ? 'bg-cyan-600 text-white'
-                : 'bg-white text-gray-500 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700'
-            }`}
-            aria-label="Table view"
-            title="Table matrix"
-          >
+          <button type="button" onClick={() => setViewMode('heatmap')}
+            className={`rounded-l-lg p-2 ${viewMode === 'heatmap' ? 'bg-cyan-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700'}`}
+            aria-label="Heatmap view" title="Heatmap (compact)">
+            <Grid3X3 className="h-4 w-4" />
+          </button>
+          <button type="button" onClick={() => setViewMode('table')}
+            className={`p-2 ${viewMode === 'table' ? 'bg-cyan-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700'}`}
+            aria-label="Table view" title="Table matrix">
             <Table2 className="h-4 w-4" />
           </button>
-          <button
-            type="button"
-            onClick={() => setViewMode('cards')}
-            className={`rounded-r-lg p-2 ${
-              viewMode === 'cards'
-                ? 'bg-cyan-600 text-white'
-                : 'bg-white text-gray-500 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700'
-            }`}
-            aria-label="Card view"
-            title="Card view"
-          >
+          <button type="button" onClick={() => setViewMode('cards')}
+            className={`rounded-r-lg p-2 ${viewMode === 'cards' ? 'bg-cyan-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700'}`}
+            aria-label="Card view" title="Card view">
             <LayoutGrid className="h-4 w-4" />
           </button>
         </div>
       </div>
 
       {/* Matrix content */}
-      {viewMode === 'table' ? (
+      {viewMode === 'heatmap' ? (
+        <HeatmapView addons={filteredAddons} clusters={data.clusters} />
+      ) : viewMode === 'table' ? (
         <MatrixTable addons={filteredAddons} clusters={data.clusters} />
       ) : (
         <div className="space-y-3">
