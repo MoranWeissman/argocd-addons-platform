@@ -322,6 +322,7 @@ func (s *Server) handleRetryMigration(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleCancelMigration(w http.ResponseWriter, r *http.Request) {
+	if !s.requireAdmin(w, r) { return }
 	if s.migrationExecutor == nil {
 		writeError(w, http.StatusServiceUnavailable, "migration service not configured")
 		return
@@ -341,6 +342,7 @@ func (s *Server) handleCancelMigration(w http.ResponseWriter, r *http.Request) {
 
 // handleRollbackMigration reverses completed PR steps of a failed migration.
 func (s *Server) handleRollbackMigration(w http.ResponseWriter, r *http.Request) {
+	if !s.requireAdmin(w, r) { return }
 	if s.migrationExecutor == nil {
 		writeError(w, http.StatusServiceUnavailable, "migration service not configured")
 		return
@@ -364,6 +366,7 @@ func (s *Server) handleRollbackMigration(w http.ResponseWriter, r *http.Request)
 
 // handleDeleteMigration removes a migration session.
 func (s *Server) handleDeleteMigration(w http.ResponseWriter, r *http.Request) {
+	if !s.requireAdmin(w, r) { return }
 	if s.migrationExecutor == nil {
 		writeError(w, http.StatusServiceUnavailable, "migration service not configured")
 		return
