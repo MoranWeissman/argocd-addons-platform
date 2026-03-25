@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.46.1](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.46.0...v1.46.1) (2026-03-25)
+
+
+### Bug Fixes
+
+* delete/cancel/rollback migrations restricted to admin only ([#223](https://github.com/MoranWeissman/argocd-addons-platform/issues/223)) ([54f5e9a](https://github.com/MoranWeissman/argocd-addons-platform/commit/54f5e9a750d0af7a0481568ebf15f957cf3635b4))
+
 ## [1.46.0](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.45.3...v1.46.0) (2026-03-25)
 
 
