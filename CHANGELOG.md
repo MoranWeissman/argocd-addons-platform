@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.48.0](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.47.0...v1.48.0) (2026-03-25)
+
+
+### Features
+
+* heatmap view for version matrix — scales to 30+ add-ons ([#227](https://github.com/MoranWeissman/argocd-addons-platform/issues/227)) ([107c42b](https://github.com/MoranWeissman/argocd-addons-platform/commit/107c42b47e2c3122d7c3e40991a084b0df40a856))
+
 ## [1.47.0](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.46.1...v1.47.0) (2026-03-25)
 
 
