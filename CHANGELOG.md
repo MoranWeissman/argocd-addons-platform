@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.46.0](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.45.3...v1.46.0) (2026-03-25)
+
+
+### Features
+
+* floating AI assistant gets page context awareness ([#222](https://github.com/MoranWeissman/argocd-addons-platform/issues/222)) ([543c1bf](https://github.com/MoranWeissman/argocd-addons-platform/commit/543c1bfc3d8c7f35dc25b227b019adcc5e135326))
+
+
+### Bug Fixes
+
+* handle nil data in users ConfigMap Helm lookup ([#220](https://github.com/MoranWeissman/argocd-addons-platform/issues/220)) ([7b6346c](https://github.com/MoranWeissman/argocd-addons-platform/commit/7b6346c595fba72ac4784d4139339695f078cb76))
+
 ## [1.45.3](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.45.2...v1.45.3) (2026-03-24)
 
 
