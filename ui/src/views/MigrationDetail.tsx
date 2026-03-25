@@ -8,6 +8,7 @@ import { LoadingState } from '@/components/LoadingState'
 import { ErrorState } from '@/components/ErrorState'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { useAuth } from '@/hooks/useAuth'
 import { cn } from '@/lib/utils'
 
 function StepIcon({ status, number }: { status: MigrationStep['status']; number: number }) {
@@ -39,6 +40,7 @@ function stepDuration(step: MigrationStep): string | null {
 export default function MigrationDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const { isAdmin } = useAuth()
   const [migration, setMigration] = useState<Migration | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -189,13 +191,13 @@ export default function MigrationDetail() {
               Resume
             </Button>
           )}
-          {migration.status === 'failed' && (
+          {isAdmin && migration.status === 'failed' && (
             <Button variant="outline" size="sm" onClick={handleRollback}
               className="border-amber-300 text-amber-600 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400">
               Rollback
             </Button>
           )}
-          {!isRunning && (
+          {isAdmin && !isRunning && (
             <Button variant="outline" size="sm" onClick={handleDelete}
               className="border-red-300 text-red-600 hover:bg-red-50 dark:border-red-700 dark:text-red-400">
               Delete
