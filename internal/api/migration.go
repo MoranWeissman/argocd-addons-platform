@@ -975,3 +975,4 @@ func buildOldGitProvider(settings *migration.MigrationSettings) (gitprovider.Git
 		return nil, fmt.Errorf("unsupported git provider: %q", settings.OldGit.Provider)
 	}
 }
+
