@@ -37,8 +37,7 @@ function getPageContext(pathname: string): string | undefined {
 export function FloatingAssistant() {
   const [open, setOpen] = useState(false)
   const location = useLocation()
-  // Page context available for future use (inject into chat system prompt)
-  void getPageContext(location.pathname)
+  const pageContext = getPageContext(location.pathname)
 
   return (
     <>
@@ -50,6 +49,9 @@ export function FloatingAssistant() {
             <div className="flex items-center gap-2 text-white">
               <Sparkles className="h-4 w-4" />
               <span className="text-sm font-semibold">AI Assistant</span>
+              {pageContext && (
+                <span className="text-[10px] text-cyan-200">on {pageContext}</span>
+              )}
             </div>
             <button
               onClick={() => setOpen(false)}
@@ -61,7 +63,7 @@ export function FloatingAssistant() {
 
           {/* Chat content — reuse the full AIAssistant component */}
           <div className="flex-1 overflow-hidden">
-            <AIAssistant embedded />
+            <AIAssistant embedded pageContext={pageContext} />
           </div>
         </div>
       )}

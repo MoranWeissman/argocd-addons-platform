@@ -282,7 +282,7 @@ function ThinkingProcess() {
 // Main component
 // ---------------------------------------------------------------------------
 
-export function AIAssistant({ embedded = false }: { embedded?: boolean } = {}) {
+export function AIAssistant({ embedded = false, pageContext }: { embedded?: boolean; pageContext?: string } = {}) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -327,7 +327,7 @@ export function AIAssistant({ embedded = false }: { embedded?: boolean } = {}) {
       setLoading(true)
 
       try {
-        const res = await api.agentChat(sessionId, trimmed)
+        const res = await api.agentChat(sessionId, trimmed, pageContext)
         const assistantMsg: ChatMessage = {
           id: crypto.randomUUID(),
           role: 'assistant',

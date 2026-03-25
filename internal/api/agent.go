@@ -30,8 +30,9 @@ var (
 
 func (s *Server) handleAgentChat(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		SessionID string `json:"session_id"`
-		Message   string `json:"message"`
+		SessionID   string `json:"session_id"`
+		Message     string `json:"message"`
+		PageContext string `json:"page_context"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request")
@@ -41,6 +42,12 @@ func (s *Server) handleAgentChat(w http.ResponseWriter, r *http.Request) {
 	if req.Message == "" {
 		writeError(w, http.StatusBadRequest, "message is required")
 		return
+	}
+
+	// Prepend page context to help the agent understand where the user is
+	message := req.Message
+	if req.PageContext != "" {
+		message = fmt.Sprintf("[User is currently viewing %s]\n\n%s", req.PageContext, req.Message)
 	}
 
 	// Get or create agent session
@@ -76,7 +83,7 @@ func (s *Server) handleAgentChat(w http.ResponseWriter, r *http.Request) {
 	}
 	agentMu.Unlock()
 
-	response, err := sess.agent.Chat(r.Context(), req.Message)
+	response, err := sess.agent.Chat(r.Context(), message)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
