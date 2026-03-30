@@ -38,8 +38,8 @@ describe('Docs', () => {
     renderDocs();
     await waitFor(() => {
       expect(screen.getByText('Documentation')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Overview', level: 1 })).toBeInTheDocument();
     });
-    expect(screen.getByRole('heading', { name: 'Overview', level: 1 })).toBeInTheDocument();
     expect(screen.getByText(/ArgoCD Addons Platform/)).toBeInTheDocument();
   });
 
