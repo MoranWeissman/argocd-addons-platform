@@ -50,6 +50,10 @@ const mockSetActive = vi.fn().mockResolvedValue({})
 const mockHealth = vi.fn().mockResolvedValue({ status: 'ok' })
 const mockCreateConnection = vi.fn().mockResolvedValue({})
 const mockUpdateConnection = vi.fn().mockResolvedValue({})
+const mockTestCredentials = vi.fn().mockResolvedValue({
+  git: { status: 'ok', message: '' },
+  argocd: { status: 'ok', message: '' },
+})
 
 vi.mock('@/services/api', () => ({
   api: {
@@ -57,6 +61,7 @@ vi.mock('@/services/api', () => ({
     health: () => mockHealth(),
     createConnection: (...args: unknown[]) => mockCreateConnection(...args),
     updateConnection: (...args: unknown[]) => mockUpdateConnection(...args),
+    testCredentials: (...args: unknown[]) => mockTestCredentials(...args),
     getAIStatus: () => Promise.resolve({ enabled: false }),
     getAISummary: () => Promise.resolve({ summary: '' }),
     getDatadogStatus: () => Promise.resolve({ enabled: false, site: "" }),

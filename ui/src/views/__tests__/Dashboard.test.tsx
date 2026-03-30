@@ -60,12 +60,12 @@ describe('Dashboard', () => {
 
     // Stat cards
     expect(screen.getByText('10')).toBeInTheDocument();
-    expect(screen.getByText('50')).toBeInTheDocument();
+    expect(screen.getByText('45/50 healthy')).toBeInTheDocument();
     expect(screen.getByText('15')).toBeInTheDocument();
-    expect(screen.getByText('85 / 100')).toBeInTheDocument();
+    expect(screen.getByText('85/100')).toBeInTheDocument();
 
-    // Charts
-    expect(screen.getByText('Application Health Status')).toBeInTheDocument();
+    // Health bars
+    expect(screen.getByText('Application Health')).toBeInTheDocument();
     expect(screen.getByText('Cluster Connectivity')).toBeInTheDocument();
   });
 });
