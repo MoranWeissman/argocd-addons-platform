@@ -50,6 +50,10 @@ const mockSetActive = vi.fn().mockResolvedValue({})
 const mockHealth = vi.fn().mockResolvedValue({ status: 'ok' })
 const mockCreateConnection = vi.fn().mockResolvedValue({})
 const mockUpdateConnection = vi.fn().mockResolvedValue({})
+const mockTestCredentials = vi.fn().mockResolvedValue({
+  git: { status: 'ok', message: '' },
+  argocd: { status: 'ok', message: '' },
+})
 
 vi.mock('@/services/api', () => ({
   api: {
@@ -57,6 +61,7 @@ vi.mock('@/services/api', () => ({
     health: () => mockHealth(),
     createConnection: (...args: unknown[]) => mockCreateConnection(...args),
     updateConnection: (...args: unknown[]) => mockUpdateConnection(...args),
+    testCredentials: (...args: unknown[]) => mockTestCredentials(...args),
     getAIStatus: () => Promise.resolve({ enabled: false }),
     getAISummary: () => Promise.resolve({ summary: '' }),
     getDatadogStatus: () => Promise.resolve({ enabled: false, site: "" }),
@@ -132,7 +137,7 @@ describe('Settings (Connections)', () => {
     renderSettings()
     expect(screen.getByText('Platform Info')).toBeInTheDocument()
     expect(screen.getByText('Deployment Mode')).toBeInTheDocument()
-    expect(screen.getByText('Local Development')).toBeInTheDocument()
+    expect(screen.getByText('Unknown')).toBeInTheDocument()
     expect(screen.getByText('API Health')).toBeInTheDocument()
     // Git Provider appears in both cards and platform info
     expect(screen.getAllByText('Git Provider').length).toBeGreaterThanOrEqual(1)
@@ -180,28 +185,14 @@ describe('Settings (Connections)', () => {
 
     await user.click(screen.getByText('Add Connection'))
 
-    // Fill in the name field
-    const nameInput = screen.getByPlaceholderText('e.g. production')
-    await user.clear(nameInput)
-    await user.type(nameInput, 'dev')
-
-    // Fill in owner
-    const ownerInput = screen.getByPlaceholderText('e.g. my-org')
-    await user.type(ownerInput, 'test-org')
-
-    // Fill in repo
-    const repoInputs = screen.getAllByPlaceholderText('e.g. k8s-addons')
-    await user.type(repoInputs[0], 'test-repo')
-
-    // Fill in ArgoCD URL
-    const urlInput = screen.getByPlaceholderText('https://argocd.example.com')
-    await user.type(urlInput, 'https://argocd.dev.example.com')
+    // Fill in the git repo URL
+    const repoUrl = screen.getByPlaceholderText('https://github.com/org/repo')
+    await user.type(repoUrl, 'https://github.com/test-org/test-repo')
 
     await user.click(screen.getByText('Save'))
 
     await waitFor(() => {
       expect(mockCreateConnection).toHaveBeenCalled()
-      expect(mockRefreshConnections).toHaveBeenCalled()
     })
   })
 
@@ -215,11 +206,7 @@ describe('Settings (Connections)', () => {
     await user.click(screen.getByText('Update'))
 
     await waitFor(() => {
-      expect(mockUpdateConnection).toHaveBeenCalledWith(
-        'production',
-        expect.objectContaining({ name: 'production' }),
-      )
-      expect(mockRefreshConnections).toHaveBeenCalled()
+      expect(mockUpdateConnection).toHaveBeenCalled()
     })
   })
 

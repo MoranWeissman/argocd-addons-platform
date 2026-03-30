@@ -4,13 +4,48 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	"sort"
+	"strings"
 
 	"github.com/moran/argocd-addons-platform/internal/argocd"
 	"github.com/moran/argocd-addons-platform/internal/config"
 	"github.com/moran/argocd-addons-platform/internal/gitprovider"
 	"github.com/moran/argocd-addons-platform/internal/models"
 )
+
+// extractEnvironment returns the environment segment from a cluster name by
+// matching each dash-separated part against the configured environments list.
+// e.g. "nms-core-dev-eks" with envs ["dev","prod"] → "dev"
+func extractEnvironment(clusterName string, envs []string) string {
+	if len(envs) == 0 {
+		return ""
+	}
+	parts := strings.Split(clusterName, "-")
+	for _, part := range parts {
+		for _, env := range envs {
+			if strings.EqualFold(part, env) {
+				return env
+			}
+		}
+	}
+	return ""
+}
+
+// loadEnvironments reads the APP_ENVIRONMENTS env var and returns the list.
+func loadEnvironments() []string {
+	raw := os.Getenv("APP_ENVIRONMENTS")
+	if raw == "" {
+		return nil
+	}
+	var envs []string
+	for _, e := range strings.Split(raw, ",") {
+		if t := strings.TrimSpace(e); t != "" {
+			envs = append(envs, t)
+		}
+	}
+	return envs
+}
 
 // AddonService handles addon-related operations.
 type AddonService struct {
@@ -63,6 +98,7 @@ func (s *AddonService) GetCatalog(ctx context.Context, gp gitprovider.GitProvide
 		appMap[app.Name] = app
 	}
 
+	envList := loadEnvironments()
 	items := make([]models.AddonCatalogItem, 0, len(repoCfg.Addons))
 	totalClusters := len(repoCfg.Clusters)
 	addonsOnlyInGit := 0
@@ -102,10 +138,11 @@ func (s *AddonService) GetCatalog(ctx context.Context, gp gitprovider.GitProvide
 			}
 
 			dep := models.AddonDeploymentInfo{
-				ClusterName:       cluster.Name,
-				Enabled:           true,
-				ConfiguredVersion: version,
-				Namespace:         addon.Namespace,
+				ClusterName:        cluster.Name,
+				ClusterEnvironment: extractEnvironment(cluster.Name, envList),
+				Enabled:            true,
+				ConfiguredVersion:  version,
+				Namespace:          addon.Namespace,
 			}
 
 			{

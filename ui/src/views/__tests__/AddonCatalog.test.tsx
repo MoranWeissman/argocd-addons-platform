@@ -89,7 +89,7 @@ describe('AddonCatalog', () => {
     renderCatalog()
 
     await waitFor(() => {
-      expect(screen.getByText('Addon Catalog')).toBeInTheDocument()
+      expect(screen.getByText('Add-ons Catalog')).toBeInTheDocument()
     })
 
     // Summary stat cards — now clickable filters
@@ -97,7 +97,7 @@ describe('AddonCatalog', () => {
     expect(screen.getByText('2')).toBeInTheDocument()
     expect(screen.getAllByText('Healthy').length).toBeGreaterThanOrEqual(1)
     expect(screen.getAllByText('Unhealthy').length).toBeGreaterThanOrEqual(1)
-    expect(screen.getAllByText('Not Deployed').length).toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByText('Catalog Only').length).toBeGreaterThanOrEqual(1)
 
     // Addon cards
     expect(screen.getByText('ingress-nginx')).toBeInTheDocument()
@@ -119,7 +119,7 @@ describe('AddonCatalog', () => {
     renderCatalog()
 
     await waitFor(() => {
-      expect(screen.getByText('Addon Catalog')).toBeInTheDocument()
+      expect(screen.getByText('Add-ons Catalog')).toBeInTheDocument()
     })
 
     expect(
@@ -131,7 +131,7 @@ describe('AddonCatalog', () => {
     renderCatalog()
 
     await waitFor(() => {
-      expect(screen.getByText('Addon Catalog')).toBeInTheDocument()
+      expect(screen.getByText('Add-ons Catalog')).toBeInTheDocument()
     })
 
     // Filter options — "All Addons" appears in both stat card and dropdown

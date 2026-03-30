@@ -16,6 +16,8 @@ const mockGetClusterComparison = vi.fn();
 vi.mock('@/services/api', () => ({
   api: {
     getClusterComparison: (...args: unknown[]) => mockGetClusterComparison(...args),
+    getConnections: vi.fn().mockResolvedValue({ connections: [], active_connection: '' }),
+    getNodeInfo: vi.fn().mockResolvedValue(null),
   },
 }));
 

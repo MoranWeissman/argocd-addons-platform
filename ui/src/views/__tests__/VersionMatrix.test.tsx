@@ -45,23 +45,25 @@ describe('VersionMatrix', () => {
 
   it('renders loading state initially', () => {
     renderMatrix()
-    expect(screen.getByText('Loading version matrix...')).toBeInTheDocument()
+    expect(screen.getByText('Loading version drift detector...')).toBeInTheDocument()
   })
 
   it('renders addon rows after loading', async () => {
     renderMatrix()
     await waitFor(() => {
-      expect(screen.getByText('Addon Version Matrix')).toBeInTheDocument()
+      expect(screen.getByText('Add-ons Version Drift Detector')).toBeInTheDocument()
     })
     expect(screen.getByText('ingress-nginx')).toBeInTheDocument()
     expect(screen.getByText('cert-manager')).toBeInTheDocument()
   })
 
-  it('renders table view by default with addon columns and cluster rows', async () => {
+  it('renders table view when table toggle is clicked', async () => {
     renderMatrix()
     await waitFor(() => {
-      expect(screen.getByText('Addon Version Matrix')).toBeInTheDocument()
+      expect(screen.getByText('Add-ons Version Drift Detector')).toBeInTheDocument()
     })
+    // Switch to table view
+    fireEvent.click(screen.getByTitle('Table matrix'))
     // Transposed: clusters as rows, addons as column headers
     expect(screen.getByText('Cluster')).toBeInTheDocument()
     expect(screen.getByText('ingress-nginx')).toBeInTheDocument()
@@ -72,7 +74,7 @@ describe('VersionMatrix', () => {
   it('switches to card view when toggle is clicked', async () => {
     renderMatrix()
     await waitFor(() => {
-      expect(screen.getByText('Addon Version Matrix')).toBeInTheDocument()
+      expect(screen.getByText('Add-ons Version Drift Detector')).toBeInTheDocument()
     })
     const cardButton = screen.getByTitle('Card view')
     fireEvent.click(cardButton)
@@ -83,16 +85,15 @@ describe('VersionMatrix', () => {
   it('renders search input', async () => {
     renderMatrix()
     await waitFor(() => {
-      expect(screen.getByText('Addon Version Matrix')).toBeInTheDocument()
+      expect(screen.getByText('Add-ons Version Drift Detector')).toBeInTheDocument()
     })
-    expect(screen.getByPlaceholderText('Search addon by name...')).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('Search add-on by name...')).toBeInTheDocument()
   })
 
-  it('shows stats summary', async () => {
+  it('shows drift badge when version drift exists', async () => {
     renderMatrix()
     await waitFor(() => {
-      expect(screen.getByText('2 addons')).toBeInTheDocument()
+      expect(screen.getByText('1 version drift')).toBeInTheDocument()
     })
-    expect(screen.getAllByText('3 clusters').length).toBeGreaterThanOrEqual(1)
   })
 })

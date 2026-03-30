@@ -82,7 +82,7 @@ describe('ClustersOverview', () => {
     renderView();
 
     await waitFor(() => {
-      expect(screen.getByText('Clusters Overview')).toBeInTheDocument();
+      expect(screen.getByText('Clusters')).toBeInTheDocument();
     });
 
     // Stat cards
