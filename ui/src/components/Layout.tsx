@@ -218,8 +218,10 @@ export function Layout() {
             )}
           </button>
 
-          {appVersion && !collapsed && (
-            <p className="mt-1 text-center text-[10px] text-slate-500">v{appVersion}</p>
+          {appVersion && (
+            <p className="mt-1 text-center text-[10px] text-slate-500" title={`Version ${appVersion}`}>
+              {collapsed ? `v${appVersion.split('.')[0]}` : `v${appVersion}`}
+            </p>
           )}
         </div>
       </aside>
