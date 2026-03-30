@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.50.0](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.49.0...v1.50.0) (2026-03-30)
+
+
+### Features
+
+* dashboards stored in K8s ConfigMap, Ask AI opens chat, nodeAccess on ([#235](https://github.com/MoranWeissman/argocd-addons-platform/issues/235)) ([e0e0774](https://github.com/MoranWeissman/argocd-addons-platform/commit/e0e077406bc16239994f298379041f2d45af796d))
+
 ## [1.49.0](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.48.2...v1.49.0) (2026-03-30)
 
 
