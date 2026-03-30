@@ -196,6 +196,11 @@ export const api = {
   deleteUser: (username: string) => deleteJSON<void>(`/users/${encodeURIComponent(username)}`),
   resetPassword: (username: string) => postJSON<{ username: string; temp_password: string }>(`/users/${encodeURIComponent(username)}/reset-password`),
 
+  // Embedded dashboards (persisted in K8s ConfigMap)
+  getEmbeddedDashboards: () => fetchJSON<{ id: string; name: string; url: string; provider: string }[]>('/embedded-dashboards'),
+  saveEmbeddedDashboards: (dashboards: { id: string; name: string; url: string; provider: string }[]) =>
+    postJSON<unknown>('/embedded-dashboards', dashboards),
+
   // Cluster nodes
   getNodeInfo: () => fetchJSON<{ nodes: unknown[]; total: number; ready: number; not_ready: number; message?: string }>('/cluster/nodes'),
 

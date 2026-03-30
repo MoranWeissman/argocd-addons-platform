@@ -120,6 +120,10 @@ func NewRouter(srv *Server, staticFS fs.FS) http.Handler {
 	mux.HandleFunc("GET /api/v1/dashboard/attention", srv.handleGetAttentionItems)
 	mux.HandleFunc("GET /api/v1/dashboard/pull-requests", srv.handleGetPullRequests)
 
+	// Embedded dashboards (persisted in K8s ConfigMap)
+	mux.HandleFunc("GET /api/v1/embedded-dashboards", srv.handleListDashboards)
+	mux.HandleFunc("POST /api/v1/embedded-dashboards", srv.handleSaveDashboards)
+
 	// Upgrade Impact Checker
 	mux.HandleFunc("GET /api/v1/upgrade/{addonName}/versions", srv.handleListUpgradeVersions)
 	mux.HandleFunc("POST /api/v1/upgrade/check", srv.handleCheckUpgrade)

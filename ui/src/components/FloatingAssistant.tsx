@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
 import { MessageSquare, X, Sparkles } from 'lucide-react'
 import { AIAssistant } from '@/views/AIAssistant'
@@ -36,8 +36,20 @@ function getPageContext(pathname: string): string | undefined {
 
 export function FloatingAssistant() {
   const [open, setOpen] = useState(false)
+  const [initialMessage, setInitialMessage] = useState<string | undefined>()
   const location = useLocation()
   const pageContext = getPageContext(location.pathname)
+
+  // Listen for programmatic open requests from other components
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const msg = (e as CustomEvent<string>).detail
+      setInitialMessage(msg || undefined)
+      setOpen(true)
+    }
+    window.addEventListener('open-assistant', handler)
+    return () => window.removeEventListener('open-assistant', handler)
+  }, [])
 
   return (
     <>
@@ -63,7 +75,7 @@ export function FloatingAssistant() {
 
           {/* Chat content — reuse the full AIAssistant component */}
           <div className="flex-1 overflow-hidden">
-            <AIAssistant embedded pageContext={pageContext} />
+            <AIAssistant embedded pageContext={pageContext} initialMessage={initialMessage} />
           </div>
         </div>
       )}
