@@ -1,7 +1,9 @@
 package api
 
 import (
+	"context"
 	"net/http"
+	"time"
 )
 
 func (s *Server) handleGetDashboardStats(w http.ResponseWriter, r *http.Request) {
@@ -33,7 +35,9 @@ func (s *Server) handleGetAttentionItems(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	apps, err := ac.ListApplications(r.Context())
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+	apps, err := ac.ListApplications(ctx)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
