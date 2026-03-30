@@ -317,6 +317,7 @@ function AddonGroupsSection({ groups }: { groups: AddonGroupHealth[] }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [sortMode, setSortMode] = useState<'issues' | 'alpha'>('issues');
   const [groupBy, setGroupBy] = useState<GroupBy>('addon');
+  const [visibleCount, setVisibleCount] = useState(10);
   const [ddEnabled, setDdEnabled] = useState<boolean | null>(null);
   // Cache: clusterName -> data (or null if fetch failed/empty)
   const [clusterMetricsCache, setClusterMetricsCache] = useState<Record<string, ClusterMetricsData | null>>({});
@@ -476,8 +477,8 @@ function AddonGroupsSection({ groups }: { groups: AddonGroupHealth[] }) {
 
       <div className="space-y-3">
         {groupBy === 'addon' ? (
-          /* ---- Group by Addon (original) ---- */
-          sortedAddonGroups.map((group) => {
+          /* ---- Group by Addon ---- */
+          sortedAddonGroups.slice(0, visibleCount).map((group) => {
             const isExpanded = expanded.has(group.addon_name);
             const healthEntries = Object.entries(group.health_counts);
             const total = group.total_apps;
@@ -769,6 +770,16 @@ function AddonGroupsSection({ groups }: { groups: AddonGroupHealth[] }) {
           )
         )}
       </div>
+
+      {/* Show more / less for addon groups */}
+      {groupBy === 'addon' && sortedAddonGroups.length > visibleCount && (
+        <button
+          onClick={() => setVisibleCount(v => v + 10)}
+          className="w-full rounded-lg border border-gray-200 bg-white py-2 text-center text-sm text-cyan-600 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-cyan-400"
+        >
+          Show more ({sortedAddonGroups.length - visibleCount} remaining)
+        </button>
+      )}
     </section>
   );
 }
@@ -940,9 +951,12 @@ export function Observability() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-        Observability
-      </h1>
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Observability</h1>
+        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          ArgoCD control plane health, add-on health per cluster, resource alerts, and sync activity timeline.
+        </p>
+      </div>
       <ControlPlaneSection data={data.control_plane} />
       <ResourceAlertsSection alerts={data.resource_alerts} />
       <AddonGroupsSection groups={data.addon_groups} />
