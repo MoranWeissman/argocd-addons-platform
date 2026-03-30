@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Server,
   CheckCircle,
@@ -37,7 +37,11 @@ export function ClustersOverview() {
   const [healthStats, setHealthStats] = useState<ClusterHealthStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [searchParams] = useSearchParams();
+  const initialStatus = searchParams.get('status');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>(
+    initialStatus === 'disconnected' ? 'failed' : 'all'
+  );
   const [filters, setFilters] = useState<Filters>({
     name: '',
     versions: [],

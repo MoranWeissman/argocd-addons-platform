@@ -423,6 +423,10 @@ type argocdApplicationItem struct {
 				TargetRevision string `json:"targetRevision"`
 			} `json:"source"`
 		} `json:"history"`
+		Conditions []struct {
+			Type    string `json:"type"`
+			Message string `json:"message"`
+		} `json:"conditions"`
 		Resources []struct {
 			Group     string `json:"group"`
 			Version   string `json:"version"`
@@ -520,6 +524,22 @@ func (a argocdApplicationItem) toModel() models.ArgocdApplication {
 			res.Message = r.Health.Message
 		}
 		app.Resources = append(app.Resources, res)
+	}
+
+	// Map conditions and override health if errors present
+	hasError := false
+	for _, c := range a.Status.Conditions {
+		app.Conditions = append(app.Conditions, models.AppCondition{
+			Type:    c.Type,
+			Message: c.Message,
+		})
+		// ComparisonError, UnknownError, etc. mean the app is NOT healthy
+		if strings.HasSuffix(c.Type, "Error") {
+			hasError = true
+		}
+	}
+	if hasError && (app.HealthStatus == "Healthy" || app.HealthStatus == "") {
+		app.HealthStatus = "Error"
 	}
 
 	return app

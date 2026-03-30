@@ -68,17 +68,21 @@ export function Dashboard() {
   const [versionDrifts, setVersionDrifts] = useState<{ addon: string; count: number }[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [attentionItems, setAttentionItems] = useState<{ app_name: string; addon_name: string; cluster: string; health: string; sync: string; error?: string; error_type?: string }[]>([]);
+  const [showAttention, setShowAttention] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      const [statsData, obsData, matrixData] = await Promise.all([
+      const [statsData, obsData, matrixData, attention] = await Promise.all([
         api.getDashboardStats(),
         api.getObservability().catch(() => null),
         api.getVersionMatrix().catch(() => null),
+        api.getAttentionItems().catch(() => []),
       ]);
       setStats(statsData);
+      setAttentionItems(attention || []);
 
       // Recent syncs (last 5)
       if (obsData?.recent_syncs) {
@@ -136,35 +140,69 @@ export function Dashboard() {
       </div>
 
       {/* Needs Attention */}
-      {hasIssues ? (
-        <div className="rounded-xl border-2 border-amber-300 bg-amber-50 p-5 dark:border-amber-700 dark:bg-amber-900/20">
-          <div className="mb-3 flex items-center gap-2 text-amber-700 dark:text-amber-400">
-            <AlertTriangle className="h-5 w-5" />
-            <h3 className="text-sm font-semibold">Needs Attention</h3>
+      {hasIssues || attentionItems.length > 0 ? (
+        <div className="rounded-xl border-2 border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-900/20">
+          <div className="flex items-center justify-between p-5 pb-3">
+            <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
+              <AlertTriangle className="h-5 w-5" />
+              <h3 className="text-sm font-semibold">Needs Attention</h3>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {attentionItems.length > 0 && (
+                <button onClick={() => setShowAttention(!showAttention)}
+                  className="flex items-center gap-2 rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs text-red-700 hover:bg-red-50 dark:border-red-800 dark:bg-gray-800 dark:text-red-400">
+                  <div className="h-2 w-2 rounded-full bg-red-500" />
+                  {attentionItems.length} app{attentionItems.length !== 1 ? 's' : ''} with issues
+                  <ChevronRight className={`h-3 w-3 transition-transform ${showAttention ? 'rotate-90' : ''}`} />
+                </button>
+              )}
+              {disconnectedCount > 0 && (
+                <button onClick={() => navigate('/clusters?status=disconnected')}
+                  className="flex items-center gap-2 rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs text-red-700 hover:bg-red-50 dark:border-red-800 dark:bg-gray-800 dark:text-red-400">
+                  <div className="h-2 w-2 rounded-full bg-red-500" />
+                  {disconnectedCount} disconnected cluster{disconnectedCount !== 1 ? 's' : ''}
+                </button>
+              )}
+              {versionDrifts.length > 0 && (
+                <button onClick={() => navigate('/version-matrix?drift=true')}
+                  className="flex items-center gap-2 rounded-lg border border-amber-200 bg-white px-3 py-1.5 text-xs text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:bg-gray-800 dark:text-amber-400">
+                  <div className="h-2 w-2 rounded-full bg-amber-500" />
+                  {versionDrifts.length} add-on{versionDrifts.length !== 1 ? 's' : ''} with drift
+                </button>
+              )}
+            </div>
           </div>
-          <div className="flex flex-wrap gap-3">
-            {degradedCount > 0 && (
-              <button onClick={() => navigate('/addons?filter=unhealthy')}
-                className="flex items-center gap-2 rounded-lg border border-red-200 bg-white px-4 py-2 text-sm text-red-700 hover:bg-red-50 dark:border-red-800 dark:bg-gray-800 dark:text-red-400">
-                <div className="h-2 w-2 rounded-full bg-red-500" />
-                {degradedCount} degraded app{degradedCount !== 1 ? 's' : ''}
-              </button>
-            )}
-            {disconnectedCount > 0 && (
-              <button onClick={() => navigate('/clusters?status=disconnected')}
-                className="flex items-center gap-2 rounded-lg border border-red-200 bg-white px-4 py-2 text-sm text-red-700 hover:bg-red-50 dark:border-red-800 dark:bg-gray-800 dark:text-red-400">
-                <div className="h-2 w-2 rounded-full bg-red-500" />
-                {disconnectedCount} disconnected cluster{disconnectedCount !== 1 ? 's' : ''}
-              </button>
-            )}
-            {versionDrifts.length > 0 && (
-              <button onClick={() => navigate('/version-matrix?drift=true')}
-                className="flex items-center gap-2 rounded-lg border border-amber-200 bg-white px-4 py-2 text-sm text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:bg-gray-800 dark:text-amber-400">
-                <div className="h-2 w-2 rounded-full bg-amber-500" />
-                {versionDrifts.length} add-on{versionDrifts.length !== 1 ? 's' : ''} with version drift
-              </button>
-            )}
-          </div>
+          {/* Expandable detail panel */}
+          {showAttention && attentionItems.length > 0 && (
+            <div className="border-t border-amber-200 p-4 dark:border-amber-700">
+              <div className="max-h-64 overflow-y-auto space-y-1.5">
+                {attentionItems.map((item, i) => (
+                  <div key={i} className="flex items-start gap-3 rounded-lg bg-white px-3 py-2 text-xs dark:bg-gray-800">
+                    <div className={`mt-0.5 h-2.5 w-2.5 shrink-0 rounded-full ${
+                      item.health === 'Error' ? 'bg-red-500' : item.health === 'Degraded' ? 'bg-red-400' : 'bg-amber-500'
+                    }`} />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-gray-900 dark:text-gray-100">{item.app_name}</span>
+                        <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
+                          item.health === 'Error' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                            : item.health === 'Degraded' ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400'
+                              : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+                        }`}>{item.health}</span>
+                        {item.cluster && <span className="text-gray-400">on {item.cluster}</span>}
+                      </div>
+                      {item.error && (
+                        <p className="mt-1 truncate text-gray-500 dark:text-gray-400" title={item.error}>
+                          {item.error_type && <span className="font-medium text-red-600 dark:text-red-400">{item.error_type}: </span>}
+                          {item.error.length > 120 ? item.error.slice(0, 120) + '...' : item.error}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       ) : (
         <div className="flex items-center gap-2 rounded-xl border border-green-200 bg-green-50 px-5 py-4 dark:border-green-800 dark:bg-green-900/20">
