@@ -26,6 +26,66 @@ func (s *Server) handleGetDashboardStats(w http.ResponseWriter, r *http.Request)
 	writeJSON(w, http.StatusOK, resp)
 }
 
+func (s *Server) handleGetAttentionItems(w http.ResponseWriter, r *http.Request) {
+	ac, err := s.connSvc.GetActiveArgocdClient()
+	if err != nil {
+		writeError(w, http.StatusServiceUnavailable, err.Error())
+		return
+	}
+
+	apps, err := ac.ListApplications(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	type AttentionItem struct {
+		AppName    string `json:"app_name"`
+		AddonName  string `json:"addon_name"`
+		Cluster    string `json:"cluster"`
+		Health     string `json:"health"`
+		Sync       string `json:"sync"`
+		Error      string `json:"error,omitempty"`
+		ErrorType  string `json:"error_type,omitempty"`
+	}
+
+	var items []AttentionItem
+	for _, app := range apps {
+		if app.HealthStatus == "Healthy" && len(app.Conditions) == 0 {
+			continue
+		}
+		// Extract addon and cluster from app name (convention: addon-cluster)
+		addonName := app.Name
+		cluster := ""
+		if app.DestinationName != "" {
+			cluster = app.DestinationName
+		}
+
+		errMsg := ""
+		errType := ""
+		for _, c := range app.Conditions {
+			if errMsg == "" {
+				errMsg = c.Message
+				errType = c.Type
+			}
+		}
+
+		if app.HealthStatus != "Healthy" || len(app.Conditions) > 0 {
+			items = append(items, AttentionItem{
+				AppName:   app.Name,
+				AddonName: addonName,
+				Cluster:   cluster,
+				Health:    app.HealthStatus,
+				Sync:      app.SyncStatus,
+				Error:     errMsg,
+				ErrorType: errType,
+			})
+		}
+	}
+
+	writeJSON(w, http.StatusOK, items)
+}
+
 func (s *Server) handleGetPullRequests(w http.ResponseWriter, r *http.Request) {
 	gp, err := s.connSvc.GetActiveGitProvider()
 	if err != nil {

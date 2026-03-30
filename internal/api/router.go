@@ -117,6 +117,7 @@ func NewRouter(srv *Server, staticFS fs.FS) http.Handler {
 
 	// Dashboard
 	mux.HandleFunc("GET /api/v1/dashboard/stats", srv.handleGetDashboardStats)
+	mux.HandleFunc("GET /api/v1/dashboard/attention", srv.handleGetAttentionItems)
 	mux.HandleFunc("GET /api/v1/dashboard/pull-requests", srv.handleGetPullRequests)
 
 	// Upgrade Impact Checker

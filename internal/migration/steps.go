@@ -531,6 +531,10 @@ func (e *Executor) createPRWithLog(
 			step.Message = fmt.Sprintf("PR #%d created but auto-merge failed — please merge manually: %s", pr.ID, pr.URL)
 		} else {
 			e.addLog(m, stepNum, repoLabel, "completed", fmt.Sprintf("PR #%d auto-merged", pr.ID))
+			// Clean up the branch
+			if delErr := gp.DeleteBranch(ctx, branch); delErr != nil {
+				e.addLog(m, stepNum, repoLabel, "warning", fmt.Sprintf("Could not delete branch %s: %s", branch, delErr.Error()))
+			}
 			step.PRStatus = "merged"
 			step.Status = StepCompleted
 			step.CompletedAt = now()

@@ -196,6 +196,9 @@ export const api = {
   deleteUser: (username: string) => deleteJSON<void>(`/users/${encodeURIComponent(username)}`),
   resetPassword: (username: string) => postJSON<{ username: string; temp_password: string }>(`/users/${encodeURIComponent(username)}/reset-password`),
 
+  // Dashboard
+  getAttentionItems: () => fetchJSON<{ app_name: string; addon_name: string; cluster: string; health: string; sync: string; error?: string; error_type?: string }[]>('/dashboard/attention'),
+
   // Docs
   docsList: () => fetchJSON<{ slug: string; title: string; order: number }[]>('/docs/list'),
   docsGet: (slug: string) => fetchJSON<{ slug: string; content: string }>(`/docs/${encodeURIComponent(slug)}`),

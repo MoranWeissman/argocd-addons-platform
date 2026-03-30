@@ -35,6 +35,13 @@ type ArgocdApplication struct {
 	OperationMessage     string            `json:"operation_message,omitempty"`
 	History              []AppHistoryEntry `json:"history,omitempty"`
 	Resources            []AppResource     `json:"resources,omitempty"`
+	Conditions           []AppCondition    `json:"conditions,omitempty"`
+}
+
+// AppCondition represents an ArgoCD application condition (error/warning).
+type AppCondition struct {
+	Type    string `json:"type"`
+	Message string `json:"message"`
 }
 
 // AppHistoryEntry represents a single deployment history entry.
