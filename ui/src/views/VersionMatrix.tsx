@@ -407,12 +407,6 @@ export function VersionMatrix() {
     })
   }, [data, search, healthFilter, showDriftOnly])
 
-  const totalDeployed = useMemo(() => {
-    if (!data) return 0
-    return data.addons.reduce((sum, row) =>
-      sum + Object.values(row.cells).filter(c => c.health !== 'not_enabled' && c.health.toLowerCase() !== 'missing').length, 0)
-  }, [data])
-
   const totalDrifts = useMemo(() => {
     if (!data) return 0
     return data.addons.reduce((sum, row) =>
@@ -428,26 +422,13 @@ export function VersionMatrix() {
       <div>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Add-on Version Matrix</h1>
         <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          Version and health status of every addon across all clusters
+          Shows the deployed version and health of each add-on across all clusters. Click any add-on to see per-cluster details.
+          {totalDrifts > 0 && (
+            <span className="ml-2 rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+              {totalDrifts} version drift{totalDrifts !== 1 ? 's' : ''}
+            </span>
+          )}
         </p>
-      </div>
-
-      {/* Stats */}
-      <div className="flex flex-wrap gap-3 text-sm">
-        <span className="rounded-full bg-gray-100 px-3 py-1 font-medium text-gray-700 dark:bg-gray-800 dark:text-gray-300">
-          {filteredAddons.length} addons
-        </span>
-        <span className="rounded-full bg-gray-100 px-3 py-1 font-medium text-gray-700 dark:bg-gray-800 dark:text-gray-300">
-          {data.clusters.length} clusters
-        </span>
-        <span className="rounded-full bg-cyan-50 px-3 py-1 font-medium text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400">
-          {totalDeployed} deployed
-        </span>
-        {totalDrifts > 0 && (
-          <span className="rounded-full bg-amber-50 px-3 py-1 font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-            {totalDrifts} version {totalDrifts === 1 ? 'drift' : 'drifts'}
-          </span>
-        )}
       </div>
 
       {/* Filters */}

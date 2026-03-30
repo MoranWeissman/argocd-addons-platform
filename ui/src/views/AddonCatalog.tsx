@@ -472,8 +472,7 @@ export function AddonCatalog() {
       <div>
         <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Add-ons Catalog</h2>
         <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          Centralized view of all available addons and their deployment status across
-          clusters
+          All add-ons defined in your Git repository. See deployment count, health breakdown, and version per add-on. Click an add-on for per-cluster details.
         </p>
       </div>
 
