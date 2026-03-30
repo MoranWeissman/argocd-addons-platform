@@ -89,7 +89,7 @@ describe('AddonCatalog', () => {
     renderCatalog()
 
     await waitFor(() => {
-      expect(screen.getByText('Addon Catalog')).toBeInTheDocument()
+      expect(screen.getByText('Add-ons Catalog')).toBeInTheDocument()
     })
 
     // Summary stat cards — now clickable filters
@@ -119,7 +119,7 @@ describe('AddonCatalog', () => {
     renderCatalog()
 
     await waitFor(() => {
-      expect(screen.getByText('Addon Catalog')).toBeInTheDocument()
+      expect(screen.getByText('Add-ons Catalog')).toBeInTheDocument()
     })
 
     expect(
@@ -131,7 +131,7 @@ describe('AddonCatalog', () => {
     renderCatalog()
 
     await waitFor(() => {
-      expect(screen.getByText('Addon Catalog')).toBeInTheDocument()
+      expect(screen.getByText('Add-ons Catalog')).toBeInTheDocument()
     })
 
     // Filter options — "All Addons" appears in both stat card and dropdown

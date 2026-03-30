@@ -86,6 +86,6 @@ describe('AIAssistant', () => {
       expect(screen.getByText('AI Assistant')).toBeInTheDocument()
     })
 
-    expect(screen.getByText('New Conversation')).toBeInTheDocument()
+    expect(screen.getByText('New')).toBeInTheDocument()
   })
 })

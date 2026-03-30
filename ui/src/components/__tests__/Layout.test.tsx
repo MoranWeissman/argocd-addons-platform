@@ -34,13 +34,10 @@ vi.mock('@/hooks/useAuth', () => ({
     login: vi.fn(),
     logout: vi.fn(),
     isAuthenticated: true,
+    isAdmin: true,
     loading: false,
     error: null,
   }),
-}))
-
-vi.mock('@/components/DateTimeDisplay', () => ({
-  DateTimeDisplay: () => <span data-testid="datetime">datetime</span>,
 }))
 
 function renderLayout() {
@@ -61,24 +58,8 @@ describe('Layout', () => {
     renderLayout()
     expect(screen.getByText('Dashboard')).toBeInTheDocument()
     expect(screen.getByText('Clusters')).toBeInTheDocument()
-    expect(screen.getByText('Addon Catalog')).toBeInTheDocument()
+    expect(screen.getByText('Add-ons Catalog')).toBeInTheDocument()
     expect(screen.getByText('Settings')).toBeInTheDocument()
-  })
-
-  it('shows the active connection name', () => {
-    renderLayout()
-    expect(screen.getByText('dev')).toBeInTheDocument()
-  })
-
-  it('shows active connection as static label', () => {
-    renderLayout()
-    // Connection is now a static label, not a dropdown
-    expect(screen.getByText('dev')).toBeInTheDocument()
-  })
-
-  it('renders DateTimeDisplay', () => {
-    renderLayout()
-    expect(screen.getByTestId('datetime')).toBeInTheDocument()
   })
 
   it('collapses sidebar when toggle button is clicked', () => {

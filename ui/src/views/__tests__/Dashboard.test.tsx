@@ -17,6 +17,9 @@ vi.mock('recharts', () => {
 
 vi.mock('@/services/api', () => ({
   api: {
+    getObservability: vi.fn().mockResolvedValue(null),
+    getVersionMatrix: vi.fn().mockResolvedValue(null),
+    getAttentionItems: vi.fn().mockResolvedValue([]),
     getDashboardStats: vi.fn().mockResolvedValue({
       connections: { total: 1, active: 'dev' },
       clusters: { total: 10, connected_to_argocd: 8, disconnected_from_argocd: 2 },
@@ -45,7 +48,7 @@ describe('Dashboard', () => {
 
   it('renders loading state initially', () => {
     renderDashboard();
-    expect(screen.getByText('Loading dashboard statistics...')).toBeInTheDocument();
+    expect(screen.getByText('Loading dashboard...')).toBeInTheDocument();
   });
 
   it('renders stats after data loads', async () => {

@@ -1,11 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { Dashboards } from '@/views/Dashboards';
 import { extractUrlFromIframe } from '@/hooks/useDashboards';
 
 vi.mock('@/hooks/useTheme', () => ({
   useTheme: () => ({ theme: 'light', toggleTheme: vi.fn() }),
+}));
+
+vi.mock('@/services/api', () => ({
+  api: {
+    getEmbeddedDashboards: vi.fn().mockRejectedValue(new Error('no backend')),
+    saveEmbeddedDashboards: vi.fn().mockRejectedValue(new Error('no backend')),
+  },
 }));
 
 // Provide a stub for crypto.randomUUID in test env
@@ -78,7 +85,7 @@ describe('Dashboards', () => {
     expect(screen.getByText('Open in new tab')).toBeInTheDocument();
   });
 
-  it('loads dashboards from localStorage', () => {
+  it('loads dashboards from localStorage', async () => {
     const stored = [
       {
         id: 'stored-1',
@@ -90,11 +97,13 @@ describe('Dashboards', () => {
     localStorage.setItem('aap-dashboards', JSON.stringify(stored));
 
     renderDashboards();
-    const matches = screen.getAllByText('Preloaded Dashboard');
-    expect(matches.length).toBeGreaterThanOrEqual(1);
+    await waitFor(() => {
+      const matches = screen.getAllByText('Preloaded Dashboard');
+      expect(matches.length).toBeGreaterThanOrEqual(1);
+    });
   });
 
-  it('shows edit form pre-filled with existing values', () => {
+  it('shows edit form pre-filled with existing values', async () => {
     const stored = [
       {
         id: 'edit-1',
@@ -106,6 +115,11 @@ describe('Dashboards', () => {
     localStorage.setItem('aap-dashboards', JSON.stringify(stored));
 
     renderDashboards();
+
+    // Wait for dashboard to load from localStorage
+    await waitFor(() => {
+      expect(screen.getByText('Edit')).toBeInTheDocument();
+    });
 
     // Click Edit button in toolbar
     fireEvent.click(screen.getByText('Edit'));
@@ -120,7 +134,7 @@ describe('Dashboards', () => {
     expect(screen.getByLabelText('Provider')).toHaveValue('grafana');
   });
 
-  it('updates a dashboard when editing', () => {
+  it('updates a dashboard when editing', async () => {
     const stored = [
       {
         id: 'edit-2',
@@ -133,7 +147,10 @@ describe('Dashboards', () => {
 
     renderDashboards();
 
-    // Open edit form
+    // Wait for dashboard to load then open edit form
+    await waitFor(() => {
+      expect(screen.getByText('Edit')).toBeInTheDocument();
+    });
     fireEvent.click(screen.getByText('Edit'));
 
     // Change name
@@ -176,7 +193,7 @@ describe('Dashboards', () => {
     ).toBeInTheDocument();
   });
 
-  it('has only one Add Dashboard button (in sidebar)', () => {
+  it('has only one Add Dashboard button (in sidebar)', async () => {
     // Pre-populate so empty state doesn't show
     const stored = [
       {
@@ -189,6 +206,9 @@ describe('Dashboards', () => {
     localStorage.setItem('aap-dashboards', JSON.stringify(stored));
 
     renderDashboards();
+    await waitFor(() => {
+      expect(screen.getAllByText('Dashboard One').length).toBeGreaterThanOrEqual(1);
+    });
     const addButtons = screen.getAllByText('Add Dashboard');
     expect(addButtons).toHaveLength(1);
   });
