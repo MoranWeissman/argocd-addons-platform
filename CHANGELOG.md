@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.49.0](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.48.2...v1.49.0) (2026-03-30)
+
+
+### Features
+
+* cluster detail improvements + node access opt-in ([#233](https://github.com/MoranWeissman/argocd-addons-platform/issues/233)) ([c80002e](https://github.com/MoranWeissman/argocd-addons-platform/commit/c80002ec47879b192379743728b62ca3865484ad))
+
 ## [1.48.2](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.48.1...v1.48.2) (2026-03-30)
 
 
