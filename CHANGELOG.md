@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.48.1](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.48.0...v1.48.1) (2026-03-30)
+
+
+### Bug Fixes
+
+* surface ArgoCD conditions, correct health status, attention panel ([#229](https://github.com/MoranWeissman/argocd-addons-platform/issues/229)) ([0f44573](https://github.com/MoranWeissman/argocd-addons-platform/commit/0f44573ba9f440d4dcdbf82ee580c6cb4d98d8f3))
+
 ## [1.48.0](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.47.0...v1.48.0) (2026-03-25)
 
 
