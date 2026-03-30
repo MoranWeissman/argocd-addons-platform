@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.52.0](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.51.0...v1.52.0) (2026-03-30)
+
+
+### Features
+
+* cluster stats, ArgoCD links, version drift detector, catalog-only label, env parsing ([c264765](https://github.com/MoranWeissman/argocd-addons-platform/commit/c264765e25f4035f9a816d0bc9b14b04ef925724))
+
 ## [1.51.0](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.50.0...v1.51.0) (2026-03-30)
 
 
