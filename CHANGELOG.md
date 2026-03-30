@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.51.0](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.50.0...v1.51.0) (2026-03-30)
+
+
+### Features
+
+* observability pagination, version matrix simplified, better page descriptions ([#237](https://github.com/MoranWeissman/argocd-addons-platform/issues/237)) ([7cf8b74](https://github.com/MoranWeissman/argocd-addons-platform/commit/7cf8b74d9e740f9ce91734c298d2eb34dc7046fd))
+
 ## [1.50.0](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.49.0...v1.50.0) (2026-03-30)
 
 
