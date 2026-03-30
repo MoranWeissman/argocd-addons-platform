@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -11,6 +12,7 @@ import (
 
 type nodeInfo struct {
 	Name              string `json:"name"`
+	Status            string `json:"status"` // "Ready" or "NotReady"
 	InstanceType      string `json:"instance_type"`
 	Architecture      string `json:"architecture"`
 	OS                string `json:"os"`
@@ -23,7 +25,8 @@ type nodeInfo struct {
 func (s *Server) handleGetNodeInfo(w http.ResponseWriter, r *http.Request) {
 	config, err := rest.InClusterConfig()
 	if err != nil {
-		writeJSON(w, http.StatusOK, map[string]string{
+		writeJSON(w, http.StatusOK, map[string]interface{}{
+			"nodes":   []nodeInfo{},
 			"message": "Node info only available when running in-cluster",
 		})
 		return
@@ -43,8 +46,18 @@ func (s *Server) handleGetNodeInfo(w http.ResponseWriter, r *http.Request) {
 
 	result := make([]nodeInfo, 0, len(nodes.Items))
 	for _, node := range nodes.Items {
+		// Determine node ready status
+		status := "NotReady"
+		for _, cond := range node.Status.Conditions {
+			if cond.Type == corev1.NodeReady && cond.Status == corev1.ConditionTrue {
+				status = "Ready"
+				break
+			}
+		}
+
 		info := nodeInfo{
 			Name:         node.Name,
+			Status:       status,
 			InstanceType: node.Labels["node.kubernetes.io/instance-type"],
 			Architecture: node.Status.NodeInfo.Architecture,
 			OS:           node.Status.NodeInfo.OperatingSystem,
@@ -66,5 +79,17 @@ func (s *Server) handleGetNodeInfo(w http.ResponseWriter, r *http.Request) {
 		result = append(result, info)
 	}
 
-	writeJSON(w, http.StatusOK, map[string]interface{}{"nodes": result})
+	readyCount := 0
+	for _, n := range result {
+		if n.Status == "Ready" {
+			readyCount++
+		}
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"nodes":       result,
+		"total":       len(result),
+		"ready":       readyCount,
+		"not_ready":   len(result) - readyCount,
+	})
 }

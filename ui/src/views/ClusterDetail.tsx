@@ -10,6 +10,11 @@ import {
   Ban,
   ChevronDown,
   ChevronUp,
+  ExternalLink,
+  Server,
+  Cpu,
+  WifiOff,
+  MessageSquare,
 } from 'lucide-react';
 import { api } from '@/services/api';
 import type { ClusterComparisonResponse, AddonComparisonStatus, ConfigDiffResponse } from '@/services/models';
@@ -48,14 +53,21 @@ export function ClusterDetail() {
   const [configDiffLoading, setConfigDiffLoading] = useState(false);
   const [configDiffError, setConfigDiffError] = useState<string | null>(null);
   const [clusterValuesYaml, setClusterValuesYaml] = useState<string | null>(null);
+  const [nodeInfo, setNodeInfo] = useState<{ total: number; ready: number; not_ready: number } | null>(null);
 
   const fetchData = useCallback(async () => {
     if (!name) return;
     try {
       setLoading(true);
       setError(null);
-      const result = await api.getClusterComparison(name);
+      const [result, nodes] = await Promise.all([
+        api.getClusterComparison(name),
+        api.getNodeInfo().catch(() => null),
+      ]);
       setData(result);
+      if (nodes && typeof nodes === 'object' && 'total' in nodes) {
+        setNodeInfo(nodes as { total: number; ready: number; not_ready: number });
+      }
     } catch (e: unknown) {
       setError(
         e instanceof Error
@@ -222,13 +234,52 @@ export function ClusterDetail() {
         Back to Clusters Overview
       </button>
 
-      {/* Heading */}
-      <div>
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{data.cluster.name}</h2>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          Addons Comparison: Git Configuration vs. Live ArgoCD Health Status
-        </p>
+      {/* Heading + cluster meta */}
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{data.cluster.name}</h2>
+          <div className="mt-1 flex flex-wrap items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
+            {data.cluster.server_version && (
+              <span className="flex items-center gap-1">
+                <Server className="h-3.5 w-3.5" />
+                {data.cluster.server_version}
+              </span>
+            )}
+            {nodeInfo && nodeInfo.total > 0 && (
+              <span className="flex items-center gap-1">
+                <Cpu className="h-3.5 w-3.5" />
+                {nodeInfo.ready}/{nodeInfo.total} nodes ready
+                {nodeInfo.not_ready > 0 && (
+                  <span className="ml-1 rounded bg-red-100 px-1.5 py-0.5 text-xs text-red-700 dark:bg-red-900/30 dark:text-red-400">
+                    {nodeInfo.not_ready} not ready
+                  </span>
+                )}
+              </span>
+            )}
+          </div>
+        </div>
       </div>
+
+      {/* Connection status banner */}
+      {data.cluster_connection_state && data.cluster_connection_state !== 'Successful' && (
+        <div className="flex items-center justify-between rounded-xl border-2 border-red-300 bg-red-50 px-5 py-3 dark:border-red-700 dark:bg-red-900/20">
+          <div className="flex items-center gap-2 text-red-700 dark:text-red-400">
+            <WifiOff className="h-5 w-5 shrink-0" />
+            <div>
+              <span className="text-sm font-semibold">Cluster unreachable</span>
+              <span className="ml-2 text-xs text-red-600 dark:text-red-400">({data.cluster_connection_state})</span>
+              <p className="text-xs text-red-600 dark:text-red-400">Add-on health data below reflects the last known state and may be stale.</p>
+            </div>
+          </div>
+          <button
+            onClick={() => { const e = new KeyboardEvent('keydown', { key: 'k', metaKey: true }); window.dispatchEvent(e) }}
+            className="flex shrink-0 items-center gap-1.5 rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs text-red-700 hover:bg-red-50 dark:border-red-800 dark:bg-gray-800 dark:text-red-400"
+          >
+            <MessageSquare className="h-3.5 w-3.5" />
+            Ask AI
+          </button>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="flex gap-1 border-b border-gray-200 dark:border-gray-700">
@@ -241,7 +292,7 @@ export function ClusterDetail() {
               : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
           }`}
         >
-          Addon Comparison
+          Add-ons
         </button>
         <button
           type="button"
@@ -252,7 +303,7 @@ export function ClusterDetail() {
               : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
           }`}
         >
-          Config Overrides
+          Values: Global vs. Cluster
         </button>
       </div>
 
@@ -344,6 +395,14 @@ function ComparisonRow({ addon, isExpanded, onToggleExpand }: ComparisonRowProps
   const isTruncated = shouldTruncateIssues(allIssues);
   const displayedIssues = isExpanded ? allIssues : allIssues.slice(0, 2);
 
+  // An app is NOT OK if health is non-healthy OR there are issues
+  const hasProblems = allIssues.length > 0
+    || addon.argocd_health_status === 'Error'
+    || addon.argocd_health_status === 'Degraded'
+    || addon.status === 'with_issues'
+    || addon.status === 'unknown_health'
+    || addon.status === 'unknown_state';
+
   return (
     <tr className="hover:bg-gray-50 dark:hover:bg-gray-700">
       <td className="px-4 py-3">
@@ -354,7 +413,21 @@ function ComparisonRow({ addon, isExpanded, onToggleExpand }: ComparisonRowProps
         )}
       </td>
       <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">
-        {capitalizeAddonName(addon.addon_name)}
+        <div className="flex items-center gap-2">
+          {capitalizeAddonName(addon.addon_name)}
+          {addon.argocd_application_name && (
+            <a
+              href={`/applications/${addon.argocd_application_name}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="text-gray-400 hover:text-cyan-600 dark:hover:text-cyan-400"
+              title="Open in ArgoCD"
+            >
+              <ExternalLink className="h-3.5 w-3.5" />
+            </a>
+          )}
+        </div>
       </td>
       <td className="px-4 py-3 font-mono text-xs text-gray-600 dark:text-gray-400">
         {addon.has_version_override
@@ -396,6 +469,10 @@ function ComparisonRow({ addon, isExpanded, onToggleExpand }: ComparisonRowProps
               </button>
             )}
           </div>
+        ) : hasProblems ? (
+          <span className="text-xs text-amber-600 dark:text-amber-400">
+            {addon.argocd_health_status || addon.status || 'Unknown'}
+          </span>
         ) : (
           <span className="text-xs text-green-600 dark:text-green-400">OK</span>
         )}

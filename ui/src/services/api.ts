@@ -196,6 +196,9 @@ export const api = {
   deleteUser: (username: string) => deleteJSON<void>(`/users/${encodeURIComponent(username)}`),
   resetPassword: (username: string) => postJSON<{ username: string; temp_password: string }>(`/users/${encodeURIComponent(username)}/reset-password`),
 
+  // Cluster nodes
+  getNodeInfo: () => fetchJSON<{ nodes: unknown[]; total: number; ready: number; not_ready: number; message?: string }>('/cluster/nodes'),
+
   // Dashboard
   getAttentionItems: () => fetchJSON<{ app_name: string; addon_name: string; cluster: string; health: string; sync: string; error?: string; error_type?: string }[]>('/dashboard/attention'),
 
