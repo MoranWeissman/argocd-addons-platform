@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.48.2](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.48.1...v1.48.2) (2026-03-30)
+
+
+### Bug Fixes
+
+* show version when sidebar collapsed, add 10s timeout to attention endpoint ([#231](https://github.com/MoranWeissman/argocd-addons-platform/issues/231)) ([ce3cfd9](https://github.com/MoranWeissman/argocd-addons-platform/commit/ce3cfd96af8dc76def60496e47e485dfc3212f92))
+
 ## [1.48.1](https://github.com/MoranWeissman/argocd-addons-platform/compare/v1.48.0...v1.48.1) (2026-03-30)
 
 
