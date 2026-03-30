@@ -36,6 +36,10 @@ config:
   # Dev mode: enables env var fallback for credentials (GITHUB_TOKEN, ARGOCD_TOKEN, etc.)
   # In production, set to false — credentials must be configured via Settings UI.
   devMode: false
+  # Enable read access to Kubernetes Nodes (get/list).
+  # Adds a ClusterRole rule allowing AAP to fetch node count and status.
+  # Requires cluster-level permissions — opt-in.
+  nodeAccess: false
 
 # ---------------------------------------------------------------------------
 # Secrets
