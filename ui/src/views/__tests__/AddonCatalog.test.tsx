@@ -97,7 +97,7 @@ describe('AddonCatalog', () => {
     expect(screen.getByText('2')).toBeInTheDocument()
     expect(screen.getAllByText('Healthy').length).toBeGreaterThanOrEqual(1)
     expect(screen.getAllByText('Unhealthy').length).toBeGreaterThanOrEqual(1)
-    expect(screen.getAllByText('Not Deployed').length).toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByText('Catalog Only').length).toBeGreaterThanOrEqual(1)
 
     // Addon cards
     expect(screen.getByText('ingress-nginx')).toBeInTheDocument()

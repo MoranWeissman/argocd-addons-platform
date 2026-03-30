@@ -51,7 +51,7 @@ describe('VersionMatrix', () => {
   it('renders addon rows after loading', async () => {
     renderMatrix()
     await waitFor(() => {
-      expect(screen.getByText('Addon Version Matrix')).toBeInTheDocument()
+      expect(screen.getByText('Add-ons Version Drift Detector')).toBeInTheDocument()
     })
     expect(screen.getByText('ingress-nginx')).toBeInTheDocument()
     expect(screen.getByText('cert-manager')).toBeInTheDocument()
@@ -60,7 +60,7 @@ describe('VersionMatrix', () => {
   it('renders table view by default with addon columns and cluster rows', async () => {
     renderMatrix()
     await waitFor(() => {
-      expect(screen.getByText('Addon Version Matrix')).toBeInTheDocument()
+      expect(screen.getByText('Add-ons Version Drift Detector')).toBeInTheDocument()
     })
     // Transposed: clusters as rows, addons as column headers
     expect(screen.getByText('Cluster')).toBeInTheDocument()
@@ -72,7 +72,7 @@ describe('VersionMatrix', () => {
   it('switches to card view when toggle is clicked', async () => {
     renderMatrix()
     await waitFor(() => {
-      expect(screen.getByText('Addon Version Matrix')).toBeInTheDocument()
+      expect(screen.getByText('Add-ons Version Drift Detector')).toBeInTheDocument()
     })
     const cardButton = screen.getByTitle('Card view')
     fireEvent.click(cardButton)
@@ -83,7 +83,7 @@ describe('VersionMatrix', () => {
   it('renders search input', async () => {
     renderMatrix()
     await waitFor(() => {
-      expect(screen.getByText('Addon Version Matrix')).toBeInTheDocument()
+      expect(screen.getByText('Add-ons Version Drift Detector')).toBeInTheDocument()
     })
     expect(screen.getByPlaceholderText('Search addon by name...')).toBeInTheDocument()
   })

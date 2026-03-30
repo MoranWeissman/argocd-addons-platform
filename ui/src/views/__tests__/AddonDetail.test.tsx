@@ -5,6 +5,7 @@ import { AddonDetail } from '@/views/AddonDetail'
 
 vi.mock('@/services/api', () => ({
   api: {
+    getConnections: vi.fn().mockResolvedValue({ connections: [], active_connection: '' }),
     getAddonValues: vi.fn().mockRejectedValue(new Error('not found')),
     getAddonDetail: vi.fn().mockResolvedValue({
       addon: {

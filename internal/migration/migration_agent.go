@@ -403,12 +403,7 @@ func (a *MigrationAgent) parseResult(content string) (StepResult, string, error)
 		}
 	}
 
-	// Last resort: check for clear success/failure signals
-	lower := strings.ToLower(content)
-	if strings.Contains(lower, "successfully") || strings.Contains(lower, "verified") || strings.Contains(lower, "confirmed") || strings.Contains(lower, "found") {
-		return StepResultSuccess, content, nil
-	}
-
+	// No recognized prefix — default to FAILED (safe: prevents false success)
 	return StepResultFailed, "Agent did not return a clear result. Response: " + content, nil
 }
 
