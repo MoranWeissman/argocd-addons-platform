@@ -1,26 +1,11 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
+import { api } from '@/services/api';
 
 export interface EmbeddedDashboard {
   id: string;
   name: string;
   url: string;
   provider: 'datadog' | 'grafana' | 'custom';
-}
-
-const STORAGE_KEY = 'aap-dashboards';
-
-function loadDashboards(): EmbeddedDashboard[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    return JSON.parse(raw) as EmbeddedDashboard[];
-  } catch {
-    return [];
-  }
-}
-
-function saveDashboards(dashboards: EmbeddedDashboard[]): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(dashboards));
 }
 
 /** Extract the src URL from an iframe snippet, or return the input as-is. */
@@ -30,7 +15,35 @@ export function extractUrlFromIframe(input: string): string {
 }
 
 export function useDashboards() {
-  const [dashboards, setDashboards] = useState<EmbeddedDashboard[]>(loadDashboards);
+  const [dashboards, setDashboards] = useState<EmbeddedDashboard[]>([]);
+  const [loaded, setLoaded] = useState(false);
+
+  // Load from backend on mount
+  useEffect(() => {
+    api.getEmbeddedDashboards()
+      .then((data) => {
+        setDashboards((data ?? []) as EmbeddedDashboard[]);
+        setLoaded(true);
+      })
+      .catch(() => {
+        // Fallback: try localStorage for backwards compat
+        try {
+          const raw = localStorage.getItem('aap-dashboards');
+          if (raw) setDashboards(JSON.parse(raw));
+        } catch { /* ignore */ }
+        setLoaded(true);
+      });
+  }, []);
+
+  const persist = useCallback(async (next: EmbeddedDashboard[]) => {
+    setDashboards(next);
+    try {
+      await api.saveEmbeddedDashboards(next);
+    } catch {
+      // Fallback: save to localStorage
+      localStorage.setItem('aap-dashboards', JSON.stringify(next));
+    }
+  }, []);
 
   const addDashboard = useCallback(
     (dashboard: Omit<EmbeddedDashboard, 'id'>) => {
@@ -38,33 +51,27 @@ export function useDashboards() {
         ...dashboard,
         id: crypto.randomUUID?.() ?? Date.now().toString(),
       };
-      setDashboards((prev) => {
-        const next = [...prev, newDashboard];
-        saveDashboards(next);
-        return next;
-      });
+      const next = [...dashboards, newDashboard];
+      void persist(next);
     },
-    [],
+    [dashboards, persist],
   );
 
   const updateDashboard = useCallback(
     (id: string, updates: Partial<Omit<EmbeddedDashboard, 'id'>>) => {
-      setDashboards((prev) => {
-        const next = prev.map((d) => (d.id === id ? { ...d, ...updates } : d));
-        saveDashboards(next);
-        return next;
-      });
+      const next = dashboards.map((d) => (d.id === id ? { ...d, ...updates } : d));
+      void persist(next);
     },
-    [],
+    [dashboards, persist],
   );
 
-  const removeDashboard = useCallback((id: string) => {
-    setDashboards((prev) => {
-      const next = prev.filter((d) => d.id !== id);
-      saveDashboards(next);
-      return next;
-    });
-  }, []);
+  const removeDashboard = useCallback(
+    (id: string) => {
+      const next = dashboards.filter((d) => d.id !== id);
+      void persist(next);
+    },
+    [dashboards, persist],
+  );
 
-  return { dashboards, addDashboard, updateDashboard, removeDashboard };
+  return { dashboards, loaded, addDashboard, updateDashboard, removeDashboard };
 }

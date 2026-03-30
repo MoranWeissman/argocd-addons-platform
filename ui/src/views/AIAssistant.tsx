@@ -282,7 +282,7 @@ function ThinkingProcess() {
 // Main component
 // ---------------------------------------------------------------------------
 
-export function AIAssistant({ embedded = false, pageContext }: { embedded?: boolean; pageContext?: string } = {}) {
+export function AIAssistant({ embedded = false, pageContext, initialMessage }: { embedded?: boolean; pageContext?: string; initialMessage?: string } = {}) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -299,6 +299,14 @@ export function AIAssistant({ embedded = false, pageContext }: { embedded?: bool
       .then((res) => setAiEnabled(res.enabled))
       .catch(() => setAiEnabled(false))
   }, [])
+
+  // Auto-send initialMessage when AI is ready
+  useEffect(() => {
+    if (initialMessage && aiEnabled === true && messages.length === 0) {
+      void sendMessage(initialMessage)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialMessage, aiEnabled])
 
   // Auto-scroll on new messages
   useEffect(() => {

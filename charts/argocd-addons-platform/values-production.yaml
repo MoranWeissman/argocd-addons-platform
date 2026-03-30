@@ -5,11 +5,12 @@ replicaCount: 1
 
 image:
   repository: ghcr.io/moranweissman/argocd-addons-platform
-  tag: "1.20.2"
+  tag: "1.49.0"
   pullPolicy: Always
 
 config:
   connectionSecretName: "aap-connections"
+  nodeAccess: true
 
 rbac:
   create: true
@@ -37,8 +38,15 @@ ingress:
   annotations:
     alb.ingress.kubernetes.io/scheme: internet-facing
     alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/group.name: private
+    alb.ingress.kubernetes.io/backend-protocol: HTTP
     alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80},{"HTTPS":443}]'
-    alb.ingress.kubernetes.io/ssl-redirect: "443"
+    alb.ingress.kubernetes.io/healthcheck-path: /api/v1/health
+    alb.ingress.kubernetes.io/healthcheck-protocol: HTTP
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: "30"
+    alb.ingress.kubernetes.io/healthcheck-timeout-seconds: "5"
+    alb.ingress.kubernetes.io/healthy-threshold-count: "3"
+    alb.ingress.kubernetes.io/unhealthy-threshold-count: "2"
   hosts:
     - host: argocd-addons-platform.mahi-techlabs.com
       paths:
