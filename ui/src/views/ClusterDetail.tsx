@@ -15,6 +15,7 @@ import {
   Cpu,
   WifiOff,
   MessageSquare,
+  Tag,
 } from 'lucide-react';
 import { api } from '@/services/api';
 import type { ClusterComparisonResponse, AddonComparisonStatus, ConfigDiffResponse } from '@/services/models';
@@ -54,19 +55,29 @@ export function ClusterDetail() {
   const [configDiffError, setConfigDiffError] = useState<string | null>(null);
   const [clusterValuesYaml, setClusterValuesYaml] = useState<string | null>(null);
   const [nodeInfo, setNodeInfo] = useState<{ total: number; ready: number; not_ready: number } | null>(null);
+  const [argocdBaseURL, setArgocdBaseURL] = useState<string>('');
 
   const fetchData = useCallback(async () => {
     if (!name) return;
     try {
       setLoading(true);
       setError(null);
-      const [result, nodes] = await Promise.all([
+      const [result, nodes, connections] = await Promise.all([
         api.getClusterComparison(name),
         api.getNodeInfo().catch(() => null),
+        api.getConnections().catch(() => null),
       ]);
       setData(result);
       if (nodes && typeof nodes === 'object' && 'total' in nodes) {
         setNodeInfo(nodes as { total: number; ready: number; not_ready: number });
+      }
+      if (connections) {
+        const active = connections.connections.find(
+          c => c.name === connections.active_connection || c.is_active
+        );
+        if (active?.argocd_server_url) {
+          setArgocdBaseURL(active.argocd_server_url.replace(/\/$/, ''));
+        }
       }
     } catch (e: unknown) {
       setError(
@@ -235,27 +246,49 @@ export function ClusterDetail() {
       </button>
 
       {/* Heading + cluster meta */}
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{data.cluster.name}</h2>
-          <div className="mt-1 flex flex-wrap items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
-            {data.cluster.server_version && (
-              <span className="flex items-center gap-1">
-                <Server className="h-3.5 w-3.5" />
-                {data.cluster.server_version}
-              </span>
-            )}
-            {nodeInfo && nodeInfo.total > 0 && (
-              <span className="flex items-center gap-1">
-                <Cpu className="h-3.5 w-3.5" />
-                {nodeInfo.ready}/{nodeInfo.total} nodes ready
+      <div>
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{data.cluster.name}</h2>
+        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          Kubernetes cluster managed by ArgoCD — deployed add-ons, health, and configuration overrides.
+        </p>
+      </div>
+
+      {/* Cluster info stat cards */}
+      <div className="flex flex-wrap gap-3">
+        {data.cluster.server_version && (
+          <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+            <Tag className="h-4 w-4 text-cyan-500" />
+            <div>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Cluster Version</p>
+              <p className="font-mono text-sm font-semibold text-gray-900 dark:text-gray-100">{data.cluster.server_version}</p>
+            </div>
+          </div>
+        )}
+        {nodeInfo && nodeInfo.total > 0 && (
+          <div className={`flex items-center gap-2 rounded-lg border px-4 py-3 shadow-sm ${
+            nodeInfo.not_ready > 0
+              ? 'border-red-200 bg-red-50 dark:border-red-700 dark:bg-red-900/20'
+              : 'border-green-200 bg-green-50 dark:border-green-700 dark:bg-green-900/20'
+          }`}>
+            <Cpu className={`h-4 w-4 ${nodeInfo.not_ready > 0 ? 'text-red-500' : 'text-green-500'}`} />
+            <div>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Nodes Ready</p>
+              <p className={`text-sm font-semibold ${nodeInfo.not_ready > 0 ? 'text-red-700 dark:text-red-400' : 'text-green-700 dark:text-green-400'}`}>
+                {nodeInfo.ready} / {nodeInfo.total}
                 {nodeInfo.not_ready > 0 && (
-                  <span className="ml-1 rounded bg-red-100 px-1.5 py-0.5 text-xs text-red-700 dark:bg-red-900/30 dark:text-red-400">
-                    {nodeInfo.not_ready} not ready
-                  </span>
+                  <span className="ml-1.5 text-xs font-normal">({nodeInfo.not_ready} not ready)</span>
                 )}
-              </span>
-            )}
+              </p>
+            </div>
+          </div>
+        )}
+        <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+          <Server className="h-4 w-4 text-cyan-500" />
+          <div>
+            <p className="text-xs text-gray-500 dark:text-gray-400">Connection</p>
+            <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+              {data.cluster_connection_state || 'Unknown'}
+            </p>
           </div>
         </div>
       </div>
@@ -347,6 +380,7 @@ export function ClusterDetail() {
                     addon={addon}
                     isExpanded={expandedRows.has(addon.addon_name)}
                     onToggleExpand={() => toggleExpanded(addon.addon_name)}
+                    argocdBaseURL={argocdBaseURL}
                   />
                 ))}
                 {filteredAddons.length === 0 && (
@@ -388,9 +422,10 @@ interface ComparisonRowProps {
   addon: AddonComparisonStatus;
   isExpanded: boolean;
   onToggleExpand: () => void;
+  argocdBaseURL: string;
 }
 
-function ComparisonRow({ addon, isExpanded, onToggleExpand }: ComparisonRowProps) {
+function ComparisonRow({ addon, isExpanded, onToggleExpand, argocdBaseURL }: ComparisonRowProps) {
   const allIssues = addon.issues;
   const isTruncated = shouldTruncateIssues(allIssues);
   const displayedIssues = isExpanded ? allIssues : allIssues.slice(0, 2);
@@ -415,14 +450,14 @@ function ComparisonRow({ addon, isExpanded, onToggleExpand }: ComparisonRowProps
       <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">
         <div className="flex items-center gap-2">
           {capitalizeAddonName(addon.addon_name)}
-          {addon.argocd_application_name && (
+          {addon.argocd_application_name && argocdBaseURL && (
             <a
-              href={`/applications/${addon.argocd_application_name}`}
+              href={`${argocdBaseURL}/applications/${addon.argocd_application_name}`}
               target="_blank"
               rel="noopener noreferrer"
               onClick={(e) => e.stopPropagation()}
               className="text-gray-400 hover:text-cyan-600 dark:hover:text-cyan-400"
-              title="Open in ArgoCD"
+              title={`Open ${addon.argocd_application_name} in ArgoCD`}
             >
               <ExternalLink className="h-3.5 w-3.5" />
             </a>

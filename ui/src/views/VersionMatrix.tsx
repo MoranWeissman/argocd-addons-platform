@@ -6,7 +6,6 @@ import type { VersionMatrixResponse, VersionMatrixRow, VersionMatrixCell } from 
 import { LoadingState } from '@/components/LoadingState'
 import { ErrorState } from '@/components/ErrorState'
 
-type HealthFilter = 'all' | 'healthy' | 'issues' | 'not_deployed'
 type ViewMode = 'heatmap' | 'table' | 'cards'
 
 /* ------------------------------------------------------------------ */
@@ -51,15 +50,6 @@ function healthBg(health: string): string {
   }
 }
 
-function matchesHealth(row: VersionMatrixRow, filter: HealthFilter): boolean {
-  if (filter === 'all') return true
-  const activeCells = Object.values(row.cells).filter(c => c.health !== 'not_enabled')
-  if (filter === 'healthy') return activeCells.length > 0 && activeCells.every(c => c.health.toLowerCase() === 'healthy')
-  if (filter === 'issues') return activeCells.some(c => ['degraded', 'unknown'].includes(c.health.toLowerCase()))
-  if (filter === 'not_deployed') return activeCells.some(c => c.health.toLowerCase() === 'missing')
-  return true
-}
-
 /* ------------------------------------------------------------------ */
 /* Table view — proper matrix: addons × clusters                       */
 /* ------------------------------------------------------------------ */
@@ -98,11 +88,6 @@ function MatrixCell({ cell, cluster, addonName }: { cell: VersionMatrixCell | un
 
 /* Transposed matrix: clusters as rows, addons as columns */
 function MatrixTable({ addons, clusters }: { addons: VersionMatrixRow[]; clusters: string[] }) {
-  // Filter to addons that have at least one active cell
-  const activeAddons = addons.filter((row) =>
-    Object.values(row.cells).some((c) => c.health !== 'not_enabled'),
-  )
-
   return (
     <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
       <table className="w-full text-left text-sm">
@@ -111,7 +96,7 @@ function MatrixTable({ addons, clusters }: { addons: VersionMatrixRow[]; cluster
             <th className="sticky left-0 z-10 min-w-[200px] border-r border-gray-200 bg-gray-50 px-4 py-3 text-xs font-semibold uppercase text-gray-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400">
               Cluster
             </th>
-            {activeAddons.map((row) => (
+            {addons.map((row) => (
               <th
                 key={row.addon_name}
                 className="border-r border-gray-100 px-2 py-3 text-center dark:border-gray-700"
@@ -128,8 +113,7 @@ function MatrixTable({ addons, clusters }: { addons: VersionMatrixRow[]; cluster
         </thead>
         <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
           {clusters.map((cluster) => {
-            // Only show clusters that have at least one active addon
-            const hasActive = activeAddons.some((row) => {
+            const hasActive = addons.some((row) => {
               const cell = row.cells[cluster]
               return cell && cell.health !== 'not_enabled'
             })
@@ -142,7 +126,7 @@ function MatrixTable({ addons, clusters }: { addons: VersionMatrixRow[]; cluster
                     {cluster.replace(/-eks$/, '')}
                   </span>
                 </td>
-                {activeAddons.map((row) => (
+                {addons.map((row) => (
                   <MatrixCell
                     key={row.addon_name}
                     cell={row.cells[cluster]}
@@ -156,7 +140,7 @@ function MatrixTable({ addons, clusters }: { addons: VersionMatrixRow[]; cluster
           {clusters.length === 0 && (
             <tr>
               <td
-                colSpan={activeAddons.length + 1}
+                colSpan={addons.length + 1}
                 className="px-6 py-8 text-center text-gray-400 dark:text-gray-500"
               >
                 No addons match the current filters.
@@ -219,8 +203,6 @@ function AddonRow({ row, clusters }: { row: VersionMatrixRow; clusters: string[]
   const issueCount = activeCells.filter(e => !['healthy', 'not_enabled'].includes(e.cell.health.toLowerCase())).length
   const driftCount = activeCells.filter(e => e.cell.drift_from_catalog).length
 
-  if (activeCells.length === 0) return null
-
   return (
     <div className="rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800/50">
       <button
@@ -237,32 +219,43 @@ function AddonRow({ row, clusters }: { row: VersionMatrixRow; clusters: string[]
           <span className="ml-2 text-xs text-gray-400 dark:text-gray-500">v{row.catalog_version}</span>
         </div>
         <div className="flex items-center gap-3 text-xs">
-          <span className="flex items-center gap-1 text-gray-500 dark:text-gray-400">
-            <span className="inline-block h-2 w-2 rounded-full bg-green-500" />
-            {healthyCount}
-          </span>
-          {issueCount > 0 && (
-            <span className="flex items-center gap-1 text-red-600 dark:text-red-400">
-              <span className="inline-block h-2 w-2 rounded-full bg-red-500" />
-              {issueCount}
-            </span>
+          {activeCells.length === 0 ? (
+            <span className="text-gray-400 dark:text-gray-500">Not deployed</span>
+          ) : (
+            <>
+              <span className="flex items-center gap-1 text-gray-500 dark:text-gray-400">
+                <span className="inline-block h-2 w-2 rounded-full bg-green-500" />
+                {healthyCount}
+              </span>
+              {issueCount > 0 && (
+                <span className="flex items-center gap-1 text-red-600 dark:text-red-400">
+                  <span className="inline-block h-2 w-2 rounded-full bg-red-500" />
+                  {issueCount}
+                </span>
+              )}
+              {driftCount > 0 && (
+                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                  {driftCount} drift
+                </span>
+              )}
+              <span className="text-gray-400 dark:text-gray-500">
+                {activeCells.length} cluster{activeCells.length !== 1 ? 's' : ''}
+              </span>
+            </>
           )}
-          {driftCount > 0 && (
-            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-              {driftCount} drift
-            </span>
-          )}
-          <span className="text-gray-400 dark:text-gray-500">
-            {activeCells.length} cluster{activeCells.length !== 1 ? 's' : ''}
-          </span>
         </div>
       </button>
 
-      {expanded && (
+      {expanded && activeCells.length > 0 && (
         <div className="flex flex-wrap gap-2 border-t border-gray-100 px-4 py-3 dark:border-gray-700">
           {activeCells.map(({ cluster, cell }) => (
             <ClusterChip key={cluster} cluster={cluster} cell={cell} addonName={row.addon_name} />
           ))}
+        </div>
+      )}
+      {expanded && activeCells.length === 0 && (
+        <div className="border-t border-gray-100 px-4 py-2 text-xs text-gray-400 dark:border-gray-700 dark:text-gray-500">
+          Not deployed on any cluster
         </div>
       )}
     </div>
@@ -277,13 +270,9 @@ function HeatmapView({ addons, clusters }: { addons: VersionMatrixRow[]; cluster
   const navigate = useNavigate()
   const [expanded, setExpanded] = useState<string | null>(null)
 
-  const activeAddons = addons.filter((row) =>
-    Object.values(row.cells).some((c) => c.health !== 'not_enabled'),
-  )
-
   return (
     <div className="space-y-2">
-      {activeAddons.map((row) => {
+      {addons.map((row) => {
         const activeCells = clusters
           .map(c => ({ cluster: c, cell: row.cells[c] }))
           .filter(e => e.cell && e.cell.health !== 'not_enabled')
@@ -309,29 +298,35 @@ function HeatmapView({ addons, clusters }: { addons: VersionMatrixRow[]; cluster
               </div>
 
               {/* Dot grid */}
-              <div className="flex flex-wrap gap-1">
-                {activeCells.map(({ cluster, cell }) => (
-                  <div
-                    key={cluster}
-                    title={`${cluster}: ${cell.version} (${healthLabel(cell.health)})${cell.drift_from_catalog ? ' - DRIFT' : ''}`}
-                    className={`h-3.5 w-3.5 rounded-sm ${healthColor(cell.health)} ${cell.drift_from_catalog ? 'ring-2 ring-amber-400' : ''}`}
-                  />
-                ))}
-              </div>
+              {activeCells.length > 0 ? (
+                <div className="flex flex-wrap gap-1">
+                  {activeCells.map(({ cluster, cell }) => (
+                    <div
+                      key={cluster}
+                      title={`${cluster}: ${cell.version} (${healthLabel(cell.health)})${cell.drift_from_catalog ? ' - DRIFT' : ''}`}
+                      className={`h-3.5 w-3.5 rounded-sm ${healthColor(cell.health)} ${cell.drift_from_catalog ? 'ring-2 ring-amber-400' : ''}`}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <span className="text-xs text-gray-400 dark:text-gray-500">Not deployed anywhere</span>
+              )}
 
               {/* Summary badges */}
-              <div className="ml-auto flex shrink-0 items-center gap-2 text-[10px]">
-                <span className="text-gray-400">{healthyCount}/{activeCells.length}</span>
-                {driftCount > 0 && (
-                  <span className="rounded bg-amber-100 px-1.5 py-0.5 font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-                    {driftCount} drift
-                  </span>
-                )}
-              </div>
+              {activeCells.length > 0 && (
+                <div className="ml-auto flex shrink-0 items-center gap-2 text-[10px]">
+                  <span className="text-gray-400">{healthyCount}/{activeCells.length}</span>
+                  {driftCount > 0 && (
+                    <span className="rounded bg-amber-100 px-1.5 py-0.5 font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                      {driftCount} drift
+                    </span>
+                  )}
+                </div>
+              )}
             </button>
 
             {/* Expanded: cluster detail table */}
-            {isExpanded && (
+            {isExpanded && activeCells.length > 0 && (
               <div className="border-t border-gray-100 p-3 dark:border-gray-700">
                 <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
                   {activeCells.map(({ cluster, cell }) => (
@@ -359,10 +354,15 @@ function HeatmapView({ addons, clusters }: { addons: VersionMatrixRow[]; cluster
                 </div>
               </div>
             )}
+            {isExpanded && activeCells.length === 0 && (
+              <div className="border-t border-gray-100 px-4 py-2 text-xs text-gray-400 dark:border-gray-700 dark:text-gray-500">
+                Not deployed on any cluster
+              </div>
+            )}
           </div>
         )
       })}
-      {activeAddons.length === 0 && (
+      {addons.length === 0 && (
         <div className="rounded-lg border border-gray-200 bg-white p-8 text-center text-sm text-gray-500 dark:border-gray-700 dark:bg-gray-800">
           No addons match the current filters.
         </div>
@@ -380,7 +380,6 @@ export function VersionMatrix() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
-  const [healthFilter, setHealthFilter] = useState<HealthFilter>('all')
   const [showDriftOnly, setShowDriftOnly] = useState(false)
   const [viewMode, setViewMode] = useState<ViewMode>('heatmap')
 
@@ -398,14 +397,11 @@ export function VersionMatrix() {
   const filteredAddons = useMemo(() => {
     if (!data) return []
     return data.addons.filter(row => {
-      const hasActive = Object.values(row.cells).some(c => c.health !== 'not_enabled')
-      if (!hasActive) return false
       if (search && !row.addon_name.toLowerCase().includes(search.toLowerCase())) return false
-      if (!matchesHealth(row, healthFilter)) return false
       if (showDriftOnly && !Object.values(row.cells).some(c => c.drift_from_catalog)) return false
       return true
     })
-  }, [data, search, healthFilter, showDriftOnly])
+  }, [data, search, showDriftOnly])
 
   const totalDrifts = useMemo(() => {
     if (!data) return 0
@@ -413,16 +409,16 @@ export function VersionMatrix() {
       sum + Object.values(row.cells).filter(c => c.drift_from_catalog).length, 0)
   }, [data])
 
-  if (loading) return <LoadingState message="Loading version matrix..." />
+  if (loading) return <LoadingState message="Loading version drift detector..." />
   if (error) return <ErrorState message={error} onRetry={fetchData} />
   if (!data) return null
 
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Add-on Version Matrix</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Add-ons Version Drift Detector</h1>
         <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          Shows the deployed version and health of each add-on across all clusters. Click any add-on to see per-cluster details.
+          Identify version drift across your fleet — spot add-ons running a different version than the catalog baseline. Use the drift filter to focus on inconsistencies.
           {totalDrifts > 0 && (
             <span className="ml-2 rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
               {totalDrifts} version drift{totalDrifts !== 1 ? 's' : ''}
@@ -437,23 +433,16 @@ export function VersionMatrix() {
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
           <input
             type="text"
-            placeholder="Search addon by name..."
+            placeholder="Search add-on by name..."
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="w-56 rounded-lg border border-gray-300 py-2 pl-10 pr-3 text-sm focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:placeholder-gray-500"
           />
         </div>
-        <select value={healthFilter} onChange={e => setHealthFilter(e.target.value as HealthFilter)}
-          className="rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200">
-          <option value="all">All Health</option>
-          <option value="healthy">Healthy Only</option>
-          <option value="issues">Has Issues</option>
-          <option value="not_deployed">Not Deployed</option>
-        </select>
-        <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+        <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700 hover:bg-amber-100 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-400 dark:hover:bg-amber-900/30">
           <input type="checkbox" checked={showDriftOnly} onChange={e => setShowDriftOnly(e.target.checked)}
-            className="rounded border-gray-300 dark:border-gray-600" />
-          Version drift only
+            className="rounded border-amber-300 dark:border-amber-600" />
+          Drift only
         </label>
 
         {/* View mode toggle */}
@@ -497,14 +486,20 @@ export function VersionMatrix() {
 
       {/* Legend */}
       <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
-        <span className="font-medium">Legend:</span>
-        <span className="flex items-center gap-1.5"><span className="inline-block h-2.5 w-2.5 rounded-full bg-green-500" /> Healthy</span>
-        <span className="flex items-center gap-1.5"><span className="inline-block h-2.5 w-2.5 rounded-full bg-red-500" /> Degraded</span>
-        <span className="flex items-center gap-1.5"><span className="inline-block h-2.5 w-2.5 rounded-full bg-amber-500" /> Not Deployed</span>
-        <span className="flex items-center gap-1.5"><span className="inline-block h-2.5 w-2.5 rounded-full bg-gray-400" /> Unknown</span>
         <span className="flex items-center gap-1.5">
-          <span className="rounded border border-amber-300 bg-amber-50 px-1 text-[10px] dark:border-amber-700 dark:bg-amber-900/20">amber</span>
-          = version drift
+          <span className="inline-block h-2.5 w-2.5 rounded-full bg-green-500" /> Healthy
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block h-2.5 w-2.5 rounded-full bg-red-500" /> Degraded
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block h-2.5 w-2.5 rounded-full bg-amber-500" /> Not Deployed / Progressing
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block h-2.5 w-2.5 rounded-full bg-gray-400" /> Unknown
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block h-2.5 w-2.5 rounded-sm bg-amber-500 ring-2 ring-amber-400" /> Version drift from catalog
         </span>
       </div>
     </div>

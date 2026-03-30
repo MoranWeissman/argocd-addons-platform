@@ -11,7 +11,7 @@ import {
   Activity,
 } from 'lucide-react'
 import { api } from '@/services/api'
-import type { AddonCatalogItem } from '@/services/models'
+import type { AddonCatalogItem, ConnectionsListResponse } from '@/services/models'
 import { StatCard } from '@/components/StatCard'
 import { StatusBadge } from '@/components/StatusBadge'
 import { LoadingState } from '@/components/LoadingState'
@@ -48,6 +48,7 @@ export function AddonDetail() {
   const [error, setError] = useState<string | null>(null)
 
   const [valuesYaml, setValuesYaml] = useState<string | null>(null)
+  const [argocdBaseURL, setArgocdBaseURL] = useState<string>('')
 
   // Filter state
   const [search, setSearch] = useState('')
@@ -71,6 +72,16 @@ export function AddonDetail() {
       .catch(() => {
         // Values file may not exist for all addons — that's OK
       })
+
+    api
+      .getConnections()
+      .then((res: ConnectionsListResponse) => {
+        const active = res.connections.find(c => c.name === res.active_connection || c.is_active)
+        if (active?.argocd_server_url) {
+          setArgocdBaseURL(active.argocd_server_url.replace(/\/$/, ''))
+        }
+      })
+      .catch(() => {})
   }, [name])
 
   const enabledApps = useMemo(
@@ -415,10 +426,12 @@ export function AddonDetail() {
                           )}
                       </td>
                       <td className="px-4 py-3">
-                        {app.application_name ? (
+                        {app.application_name && argocdBaseURL ? (
                           <a
-                            href={`#argocd-${app.application_name}`}
-                            title={`View ${app.application_name} in ArgoCD`}
+                            href={`${argocdBaseURL}/applications/${app.application_name}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title={`Open ${app.application_name} in ArgoCD`}
                             className="text-gray-500 hover:text-cyan-600 dark:text-gray-400 dark:hover:text-cyan-400"
                           >
                             <ExternalLink className="h-4 w-4" />

@@ -472,7 +472,7 @@ export function AddonCatalog() {
       <div>
         <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Add-ons Catalog</h2>
         <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          All add-ons defined in your Git repository. See deployment count, health breakdown, and version per add-on. Click an add-on for per-cluster details.
+          All add-ons defined in your Git catalog. See deployment coverage, health, and version per add-on. <span className="font-medium text-amber-600 dark:text-amber-400">Catalog Only</span> means the add-on is defined in your catalog but not yet enabled on any cluster.
         </p>
       </div>
 
@@ -502,13 +502,13 @@ export function AddonCatalog() {
           selected={filterType === 'unhealthy'}
         />
         <StatCard
-          title="Not Deployed"
+          title="Catalog Only"
           value={catalogData.addons_only_in_git}
           icon={<AlertTriangle className="h-5 w-5" />}
           color="warning"
           onClick={() => handleStatFilter('git-only')}
           selected={filterType === 'git-only'}
-          subtitle="Enabled in Git but not found in ArgoCD"
+          subtitle="Defined in catalog, not deployed anywhere"
         />
       </div>
 
@@ -535,7 +535,7 @@ export function AddonCatalog() {
             <option value="all">All Addons</option>
             <option value="healthy">Healthy Only</option>
             <option value="unhealthy">Not Healthy</option>
-            <option value="git-only">Only in Git</option>
+            <option value="git-only">Catalog Only (not deployed)</option>
           </select>
         </div>
 

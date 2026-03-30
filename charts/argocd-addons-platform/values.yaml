@@ -40,6 +40,9 @@ config:
   # Adds a ClusterRole rule allowing AAP to fetch node count and status.
   # Requires cluster-level permissions — opt-in.
   nodeAccess: false
+  # Comma-separated list of environment keywords to extract from cluster names.
+  # e.g. "dev,qa,staging,prod" — cluster "nms-core-dev-eks" → env "dev"
+  environments: ""
 
 # ---------------------------------------------------------------------------
 # Secrets

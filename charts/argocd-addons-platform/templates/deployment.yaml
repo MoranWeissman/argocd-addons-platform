@@ -84,6 +84,10 @@ spec:
               value: {{ .Values.ai.maxIterations | quote }}
             {{- end }}
             {{- end }}
+            {{- if .Values.config.environments }}
+            - name: APP_ENVIRONMENTS
+              value: {{ .Values.config.environments | quote }}
+            {{- end }}
             {{- if .Values.gitops.actions.enabled }}
             - name: GITOPS_ACTIONS_ENABLED
               value: "true"
